@@ -1,4 +1,5 @@
-from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, Enum
+from sqlalchemy import String, Text, Integer, Boolean, UUID, Enum
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, TimestampMixin
 from typing import List
@@ -12,10 +13,10 @@ class LanguageEnum(enum.Enum):
 
 class Scenario(Base, TimestampMixin):
     __tablename__ = "scenarios"
-    __versioned__ = {} 
+    __versioned__ = {}
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)  
+    user_id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), nullable=False, index=True)
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
