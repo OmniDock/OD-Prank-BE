@@ -1,10 +1,10 @@
-from sqlalchemy import String, Text, Integer, Boolean, ForeignKey
+from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, TimestampMixin
 from typing import List
-from enum import Enum 
+import enum
 
-class LanguageEnum(Enum):
+class LanguageEnum(enum.Enum):
     ENGLISH = "en"
     GERMAN = "de"
 
@@ -33,4 +33,4 @@ class Scenario(Base, TimestampMixin):
     )
     
     def __repr__(self):
-        return f"<Scenario(id={self.id}, title='{self.title}', category='{self.category}')>"
+        return f"<Scenario(id={self.id}, title='{self.title}', language='{self.language.value}')>"

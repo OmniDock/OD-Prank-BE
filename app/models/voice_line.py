@@ -1,9 +1,9 @@
-from sqlalchemy import String, Text, Integer, Boolean, ForeignKey
+from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, Enum 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, TimestampMixin
-from enum import Enum 
+import enum 
 
-class VoiceLineTypeEnum(Enum):
+class VoiceLineTypeEnum(enum.Enum):
     OPENING = "opening"
     QUESTION = "question"
     RESPONSE = "response"
