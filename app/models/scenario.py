@@ -4,6 +4,7 @@ from .base import Base, TimestampMixin
 from typing import List
 import enum
 
+
 class LanguageEnum(enum.Enum):
     ENGLISH = "en"
     GERMAN = "de"
@@ -11,6 +12,7 @@ class LanguageEnum(enum.Enum):
 
 class Scenario(Base, TimestampMixin):
     __tablename__ = "scenarios"
+    __versioned__ = {} 
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)  
@@ -34,3 +36,4 @@ class Scenario(Base, TimestampMixin):
     
     def __repr__(self):
         return f"<Scenario(id={self.id}, title='{self.title}', language='{self.language.value}')>"
+
