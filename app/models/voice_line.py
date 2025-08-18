@@ -1,13 +1,8 @@
 from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, Enum 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, TimestampMixin
-import enum 
+from app.core.utils.enums import VoiceLineTypeEnum
 
-class VoiceLineTypeEnum(enum.Enum):
-    OPENING = "opening"
-    QUESTION = "question"
-    RESPONSE = "response"
-    CLOSING = "closing"
 
 class VoiceLine(Base, TimestampMixin):
     __tablename__ = "voice_lines"

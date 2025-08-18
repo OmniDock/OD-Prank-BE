@@ -3,12 +3,7 @@ from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, TimestampMixin
 from typing import List
-import enum
-
-
-class LanguageEnum(enum.Enum):
-    ENGLISH = "en"
-    GERMAN = "de"
+from app.core.utils.enums import LanguageEnum
 
 
 class Scenario(Base, TimestampMixin):
@@ -21,6 +16,7 @@ class Scenario(Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     language: Mapped[LanguageEnum] = mapped_column(Enum(LanguageEnum), nullable=False)
+    target_name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     is_safe: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_not_safe_reason: Mapped[str] = mapped_column(Text, nullable=True)
