@@ -1,0 +1,24 @@
+# Environment Variables 
+.env.*
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+*.orig.bak
+*.orig.backup
+*.orig.old
+
+# IDEs
+.claude
+.cursor
+.vscode
+
+# Python
+*/__pycache__
+
+# Node
+node_modules
