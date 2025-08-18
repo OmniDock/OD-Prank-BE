@@ -14,8 +14,6 @@ async_session_maker = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )
 
-class Base(DeclarativeBase):
-    pass
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
