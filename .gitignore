@@ -22,3 +22,8 @@
 
 # Node
 node_modules
+
+# Python Envir
+.venv/
+.env
+env
