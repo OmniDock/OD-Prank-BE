@@ -15,6 +15,18 @@ class VoiceLineGenerationResult(BaseModel):
     quality_score: float = Field(ge=0.0, le=1.0, description="Quality assessment of generated lines (0-1)")
     reasoning: str = Field(description="Brief explanation of the generation approach")
 
+# NOTE THIS JUST WORKS WITH V3 FROM ELEVENLABS (NOT OPEN FOR US ATM)
+# - Leverage ElevenLabs audio tags in square brackets for enhanced expression:
+#   * [laughter] - for laughing sounds
+#   * [sigh] - for sighing
+#   * [whisper] - for whispering effect
+#   * [excited] - for excited tone
+#   * [confused] - for confused tone
+#   * [pause] - for natural pauses
+#   * [cough] - for coughing sounds
+#   * [clearing throat] - for throat clearing
+#   * [breathing] - for breathing sounds
+#   * [mumbling] - for unclear speech
 
 class VoiceLineGenerator:
     """Handles voice line generation with structured output"""
@@ -36,17 +48,7 @@ class VoiceLineGenerator:
                 ELEVENLABS TTS FORMATTING GUIDELINES:
                 - Write text that sounds natural when spoken by AI
                 - Use minimal punctuation for better flow
-                - Leverage ElevenLabs audio tags in square brackets for enhanced expression:
-                  * [laughter] - for laughing sounds
-                  * [sigh] - for sighing
-                  * [whisper] - for whispering effect
-                  * [excited] - for excited tone
-                  * [confused] - for confused tone
-                  * [pause] - for natural pauses
-                  * [cough] - for coughing sounds
-                  * [clearing throat] - for throat clearing
-                  * [breathing] - for breathing sounds
-                  * [mumbling] - for unclear speech
+
                 - Avoid complex punctuation, special characters, or formatting
                 - Write numbers as words (e.g., "twenty-three" not "23")
                 - Use natural speech patterns and contractions

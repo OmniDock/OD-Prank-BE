@@ -13,6 +13,19 @@ class IndividualVoiceLineEnhancementResult(BaseModel):
     quality_score: float = Field(ge=0.0, le=1.0, description="Quality assessment of enhancement (0-1)")
     reasoning: str = Field(description="Brief explanation of the enhancement approach")
 
+# NOTE THIS JUST WORKS WITH V3 FROM ELEVENLABS (NOT OPEN FOR US ATM)
+# - Leverage ElevenLabs audio tags in square brackets for enhanced expression:
+#   * [laughter] - for laughing sounds
+#   * [sigh] - for sighing
+#   * [whisper] - for whispering effect
+#   * [excited] - for excited tone
+#   * [confused] - for confused tone
+#   * [pause] - for natural pauses
+#   * [cough] - for coughing sounds
+#   * [clearing throat] - for throat clearing
+#   * [breathing] - for breathing sounds
+#   * [mumbling] - for unclear speech
+
 
 class IndividualVoiceLineEnhancer:
     """Handles individual voice line enhancement with user feedback"""
@@ -34,13 +47,6 @@ class IndividualVoiceLineEnhancer:
             ELEVENLABS TTS FORMATTING GUIDELINES:
             - Write text that sounds natural when spoken by AI
             - Use minimal punctuation for better flow
-            - Leverage ElevenLabs audio tags in square brackets for enhanced expression:
-            * [laughter] - for laughing sounds
-            * [sigh] - for sighing
-            * [whisper] - for whispering effect
-            * [excited] - for excited tone
-            * [confused] - for confused tone
-            * [pause] - for natural pauses
             - Write numbers as words (e.g., "twenty-three" not "23")
             - Use natural speech patterns and contractions
 
