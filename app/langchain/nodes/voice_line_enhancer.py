@@ -138,7 +138,9 @@ Your enhanced voice lines should feel like natural improvements that the origina
             3. Improve naturalness and TTS delivery
             4. Preserve the cultural and linguistic context
             5. Keep the core intent while improving execution
+            6. Return ONLY the enhanced spoken text without quotation marks or formatting
             
+            IMPORTANT: Generate only clean spoken dialogue without quotes, brackets, or formatting!
             The enhanced voice line should sound like something {persona_name} would naturally say, just better.
             """)
         ])
@@ -161,4 +163,12 @@ Your enhanced voice lines should feel like natural improvements that the origina
         
         console_logger.info(f"Enhanced voice line for {scenario_analysis.persona_name} with quality score: {result.quality_score}")
         
-        return result
+        # Clean up any quotation marks that might have slipped through
+        cleaned_text = result.enhanced_text.strip('"\'')
+        
+        return IndividualVoiceLineEnhancementResult(
+            enhanced_text=cleaned_text,
+            quality_score=result.quality_score,
+            reasoning=result.reasoning,
+            persona_consistency=result.persona_consistency
+        )

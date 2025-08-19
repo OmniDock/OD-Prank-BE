@@ -80,6 +80,7 @@ class VoiceLineGenerator:
                                  scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
         """Generate voice lines with shared scenario analysis"""
         console_logger.info(f"Generating {count} {voice_line_type.value} voice lines using shared persona analysis")
+        console_logger.info(f"Voice line type: {voice_line_type.value}, Persona: {scenario_analysis.persona_name if scenario_analysis else 'None'}")
         
         # Use provided scenario analysis
         if not scenario_analysis:
@@ -97,12 +98,22 @@ class VoiceLineGenerator:
             ("user", """
             Generate {count} {voice_line_type} voice lines for this prank scenario.
             
+            CRITICAL: These are {voice_line_type} voice lines - NOT opening lines!
+            - OPENING: First contact, introduce yourself and purpose
+            - QUESTION: Ask follow-up questions during ongoing conversation  
+            - RESPONSE: React to target's questions/objections in mid-conversation
+            - CLOSING: End the call, wrap up the conversation
+            
+            IMPORTANT: Generate ONLY the spoken text without quotation marks or any formatting!
+            
             Use the persona analysis and context provided to create natural, engaging dialogue that:
             1. Maintains character consistency
             2. Sounds completely natural when spoken
             3. Fits the cultural and linguistic context
             4. Follows the escalation strategy outlined
             5. Incorporates the character's speech patterns and quirks
+            6. MATCHES THE SPECIFIC {voice_line_type} CONTEXT - not a fresh introduction!
+            7. NO quotation marks, brackets, or formatting - just pure spoken dialogue!
             
             SCENARIO DETAILS:
             Title: {title}
@@ -111,6 +122,8 @@ class VoiceLineGenerator:
             Language: {language}
             
             Remember: You are {persona_name} from {company_service}. Stay in character!
+            Generate {voice_line_type} lines that fit naturally in the middle of an ongoing conversation!
+            Return only clean spoken text without any quotation marks or formatting!
             """)
         ])
         
@@ -128,8 +141,11 @@ class VoiceLineGenerator:
             "company_service": scenario_analysis.company_service
         })
         
+        # Clean up any quotation marks that might have slipped through
+        cleaned_voice_lines = [line.strip('"\'') for line in result.voice_lines]
+        
         # Trim to requested count
-        sorted_result = self._trim_to_count(result.voice_lines, count)
+        sorted_result = self._trim_to_count(cleaned_voice_lines, count)
         
         console_logger.info(f"Generated {len(sorted_result)} voice lines for {scenario_analysis.persona_name}")
         
