@@ -1,7 +1,8 @@
 from langgraph.graph import StateGraph, END, START
 from app.core.logging import console_logger
-from app.langchain.nodes.voice_line_enhancer import IndividualVoiceLineEnhancer
+from app.langchain.nodes.voice_line_enhancer import  VoiceLineEnhancer
 from app.langchain.nodes.scenario_safety import ScenarioSafetyChecker
+from app.langchain.nodes.scenario_analyzer import ScenarioAnalyzer
 from .state import IndividualVoiceLineEnhancementState
 
 
@@ -9,8 +10,9 @@ class IndividualVoiceLineEnhancementProcessor:
     """Minimal LangGraph processor for individual voice line enhancement with user feedback"""
 
     def __init__(self):
-        self.enhancer = IndividualVoiceLineEnhancer()
+        self.enhancer = VoiceLineEnhancer()
         self.safety_checker = ScenarioSafetyChecker()
+        self.scenario_analyzer = ScenarioAnalyzer()
         self.workflow = self._build_workflow()
 
     def _build_workflow(self) -> StateGraph:

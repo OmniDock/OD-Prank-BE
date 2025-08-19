@@ -1,10 +1,15 @@
-# OD-Prank-BE/app/langchain/nodes/individual_voice_line_enhancer.py
+# OD-Prank-BE/app/langchain/nodes/voice_line_enhancer_v2.py
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
+
 from app.schemas.scenario import ScenarioCreateRequest
 from app.core.utils.enums import VoiceLineTypeEnum
 from app.core.logging import console_logger
+
+# Import the new prompt structure
+from app.langchain.prompts.base_prompts import BASE_SYSTEM_PROMPT, get_language_specific_context, get_emotional_state_context
+from app.langchain.nodes.scenario_analyzer import ScenarioAnalyzer, PersonaContextBuilder, ScenarioAnalysisResult
 
 
 class IndividualVoiceLineEnhancementResult(BaseModel):
@@ -12,144 +17,148 @@ class IndividualVoiceLineEnhancementResult(BaseModel):
     enhanced_text: str = Field(description="Enhanced voice line based on user feedback")
     quality_score: float = Field(ge=0.0, le=1.0, description="Quality assessment of enhancement (0-1)")
     reasoning: str = Field(description="Brief explanation of the enhancement approach")
-
-# NOTE THIS JUST WORKS WITH V3 FROM ELEVENLABS (NOT OPEN FOR US ATM)
-# - Leverage ElevenLabs audio tags in square brackets for enhanced expression:
-#   * [laughter] - for laughing sounds
-#   * [sigh] - for sighing
-#   * [whisper] - for whispering effect
-#   * [excited] - for excited tone
-#   * [confused] - for confused tone
-#   * [pause] - for natural pauses
-#   * [cough] - for coughing sounds
-#   * [clearing throat] - for throat clearing
-#   * [breathing] - for breathing sounds
-#   * [mumbling] - for unclear speech
+    persona_consistency: float = Field(ge=0.0, le=1.0, description="How well the enhancement maintains persona consistency (0-1)")
 
 
-class IndividualVoiceLineEnhancer:
-    """Handles individual voice line enhancement with user feedback"""
+class VoiceLineEnhancer:
+    """Enhanced voice line enhancer with dynamic persona analysis and context awareness"""
     
     def __init__(self, model_name: str = "gpt-4o"):
         self.model_name = model_name
-        self.llm = ChatOpenAI(model=model_name, temperature=0.6).with_structured_output(IndividualVoiceLineEnhancementResult)
         
-        self.base_system_prompt = """
-            You are an expert prank call script writer specializing in enhancing voice lines based on user feedback.
+        self.enhancement_system_prompt = """
+VOICE LINE ENHANCEMENT SPECIALIST
 
-            Your role is to improve voice lines for prank call scenarios that are:
-            - Entertaining and engaging
-            - Contextually appropriate for the scenario
-            - Natural and conversational
-            - Safe and respectful (no harmful content)
-            - Optimized for ElevenLabs Text-to-Speech API
+You are an expert at enhancing prank call voice lines based on user feedback while maintaining character authenticity and natural speech patterns.
 
-            ELEVENLABS TTS FORMATTING GUIDELINES:
-            - Write text that sounds natural when spoken by AI
-            - Use SSML tags for precise speech control:
-            * <break time="0.5s" /> for short pauses
-            * <break time="1.0s" /> for medium pauses  
-            * <break time="2.0s" /> for longer dramatic pauses (max 3s)
-            * <phoneme alphabet="cmu-arpabet" ph="pronunciation">word</phoneme> for difficult words
-            - Write numbers as words (e.g., "twenty-three" not "23")
-            - Write abbreviations as full words (e.g., "Doctor" not "Dr.")
-            - Use natural speech patterns and contractions
-            - Keep sentences under 20 words for optimal clarity
+ENHANCEMENT PRINCIPLES:
+1. MAINTAIN PERSONA CONSISTENCY: Keep the character's established voice, quirks, and background
+2. INCORPORATE FEEDBACK THOUGHTFULLY: Address user requests while preserving believability
+3. ENHANCE NATURALNESS: Make speech more human-like and conversational
+4. PRESERVE CULTURAL CONTEXT: Maintain language-appropriate formality and references
+5. IMPROVE TTS OPTIMIZATION: Enhance for better speech synthesis delivery
 
-            SPEECH FLOW AND PUNCTUATION:
-            - Use commas for natural breathing points
-            - Use ellipses (...) for hesitation: "Well... I suppose"
-            - Use em-dashes (—) for interruptions: "I was thinking — wait, what?"
-            - Use periods for complete stops and natural sentence endings
-            - Use question marks and exclamation points for appropriate intonation
-            - Break complex ideas into multiple short sentences
-            - Each voice line should flow naturally when read aloud
+ENHANCEMENT STRATEGIES:
 
-            EMOTIONAL EXPRESSION THROUGH TEXT:
-            - Use capitalization sparingly for emphasis: "That's INCREDIBLE!"
-            - Repeat letters for drawn-out sounds: "Sooooo weird"
-            - Include natural speech fillers: "you know", "like", "well" (sparingly)
-            - Use onomatopoeia when appropriate: "Hmm", "Uh-huh", "Oh my!"
-            - Match emotional tone to scenario context
-            - Vary sentence length: short for excitement, longer for explanation
+FEEDBACK INTEGRATION:
+- Analyze user feedback for specific improvement requests
+- Balance requested changes with character consistency
+- Enhance without breaking the established persona
+- Maintain the original intent while improving execution
 
-            ENHANCEMENT GUIDELINES:
-            - Carefully consider the user's feedback
-            - Maintain the original intent while incorporating improvements
-            - Keep the voice line natural and believable for voice synthesis
-            - Match the scenario's tone and context
-            - Ensure the enhancement addresses the specific feedback provided
-            - If the user feedback is not appropriate, create a new appropriate voice line
-            - Test readability: the text should sound natural when read aloud
-            - Optimize for the target audience and scenario context
+NATURALNESS IMPROVEMENTS:
+- Add realistic speech hesitations and corrections
+- Include character-appropriate emotional reactions
+- Enhance conversational flow and pacing
+- Improve speech patterns for TTS delivery
 
-            TONE AND TEXT STYLE: 
-            You are a text generator for speech synthesis. Always write sentences that sound natural when read aloud. 
-            Use proper punctuation, short sentences, and natural pauses. Avoid run-ons. Break up long ideas into multiple lines or sentences. 
-            Where a pause is needed, use SSML break tags, commas, dashes (—), or ellipses (…). 
-            Keep paragraphs short. Write in a style that reflects spoken language, not formal writing.
-            Consider the emotional context and use text formatting to guide the TTS engine's emotional expression.
-        """
+PERSONA PRESERVATION:
+- Keep character name, background, and company consistent
+- Maintain established speech patterns and quirks
+- Preserve emotional state and motivations
+- Ensure cultural and linguistic consistency
 
-    async def enhance_voice_line(self, scenario_data: ScenarioCreateRequest, voice_line_type: VoiceLineTypeEnum, 
-                                original_text: str, user_feedback: str) -> IndividualVoiceLineEnhancementResult:
-        """Enhance a single voice line based on user feedback"""
-        console_logger.info(f"Enhancing {voice_line_type.value} voice line with feedback")
+QUALITY ENHANCEMENT:
+- Improve clarity and engagement
+- Enhance humor while maintaining believability
+- Optimize for natural speech synthesis
+- Strengthen scenario credibility
+
+Your enhanced voice lines should feel like natural improvements that the original character would actually say, not completely different content.
+"""
+    
+
+    
+    def _build_enhancement_system_prompt(self, scenario_data: ScenarioCreateRequest,
+                                       voice_line_type: VoiceLineTypeEnum,
+                                       scenario_analysis: ScenarioAnalysisResult) -> str:
+        """Build complete enhancement system prompt"""
         
-        # Create type-specific enhancement prompt
-        type_specific_context = self._get_type_specific_context(voice_line_type)
+        # Base enhancement prompt
+        complete_prompt = self.enhancement_system_prompt
         
+        # Add base speech naturalness techniques
+        complete_prompt += "\n\n" + BASE_SYSTEM_PROMPT
+        
+        # Add language-specific context
+        complete_prompt += "\n\n" + get_language_specific_context(scenario_data.language)
+        
+        # Add emotional state context
+        complete_prompt += "\n\n" + get_emotional_state_context(voice_line_type.value)
+        
+        # Add dynamic persona context
+        persona_context = PersonaContextBuilder.build_enhanced_context(scenario_analysis, voice_line_type.value)
+        complete_prompt += "\n\n" + persona_context
+        
+        return complete_prompt
+    
+    async def enhance_voice_line(self, scenario_data: ScenarioCreateRequest, 
+                               voice_line_type: VoiceLineTypeEnum,
+                               original_text: str, 
+                               user_feedback: str,
+                               scenario_analysis: ScenarioAnalysisResult) -> IndividualVoiceLineEnhancementResult:
+        """Enhance a single voice line based on user feedback with persona consistency"""
+        console_logger.info(f"Enhancing {voice_line_type.value} voice line with shared persona analysis")
+        
+        # Use provided scenario analysis
+        if not scenario_analysis:
+            raise ValueError("Scenario analysis is required for voice line enhancement")
+        
+        # Build complete system prompt
+        system_prompt = self._build_enhancement_system_prompt(scenario_data, voice_line_type, scenario_analysis)
+        
+        # Create LLM with structured output
+        llm = ChatOpenAI(model=self.model_name, temperature=0.6).with_structured_output(IndividualVoiceLineEnhancementResult)
+        
+        # Create enhancement prompt
         enhancement_prompt = ChatPromptTemplate.from_messages([
-            ("system", self.base_system_prompt + f"\n\n{type_specific_context}"),
+            ("system", system_prompt),
             ("user", """
-            Your task is to enhance the original voice line based on the user feedback provided.
-
-            SCENARIO DETAILS:
+            Enhance this voice line based on the user feedback while maintaining persona consistency.
+            
+            SCENARIO CONTEXT:
             Title: {title}
             Description: {description}
             Target Name: {target_name}
             Language: {language}
             Voice Line Type: {voice_line_type}
-
-            ORIGINAL VOICE LINE: {original_text}
-            USER FEEDBACK: {user_feedback}
-
-            Please enhance the voice line to address the feedback while maintaining quality and appropriateness.
+            
+            CHARACTER CONTEXT:
+            You are enhancing dialogue for: {persona_name}
+            From company/service: {company_service}
+            Character background: {persona_background}
+            
+            ENHANCEMENT TASK:
+            Original Voice Line: "{original_text}"
+            User Feedback: "{user_feedback}"
+            
+            Please enhance the voice line to:
+            1. Address the specific feedback provided
+            2. Maintain {persona_name}'s character consistency
+            3. Improve naturalness and TTS delivery
+            4. Preserve the cultural and linguistic context
+            5. Keep the core intent while improving execution
+            
+            The enhanced voice line should sound like something {persona_name} would naturally say, just better.
             """)
         ])
-
-        chain = enhancement_prompt | self.llm
+        
+        # Execute enhancement
+        chain = enhancement_prompt | llm
         
         result = await chain.ainvoke({
             "title": scenario_data.title,
             "description": scenario_data.description,
             "target_name": scenario_data.target_name,
-            "language": scenario_data.language,
+            "language": scenario_data.language.value if hasattr(scenario_data.language, 'value') else str(scenario_data.language),
             "voice_line_type": voice_line_type.value,
             "original_text": original_text,
-            "user_feedback": user_feedback
+            "user_feedback": user_feedback,
+            "persona_name": scenario_analysis.persona_name,
+            "company_service": scenario_analysis.company_service,
+            "persona_background": scenario_analysis.persona_background
         })
-
+        
+        console_logger.info(f"Enhanced voice line for {scenario_analysis.persona_name} with quality score: {result.quality_score}")
+        
         return result
-    
-    def _get_type_specific_context(self, voice_line_type: VoiceLineTypeEnum) -> str:
-        """Get type-specific context for enhancement"""
-        contexts = {
-            VoiceLineTypeEnum.OPENING: """
-            OPENING VOICE LINES: These are introductory statements that establish the scenario.
-            They should be engaging and set the tone for the conversation.
-            """,
-            VoiceLineTypeEnum.QUESTION: """
-            QUESTION VOICE LINES: These are questions that drive the conversation forward.
-            They can be contextual or surprisingly off-topic for comedic effect.
-            """,
-            VoiceLineTypeEnum.RESPONSE: """
-            RESPONSE VOICE LINES: These are answers to potential questions from the target.
-            They should be plausible yet potentially confusing or humorous.
-            """,
-            VoiceLineTypeEnum.CLOSING: """
-            CLOSING VOICE LINES: These conclude the conversation.
-            They should provide a satisfying or amusing end to the interaction.
-            """
-        }
-        return contexts.get(voice_line_type, "")

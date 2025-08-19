@@ -9,6 +9,7 @@ from app.schemas.scenario import ScenarioCreateRequest
 # Nodes 
 from app.langchain.nodes.scenario_safety import ScenarioSafetyChecker
 from app.langchain.nodes.voice_line_generator import VoiceLineGenerator
+from app.langchain.nodes.scenario_analyzer import ScenarioAnalyzer, ScenarioAnalysisResult
 
 # State
 from .state import ScenarioProcessorState, VoiceLineState
@@ -20,6 +21,7 @@ class InitialScenarioProcessor:
         self.target_counts = target_counts
         # Node Classes 
         self.scenario_safety = ScenarioSafetyChecker()
+        self.scenario_analyzer = ScenarioAnalyzer()
         self.voice_line_generator = VoiceLineGenerator()
         self.workflow = self._build_workflow()
     
@@ -42,6 +44,7 @@ class InitialScenarioProcessor:
         
         # Add nodes
         workflow.add_node("initial_safety", self._initial_safety_node)
+        workflow.add_node("scenario_analysis", self._scenario_analysis_node)
 
         workflow.add_node("initial_safety_router", self._initial_safety_router)
         workflow.add_node("voice_line_generation_parallel_node", self._voice_line_generation_parallel_node)
@@ -63,10 +66,13 @@ class InitialScenarioProcessor:
             "initial_safety",
             self._initial_safety_router,
             {
-                "continue": "voice_line_generation_parallel_node",
+                "continue": "scenario_analysis",
                 "end": END
             }
         )
+        
+        # Scenario analysis flows to voice line generation
+        workflow.add_edge("scenario_analysis", "voice_line_generation_parallel_node")
 
         workflow.add_edge("voice_line_generation_parallel_node", "generate_opening")
         workflow.add_edge("voice_line_generation_parallel_node", "generate_question")
@@ -115,11 +121,27 @@ class InitialScenarioProcessor:
     async def _initial_safety_router(self, state: ScenarioProcessorState) -> str:
         """Route based on safety assessment"""
         if state.initial_safety_passed:
-            console_logger.info("Safety check passed, proceeding with voice line generation")
+            console_logger.info("Safety check passed, proceeding with scenario analysis")
             return "continue"
         else:
             console_logger.warning(f"Safety check failed: {state.initial_safety_issues}")
             return "end"
+    
+    async def _scenario_analysis_node(self, state: ScenarioProcessorState) -> ScenarioProcessorState:
+        """Perform scenario analysis and generate persona context"""
+        try:
+            console_logger.info("Performing scenario analysis")
+            analysis_result = await self.scenario_analyzer.analyze_scenario(state.scenario_data)
+            
+            return {
+                "scenario_analysis": analysis_result
+            }
+        except Exception as e:
+            console_logger.error(f"Scenario analysis failed: {str(e)}")
+            # Return empty analysis - nodes should handle gracefully
+            return {
+                "scenario_analysis": None
+            }
         
     async def _voice_line_generation_parallel_node(self, state: ScenarioProcessorState) -> str:
         """Route based on voice line generation"""
@@ -132,7 +154,8 @@ class InitialScenarioProcessor:
             count = state.target_counts.get(VoiceLineTypeEnum.OPENING.value)
             result = await self.voice_line_generator.generate_opening_voice_lines(
                 state.scenario_data, 
-                count
+                count,
+                state.scenario_analysis
             )
             
             # Convert to VoiceLineState objects - return them, don't append
@@ -163,7 +186,8 @@ class InitialScenarioProcessor:
             count = state.target_counts.get(VoiceLineTypeEnum.QUESTION.value)
             result = await self.voice_line_generator.generate_question_voice_lines(
                 state.scenario_data, 
-                count
+                count,
+                state.scenario_analysis
             )
             
             # Convert to VoiceLineState objects - return them, don't append
@@ -193,7 +217,8 @@ class InitialScenarioProcessor:
             count = state.target_counts.get(VoiceLineTypeEnum.RESPONSE.value)
             result = await self.voice_line_generator.generate_response_voice_lines(
                 state.scenario_data, 
-                count
+                count,
+                state.scenario_analysis
             )
             
             # Convert to VoiceLineState objects - return them, don't append
@@ -223,7 +248,8 @@ class InitialScenarioProcessor:
             count = state.target_counts.get(VoiceLineTypeEnum.CLOSING.value)
             result = await self.voice_line_generator.generate_closing_voice_lines(
                 state.scenario_data, 
-                count
+                count,
+                state.scenario_analysis
             )
             
             # Convert to VoiceLineState objects - return them, don't append
