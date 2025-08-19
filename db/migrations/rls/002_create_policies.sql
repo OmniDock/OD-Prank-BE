@@ -15,3 +15,4 @@ CREATE POLICY "users_manage_own_voice_lines" ON voice_lines
         WHERE scenarios.id = voice_lines.scenario_id 
         AND scenarios.user_id = auth.uid()
     ));
+

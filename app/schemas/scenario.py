@@ -25,7 +25,7 @@ class ScenarioCreateRequest(BaseModel):
 
     class Config:
         use_enum_values = True
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "title": "Pizza Delivery Prank",
                 "description": "A funny prank call pretending to be a pizza delivery service",
