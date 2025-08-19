@@ -1,6 +1,3 @@
-
-
-
 from typing import Dict
 from langgraph.graph import StateGraph, END, START
 from app.core.logging import console_logger
@@ -253,8 +250,6 @@ class InitialScenarioProcessor:
     async def _collect_results_node(self, state: ScenarioProcessorState) -> ScenarioProcessorState:
         """Collect and finalize results from parallel voice line generation"""
         console_logger.info("Collecting voice line generation results")
-        
-        # Mark processing as complete
         return {
             "processing_complete": True
         }
