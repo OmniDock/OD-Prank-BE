@@ -52,9 +52,10 @@ class TTSService:
                 text=text,
                 voice_id=selected_voice_id,
                 voice_settings=VoiceSettings(
-                    stability=0.71,        
-                    similarity_boost=0.5,  
-                    style=0.0,            
+                    stability=0.50,        
+                    similarity_boost=0.75,  
+                    style=0.0,
+                    speed=1.15,
                     use_speaker_boost=True 
                 ),
                 model_id=model.value
