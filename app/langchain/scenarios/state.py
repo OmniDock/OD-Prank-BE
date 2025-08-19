@@ -76,3 +76,28 @@ class ScenarioProcessorState(BaseModel):
         """Pydantic configuration"""
         arbitrary_types_allowed = True  
         use_enum_values = True  
+
+
+
+
+class IndividualVoiceLineEnhancementState(BaseModel):
+    """State object for individual voice line enhancement with user feedback"""
+    # Input data
+    voice_line_id: int
+    original_text: str
+    user_feedback: str
+    scenario_data: ScenarioCreateRequest
+    voice_line_type: VoiceLineTypeEnum
+    
+    # Processing results
+    enhanced_text: str = ""
+    safety_passed: bool = False
+    safety_issues: Annotated[List[str], add] = Field(default_factory=list)
+    enhancement_attempt: int = 0
+    processing_complete: bool = False
+    
+    class Config:
+        """Pydantic configuration"""
+        arbitrary_types_allowed = True
+        use_enum_values = True
+

@@ -80,3 +80,28 @@ class ScenarioRepository:
     async def rollback(self):
         """Rollback the current transaction"""
         await self.db_session.rollback()
+
+    async def update_voice_line_text(self, voice_line_id: int, new_text: str, user_id: str) -> Optional[VoiceLine]:
+        """Update the text of a specific voice line (with RLS check)"""
+        console_logger.info(f"Updating voice line {voice_line_id} for user {user_id}")
+        
+        # First, get the voice line with RLS check through scenario
+        query = (
+            select(VoiceLine)
+            .join(Scenario)
+            .where(VoiceLine.id == voice_line_id)
+            .where(Scenario.user_id == user_id)  # RLS protection
+        )
+        
+        result = await self.db_session.execute(query)
+        voice_line = result.scalar_one_or_none()
+        
+        if voice_line:
+            voice_line.text = new_text
+            await self.db_session.flush()
+            await self.db_session.refresh(voice_line)
+            console_logger.info(f"Updated voice line {voice_line_id}")
+            return voice_line
+        else:
+            console_logger.warning(f"Voice line {voice_line_id} not found or access denied for user {user_id}")
+            return None

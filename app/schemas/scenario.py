@@ -79,3 +79,39 @@ class ScenarioCreateResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+
+class VoiceLineEnhancementRequest(BaseModel):
+    """Schema for voice line enhancement request"""
+    voice_line_ids: List[int] = Field(..., min_items=1, max_items=50, description="List of voice line IDs to enhance")
+    user_feedback: str = Field(..., min_length=1, max_length=2000, description="User feedback for enhancement")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "voice_line_ids": [1, 2, 3],
+                "user_feedback": "Make them funnier and add more pauses"
+            }
+        }
+
+
+class VoiceLineEnhancementResult(BaseModel):
+    """Schema for individual voice line enhancement result"""
+    voice_line_id: int
+    original_text: str
+    enhanced_text: Optional[str] = None
+    error: Optional[str] = None
+    safety_passed: bool
+    safety_issues: List[str] = []
+
+
+class VoiceLineEnhancementResponse(BaseModel):
+    """Schema for voice line enhancement response"""
+    success: bool
+    total_processed: int
+    successful_count: int
+    failed_count: int
+    successful_enhancements: List[VoiceLineEnhancementResult] = []
+    failed_enhancements: List[VoiceLineEnhancementResult] = []
+    user_feedback: str

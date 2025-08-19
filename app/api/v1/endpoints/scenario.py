@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.auth import get_current_user, AuthUser
-from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse
+from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, VoiceLineEnhancementRequest, VoiceLineEnhancementResponse
 from fastapi import Body
 from app.services.scenario_service import ScenarioService
 from app.core.database import AsyncSession, get_db_session
@@ -53,3 +53,24 @@ async def get_user_scenarios(
         return await scenario_service.get_user_scenarios(user, limit, offset)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get scenarios: {str(e)}")
+    
+
+
+
+@router.post("/voice-lines/enhance", response_model=VoiceLineEnhancementResponse)
+async def enhance_voice_lines(
+    request: VoiceLineEnhancementRequest = Body(...),
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> VoiceLineEnhancementResponse:
+    """Enhance multiple voice lines with user feedback"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        result = await scenario_service.enhance_voice_lines_with_feedback(
+            user, request.voice_line_ids, request.user_feedback
+        )
+        return VoiceLineEnhancementResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to enhance voice lines: {str(e)}")
