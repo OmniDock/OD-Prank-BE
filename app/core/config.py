@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = Field(default="")
     SUPABASE_JWT_SECRET: str = Field(default="your-super-secret-jwt-token-with-at-least-32-characters-long")
     
+    STORAGE_BUCKET_VOICE_LINES: str = Field(default="voice-lines")
+    
     # Database
     DATABASE_URL: str = Field(default="postgresql://postgres:password@localhost:5432/your_db")
     

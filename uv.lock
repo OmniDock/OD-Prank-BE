@@ -237,6 +237,23 @@ wheels = [
 ]
 
 [[package]]
+name = "elevenlabs"
+version = "2.10.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pydantic-core" },
+    { name = "requests" },
+    { name = "typing-extensions" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a0/43/1fc747d2e3ec4c27acb5bc178a384e9d703196f0bf28401f6532956f8ee1/elevenlabs-2.10.0.tar.gz", hash = "sha256:16460b51333f0c99c6f6df05ffe54d39d03a82cafe4836b6dc92801b78ea08ae", size = 284840 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b2/c6/558972f79a72f7cd8f90ed7182da205d7006f3b9e35eeda7bf0328cd7023/elevenlabs-2.10.0-py3-none-any.whl", hash = "sha256:21af6848ebf202514ca93a9a5bc101c64ab2f5112a3c479e596c969d86dbe726", size = 820119 },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.116.1"
 source = { registry = "https://pypi.org/simple" }
@@ -597,6 +614,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
+    { name = "elevenlabs" },
     { name = "fastapi" },
     { name = "greenlet" },
     { name = "langchain-core" },
@@ -616,6 +634,7 @@ dependencies = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.16.4" },
     { name = "asyncpg", specifier = ">=0.30.0" },
+    { name = "elevenlabs", specifier = ">=2.10.0" },
     { name = "fastapi", specifier = ">=0.116.1" },
     { name = "greenlet", specifier = ">=3.2.4" },
     { name = "langchain-core", specifier = ">=0.3.74" },

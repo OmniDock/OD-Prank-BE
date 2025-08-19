@@ -105,3 +105,76 @@ class ScenarioRepository:
         else:
             console_logger.warning(f"Voice line {voice_line_id} not found or access denied for user {user_id}")
             return None
+
+    async def get_voice_line_by_id_with_user_check(self, voice_line_id: int, user_id: str) -> Optional[VoiceLine]:
+        """Get a voice line by ID with RLS check through scenario"""
+        console_logger.info(f"Getting voice line {voice_line_id} for user {user_id}")
+        
+        query = (
+            select(VoiceLine)
+            .join(Scenario)
+            .where(VoiceLine.id == voice_line_id)
+            .where(Scenario.user_id == user_id)  # RLS protection
+        )
+        
+        result = await self.db_session.execute(query)
+        voice_line = result.scalar_one_or_none()
+        
+        if voice_line:
+            console_logger.info(f"Found voice line {voice_line_id}")
+        else:
+            console_logger.warning(f"Voice line {voice_line_id} not found or access denied for user {user_id}")
+        
+        return voice_line
+
+    async def get_voice_lines_by_ids_with_user_check(self, voice_line_ids: List[int], user_id: str) -> List[VoiceLine]:
+        """Get multiple voice lines by IDs with RLS check through scenario"""
+        console_logger.info(f"Getting voice lines {voice_line_ids} for user {user_id}")
+        
+        query = (
+            select(VoiceLine)
+            .join(Scenario)
+            .where(VoiceLine.id.in_(voice_line_ids))
+            .where(Scenario.user_id == user_id)  # RLS protection
+            .order_by(VoiceLine.order_index)
+        )
+        
+        result = await self.db_session.execute(query)
+        voice_lines = result.scalars().all()
+        
+        console_logger.info(f"Found {len(voice_lines)} voice lines out of {len(voice_line_ids)} requested")
+        return voice_lines
+
+    async def get_voice_lines_by_scenario_id(self, scenario_id: int) -> List[VoiceLine]:
+        """Get all voice lines for a scenario (assumes scenario access already verified)"""
+        console_logger.info(f"Getting voice lines for scenario {scenario_id}")
+        
+        query = (
+            select(VoiceLine)
+            .where(VoiceLine.scenario_id == scenario_id)
+            .order_by(VoiceLine.order_index)
+        )
+        
+        result = await self.db_session.execute(query)
+        voice_lines = result.scalars().all()
+        
+        console_logger.info(f"Found {len(voice_lines)} voice lines for scenario {scenario_id}")
+        return voice_lines
+
+    async def update_voice_line_storage(self, voice_line_id: int, signed_url: str, storage_path: str, user_id: str) -> Optional[VoiceLine]:
+        """Update voice line storage information with RLS check"""
+        console_logger.info(f"Updating storage for voice line {voice_line_id} for user {user_id}")
+        
+        # First, get the voice line with RLS check
+        voice_line = await self.get_voice_line_by_id_with_user_check(voice_line_id, user_id)
+        
+        if voice_line:
+            voice_line.storage_url = signed_url
+            voice_line.storage_path = storage_path
+            await self.db_session.flush()
+            await self.db_session.refresh(voice_line)
+            console_logger.info(f"Updated storage for voice line {voice_line_id}")
+            return voice_line
+        else:
+            console_logger.warning(f"Voice line {voice_line_id} not found or access denied for user {user_id}")
+            return None

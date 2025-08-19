@@ -15,8 +15,9 @@ class VoiceLine(Base, TimestampMixin):
     type: Mapped[VoiceLineTypeEnum] = mapped_column(Enum(VoiceLineTypeEnum), nullable=False)  
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     
-    # Storage
-    storage_url: Mapped[str] = mapped_column(String(255), nullable=True)
+    # Storage - User-dependent private storage only
+    storage_url: Mapped[str] = mapped_column(String(500), nullable=True)  # Signed URL (temporary)
+    storage_path: Mapped[str] = mapped_column(String(255), nullable=True)  # Internal storage path (permanent)
 
     # Relationship back to scenario
     scenario: Mapped["Scenario"] = relationship("Scenario", back_populates="voice_lines")
