@@ -13,6 +13,7 @@ class VoiceLine(Base, TimestampMixin):
     # Content
     text: Mapped[str] = mapped_column(Text, nullable=False) 
     type: Mapped[VoiceLineTypeEnum] = mapped_column(Enum(VoiceLineTypeEnum), nullable=False)  
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     
     # Storage
     storage_url: Mapped[str] = mapped_column(String(255), nullable=True)

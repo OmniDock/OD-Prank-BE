@@ -25,6 +25,17 @@ class InitialScenarioProcessor:
         self.scenario_safety = ScenarioSafetyChecker()
         self.voice_line_generator = VoiceLineGenerator()
         self.workflow = self._build_workflow()
+    
+    @classmethod
+    def with_default_counts(cls) -> "InitialScenarioProcessor":
+        """Create processor with default target counts for each voice line type"""
+        default_counts = {
+            VoiceLineTypeEnum.OPENING: 1,
+            VoiceLineTypeEnum.QUESTION: 1,
+            VoiceLineTypeEnum.RESPONSE: 1,
+            VoiceLineTypeEnum.CLOSING: 1
+        }
+        return cls(default_counts)
 
 
     def _build_workflow(self) -> StateGraph:
@@ -77,8 +88,8 @@ class InitialScenarioProcessor:
         return workflow.compile()
     
 
-    async def _process_scenario(self, scenario_create_request: ScenarioCreateRequest) -> ScenarioProcessorState:
-        """Process the scenario"""
+    async def process_scenario(self, scenario_create_request: ScenarioCreateRequest) -> ScenarioProcessorState:
+        """Process the scenario - public method"""
         state = ScenarioProcessorState(
             scenario_data=scenario_create_request,
             target_counts=self.target_counts,
@@ -122,7 +133,6 @@ class InitialScenarioProcessor:
         """Generate opening voice lines"""
         try:
             count = state.target_counts.get(VoiceLineTypeEnum.OPENING.value)
-            console_logger.info(f"Generating {count} opening voice lines")
             result = await self.voice_line_generator.generate_opening_voice_lines(
                 state.scenario_data, 
                 count

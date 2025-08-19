@@ -112,7 +112,7 @@ class ScenarioSafetyChecker:
                  
                 """
                 )
-        ]
+            ]
         )
 
         chain = overall_safety_prompt | self.llm

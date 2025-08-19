@@ -1,25 +1,55 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.auth import get_current_user, AuthUser
-from app.schemas.scenario import ScenarioCreateRequest
+from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse
 from fastapi import Body
-from app.langchain.scenarios.initial_processor import InitialScenarioProcessor
-from app.core.utils.enums import VoiceLineTypeEnum
+from app.services.scenario_service import ScenarioService
+from app.core.database import AsyncSession, get_db_session
+from typing import List
 
 router = APIRouter(tags=["scenario"])
 
 
-@router.post("/")
+@router.post("/", response_model=ScenarioCreateResponse)
 async def create_scenario(
-    user: AuthUser = Depends(get_current_user),
     scenario_create_request: ScenarioCreateRequest = Body(...),
-):
-    target_counts = {
-        VoiceLineTypeEnum.OPENING: 3,
-        VoiceLineTypeEnum.QUESTION: 8,
-        VoiceLineTypeEnum.RESPONSE: 5,
-        VoiceLineTypeEnum.CLOSING: 3,
-    }
-    scenario_processor = InitialScenarioProcessor(target_counts)
-    result = await scenario_processor._process_scenario(scenario_create_request)
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> ScenarioCreateResponse:
+    """Create a new scenario with LangChain processing and save to database"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        result = await scenario_service.create_scenario(user, scenario_create_request)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create scenario: {str(e)}")
 
-    return result
+
+@router.get("/{scenario_id}", response_model=ScenarioResponse)
+async def get_scenario(
+    scenario_id: int,
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> ScenarioResponse:
+    """Get a scenario by ID"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        return await scenario_service.get_scenario(user, scenario_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get scenario: {str(e)}")
+
+
+@router.get("/", response_model=List[ScenarioResponse])
+async def get_user_scenarios(
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+    limit: int = Query(50, ge=1, le=100, description="Number of scenarios to return"),
+    offset: int = Query(0, ge=0, description="Number of scenarios to skip"),
+) -> List[ScenarioResponse]:
+    """Get scenarios for the current user"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        return await scenario_service.get_user_scenarios(user, limit, offset)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get scenarios: {str(e)}")

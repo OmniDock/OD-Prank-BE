@@ -1,12 +1,12 @@
 import enum
 
 class LanguageEnum(enum.Enum):
-    ENGLISH = "en"
-    GERMAN = "de"
+    ENGLISH = "ENGLISH"
+    GERMAN = "GERMAN"
 
 
 class VoiceLineTypeEnum(enum.Enum):
-    OPENING = "opening"
-    QUESTION = "question"
-    RESPONSE = "response"
-    CLOSING = "closing"
+    OPENING = "OPENING"
+    QUESTION = "QUESTION"
+    RESPONSE = "RESPONSE"
+    CLOSING = "CLOSING"
