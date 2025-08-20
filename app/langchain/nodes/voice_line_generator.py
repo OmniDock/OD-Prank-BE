@@ -130,7 +130,7 @@ class VoiceLineGenerator:
             4. Follows the escalation strategy outlined
             5. Incorporates the character's speech patterns and quirks
             6. MATCHES THE SPECIFIC {voice_line_type} CONTEXT - not a fresh introduction!
-            7. NO quotation marks, brackets, or formatting - just pure spoken dialogue!
+            7. NO quotation marks, brackets - just pure spoken dialogue!
             8. MUST include realistic speech patterns and natural hesitations!
             
             SCENARIO DETAILS:
