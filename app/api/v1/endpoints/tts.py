@@ -17,22 +17,18 @@ async def get_available_voices():
     voices = {
         "english": {
             "male": [
-                {"id": ElevenLabsVoiceIdEnum.ENGLISH_MALE_ADAM.value, "name": "Adam", "description": "Deep, American, great for narration"},
-                {"id": ElevenLabsVoiceIdEnum.ENGLISH_MALE_ANTONI.value, "name": "Antoni", "description": "Well-rounded, young American voice"}
+                {"id": ElevenLabsVoiceIdEnum.ENGLISH_MALE_JARNATHAN.value, "name": "Jarnathan", "description": "Well-rounded, young American voice"},
             ],
             "female": [
-                {"id": ElevenLabsVoiceIdEnum.ENGLISH_FEMALE_ALICE.value, "name": "Alice", "description": "Confident, British, news presenter style"},
-                {"id": ElevenLabsVoiceIdEnum.ENGLISH_FEMALE_DOROTHY.value, "name": "Dorothy", "description": "Pleasant, British, engaging"}
+                {"id": ElevenLabsVoiceIdEnum.ENGLISH_FEMALE_CHELSEA.value, "name": "Chelsea", "description": "Pleasant, British, engaging"},
             ]
         },
         "german": {
             "male": [
-                {"id": ElevenLabsVoiceIdEnum.GERMAN_MALE_ARNOLD.value, "name": "Arnold", "description": "Crisp, clear narration"},
-                {"id": ElevenLabsVoiceIdEnum.GERMAN_MALE_BILL.value, "name": "Bill", "description": "Strong, documentary style"}
+                {"id": ElevenLabsVoiceIdEnum.GERMAN_MALE_FELIX.value, "name": "Felix", "description": "Strong, documentary style"},
             ],
             "female": [
-                {"id": ElevenLabsVoiceIdEnum.GERMAN_FEMALE_CHARLOTTE.value, "name": "Charlotte", "description": "Seductive, confident"},
-                {"id": ElevenLabsVoiceIdEnum.GERMAN_FEMALE_SARAH.value, "name": "Sarah", "description": "Soft, news presenter style"}
+                {"id": ElevenLabsVoiceIdEnum.GERMAN_FEMALE_SUSI.value, "name": "Susi", "description": "Soft, news presenter style"},
             ]
         }
     }

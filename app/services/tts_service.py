@@ -43,7 +43,7 @@ class TTSService:
             elif language and gender:
                 selected_voice_id = get_voice_id(language, gender)
             else:
-                selected_voice_id = ElevenLabsVoiceIdEnum.ENGLISH_MALE_ADAM.value  # Default
+                selected_voice_id = ElevenLabsVoiceIdEnum.GERMAN_MALE_FELIX.value 
             
             console_logger.info(f"Generating audio with voice {selected_voice_id}, model {model.value}")
             console_logger.info(f"Text: {text[:50]}...")

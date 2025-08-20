@@ -28,7 +28,9 @@ class ScenarioService:
             
             # Step 2: Determine safety status from results
             is_safe = results['overall_safety_passed']
-            safety_issues = "; ".join(results['overall_safety_issues']) if results['overall_safety_issues'] else None
+            # Use overall safety issues if available, otherwise fall back to initial safety issues
+            all_safety_issues = results['overall_safety_issues'] if results['overall_safety_issues'] else results['initial_safety_issues']
+            safety_issues = "; ".join(all_safety_issues) if all_safety_issues else None
             
             # Step 3: Create scenario in database
             scenario_db_data = {
