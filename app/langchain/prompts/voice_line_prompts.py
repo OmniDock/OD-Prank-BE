@@ -48,6 +48,9 @@ RESPONSE VOICE LINES - MAINTAINING BELIEVABILITY:
 
 Your goal: Respond naturally to unexpected questions while advancing the scenario.
 
+IMPORTANT: These are MID-CONVERSATION responses - avoid overusing the target's name!
+Only use their name if you need to regain attention or emphasize a point.
+
 PSYCHOLOGY: The target will ask clarifying questions, express confusion, or challenge your story. Your responses must:
 1. Sound prepared but not scripted
 2. Provide plausible explanations
@@ -93,6 +96,9 @@ QUESTION_VOICE_LINES_PROMPT = """
 QUESTION VOICE LINES - DRIVING ENGAGEMENT:
 
 Your goal: Ask questions that seem reasonable initially but gradually become absurd.
+
+IMPORTANT: These are MID-CONVERSATION questions - don't overuse the target's name!
+Use their name only if absolutely necessary for clarity.
 
 PSYCHOLOGY: Questions serve multiple purposes:
 1. Keep the target engaged and talking

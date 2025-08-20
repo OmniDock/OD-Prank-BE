@@ -18,49 +18,49 @@ class ScenarioAnalyzer:
         self.model_name = model_name
         
         self.analysis_system_prompt = """
-You are an expert scenario analyst and character development specialist for prank call scenarios.
+            You are an expert scenario analyst and character development specialist for prank call scenarios.
 
-Your role is to analyze a given prank scenario and create:
-1. A believable, engaging character persona
-2. Realistic company/service context
-3. Natural speech patterns and quirks
-4. Believability anchors and escalation strategy
-5. Cultural and linguistic adaptation
+            Your role is to analyze a given prank scenario and create:
+            1. A believable, engaging character persona
+            2. Realistic company/service context
+            3. Natural speech patterns and quirks
+            4. Believability anchors and escalation strategy
+            5. Cultural and linguistic adaptation
 
-ANALYSIS FRAMEWORK:
+            ANALYSIS FRAMEWORK:
 
-CHARACTER DEVELOPMENT:
-- Create a specific character name that fits the scenario and language
-- Develop realistic background, motivation, and current situation
-- Design speech patterns that feel authentic and memorable
-- Consider personality traits that drive conversation behavior
+            CHARACTER DEVELOPMENT:
+            - Create a specific character name that fits the scenario and language
+            - Develop realistic background, motivation, and current situation
+            - Design speech patterns that feel authentic and memorable
+            - Consider personality traits that drive conversation behavior
 
-BELIEVABILITY ENGINEERING:
-- Identify specific details that make the scenario credible
-- Create logical company/service context
-- Develop reasonable explanations for unusual requests
-- Plan gradual introduction of absurd elements
+            BELIEVABILITY ENGINEERING:
+            - Identify specific details that make the scenario credible
+            - Create logical company/service context
+            - Develop reasonable explanations for unusual requests
+            - Plan gradual introduction of absurd elements
 
-SPEECH PATTERN ANALYSIS:
-- Design character-specific vocabulary and phrases
-- Create natural hesitations, corrections, and quirks
-- Develop emotional responses appropriate to the character
-- Consider regional/cultural speech variations
+            SPEECH PATTERN ANALYSIS:
+            - Design character-specific vocabulary and phrases
+            - Create natural hesitations, corrections, and quirks
+            - Develop emotional responses appropriate to the character
+            - Consider regional/cultural speech variations
 
-CULTURAL ADAPTATION:
-- Analyze target language and cultural context
-- Adapt formality levels and social expectations
-- Include appropriate cultural references and services
-- Consider regional variations in communication style
+            CULTURAL ADAPTATION:
+            - Analyze target language and cultural context
+            - Adapt formality levels and social expectations
+            - Include appropriate cultural references and services
+            - Consider regional variations in communication style
 
-ESCALATION STRATEGY:
-- Plan believable-to-absurd progression
-- Design natural conversation flow
-- Create opportunities for humor without breaking character
-- Maintain engagement throughout the escalation
+            ESCALATION STRATEGY:
+            - Plan believable-to-absurd progression
+            - Design natural conversation flow
+            - Create opportunities for humor without breaking character
+            - Maintain engagement throughout the escalation
 
-Your analysis should result in a comprehensive character and scenario profile that enables natural, engaging voice line generation.
-"""
+            Your analysis should result in a comprehensive character and scenario profile that enables natural, engaging voice line generation.
+        """
 
     async def analyze_scenario(self, scenario_data: ScenarioCreateRequest) -> ScenarioAnalysisResult:
         """Analyze scenario and generate dynamic persona and context"""
@@ -153,12 +153,14 @@ TYPE-SPECIFIC GUIDANCE - RESPONSE:
 - {analysis.persona_name} should respond as someone who: {analysis.persona_background}
 - When questioned, deflect using: {analysis.company_service} procedures/systems
 - Emotional reactions should reflect: {analysis.emotional_state}
+- AVOID overusing target's name - this is mid-conversation, not an introduction
 """,
             "QUESTION": f"""
 TYPE-SPECIFIC GUIDANCE - QUESTION:
 - Start with reasonable questions related to: {analysis.conversation_goals[0] if analysis.conversation_goals else "the scenario"}
 - Escalation path: {' → '.join(analysis.absurdity_escalation[:3])}
 - Character motivation for asking: {analysis.persona_background}
+- AVOID overusing target's name - ask questions naturally without constant name repetition
 """,
             "CLOSING": f"""
 TYPE-SPECIFIC GUIDANCE - CLOSING:

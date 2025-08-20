@@ -43,7 +43,7 @@ class ElevenLabsModelEnum(enum.Enum):
     MULTILINGUAL_V2 = "eleven_multilingual_v2"        # Good quality, 29 languages  
     TURBO_V2_5 = "eleven_turbo_v2_5"                  # Fast generation, good quality
     FLASH_V2_5 = "eleven_flash_v2_5"                  # Ultra-low latency, 32 languages
-    #ELEVEN_TTV_V3 = "eleven_ttv_v3"            # Ultra-low latency, 32 languages
+    ELEVEN_TTV_V3 = "eleven_ttv_v3"            # Ultra-low latency, 32 languages
 
 
 # Helper function to get voice ID based on language and gender

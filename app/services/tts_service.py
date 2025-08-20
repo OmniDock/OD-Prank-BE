@@ -55,7 +55,7 @@ class TTSService:
                     stability=0.50,        
                     similarity_boost=0.75,  
                     style=0.0,
-                    speed=1.15,
+                    speed=1.0,
                     use_speaker_boost=True 
                 ),
                 model_id=model.value

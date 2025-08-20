@@ -16,7 +16,7 @@ from app.langchain.prompts.voice_line_prompts import (
     QUESTION_VOICE_LINES_PROMPT,
     CLOSING_VOICE_LINES_PROMPT
 )
-from app.langchain.nodes.scenario_analyzer import ScenarioAnalyzer, PersonaContextBuilder, ScenarioAnalysisResult
+from app.langchain.nodes.scenario_analyzer import  PersonaContextBuilder, ScenarioAnalysisResult
 
 
 class VoiceLineGenerationResult(BaseModel):
@@ -74,10 +74,14 @@ class VoiceLineGenerator:
             return voice_lines[:keep_count]
         return voice_lines
     
-    async def generate_voice_lines(self, scenario_data: ScenarioCreateRequest, 
-                                 voice_line_type: VoiceLineTypeEnum, 
-                                 count: int,
-                                 scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
+    async def generate_voice_lines(
+            self, 
+            scenario_data: ScenarioCreateRequest, 
+            voice_line_type: VoiceLineTypeEnum, 
+            count: int,
+            scenario_analysis: ScenarioAnalysisResult,
+            language: LanguageEnum = LanguageEnum.GERMAN
+        ) -> VoiceLineGenerationResult:
         """Generate voice lines with shared scenario analysis"""
         console_logger.info(f"Generating {count} {voice_line_type.value} voice lines using shared persona analysis")
         console_logger.info(f"Voice line type: {voice_line_type.value}, Persona: {scenario_analysis.persona_name if scenario_analysis else 'None'}")
@@ -89,8 +93,8 @@ class VoiceLineGenerator:
         # Build complete system prompt
         system_prompt = self._build_complete_system_prompt(scenario_data, voice_line_type, scenario_analysis)
         
-        # Create LLM with structured output
-        llm = ChatOpenAI(model=self.model_name, temperature=0.4).with_structured_output(VoiceLineGenerationResult)
+        # Create LLM with structured output - higher temperature for more natural speech variation
+        llm = ChatOpenAI(model=self.model_name, temperature=0.7).with_structured_output(VoiceLineGenerationResult)
         
         # Create prompt template
         generation_prompt = ChatPromptTemplate.from_messages([
@@ -99,21 +103,35 @@ class VoiceLineGenerator:
             Generate {count} {voice_line_type} voice lines for this prank scenario.
             
             CRITICAL: These are {voice_line_type} voice lines - NOT opening lines!
-            - OPENING: First contact, introduce yourself and purpose
-            - QUESTION: Ask follow-up questions during ongoing conversation  
-            - RESPONSE: React to target's questions/objections in mid-conversation
-            - CLOSING: End the call, wrap up the conversation
+            - OPENING: First contact, introduce yourself and purpose (USE target name)
+            - QUESTION: Ask follow-up questions during ongoing conversation (AVOID overusing name)
+            - RESPONSE: React to target's questions/objections in mid-conversation (AVOID overusing name)
+            - CLOSING: End the call, wrap up the conversation (USE target name for farewell)
+            
+            NAME USAGE RULES:
+            - OPENING & CLOSING: Include target name naturally
+            - QUESTION & RESPONSE: Avoid using target name unless absolutely necessary
+            - Don't repeat the name excessively - it sounds robotic and unnatural!
             
             IMPORTANT: Generate ONLY the spoken text without quotation marks or any formatting!
             
+            CRITICAL: Make the dialogue sound NATURALLY HUMAN with realistic speech patterns:
+            - Include natural hesitations: "Uhh...", "Well...", "Let's see..."
+            - Use self-corrections: "I mean... actually, let me put it this way..."
+            - Add thinking out loud: "Now where did I put... ah yes, here it is"
+            - Include SSML breaks for natural pauses: <break time="0.3s" />
+            - Use incomplete thoughts: "So the thing is... well, you know what I mean"
+            - Add natural restarts: "What I'm trying to— sorry, let me start over"
+            
             Use the persona analysis and context provided to create natural, engaging dialogue that:
             1. Maintains character consistency
-            2. Sounds completely natural when spoken
+            2. Sounds completely natural when spoken with human imperfections
             3. Fits the cultural and linguistic context
             4. Follows the escalation strategy outlined
             5. Incorporates the character's speech patterns and quirks
             6. MATCHES THE SPECIFIC {voice_line_type} CONTEXT - not a fresh introduction!
             7. NO quotation marks, brackets, or formatting - just pure spoken dialogue!
+            8. MUST include realistic speech patterns and natural hesitations!
             
             SCENARIO DETAILS:
             Title: {title}
@@ -141,7 +159,7 @@ class VoiceLineGenerator:
             "company_service": scenario_analysis.company_service
         })
         
-        # Clean up any quotation marks that might have slipped through
+        # Clean up any quotation marks that might have slipped through (but preserve SSML tags)
         cleaned_voice_lines = [line.strip('"\'') for line in result.voice_lines]
         
         # Trim to requested count

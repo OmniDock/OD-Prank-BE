@@ -9,7 +9,7 @@ from app.core.logging import console_logger
 
 # Import the new prompt structure
 from app.langchain.prompts.base_prompts import BASE_SYSTEM_PROMPT, get_language_specific_context, get_emotional_state_context
-from app.langchain.nodes.scenario_analyzer import ScenarioAnalyzer, PersonaContextBuilder, ScenarioAnalysisResult
+from app.langchain.nodes.scenario_analyzer import PersonaContextBuilder, ScenarioAnalysisResult
 
 
 class IndividualVoiceLineEnhancementResult(BaseModel):
@@ -27,45 +27,45 @@ class VoiceLineEnhancer:
         self.model_name = model_name
         
         self.enhancement_system_prompt = """
-VOICE LINE ENHANCEMENT SPECIALIST
+            VOICE LINE ENHANCEMENT SPECIALIST
 
-You are an expert at enhancing prank call voice lines based on user feedback while maintaining character authenticity and natural speech patterns.
+            You are an expert at enhancing prank call voice lines based on user feedback while maintaining character authenticity and natural speech patterns.
 
-ENHANCEMENT PRINCIPLES:
-1. MAINTAIN PERSONA CONSISTENCY: Keep the character's established voice, quirks, and background
-2. INCORPORATE FEEDBACK THOUGHTFULLY: Address user requests while preserving believability
-3. ENHANCE NATURALNESS: Make speech more human-like and conversational
-4. PRESERVE CULTURAL CONTEXT: Maintain language-appropriate formality and references
-5. IMPROVE TTS OPTIMIZATION: Enhance for better speech synthesis delivery
+            ENHANCEMENT PRINCIPLES:
+            1. MAINTAIN PERSONA CONSISTENCY: Keep the character's established voice, quirks, and background
+            2. INCORPORATE FEEDBACK THOUGHTFULLY: Address user requests while preserving believability
+            3. ENHANCE NATURALNESS: Make speech more human-like and conversational
+            4. PRESERVE CULTURAL CONTEXT: Maintain language-appropriate formality and references
+            5. IMPROVE TTS OPTIMIZATION: Enhance for better speech synthesis delivery
 
-ENHANCEMENT STRATEGIES:
+            ENHANCEMENT STRATEGIES:
 
-FEEDBACK INTEGRATION:
-- Analyze user feedback for specific improvement requests
-- Balance requested changes with character consistency
-- Enhance without breaking the established persona
-- Maintain the original intent while improving execution
+            FEEDBACK INTEGRATION:
+            - Analyze user feedback for specific improvement requests
+            - Balance requested changes with character consistency
+            - Enhance without breaking the established persona
+            - Maintain the original intent while improving execution
 
-NATURALNESS IMPROVEMENTS:
-- Add realistic speech hesitations and corrections
-- Include character-appropriate emotional reactions
-- Enhance conversational flow and pacing
-- Improve speech patterns for TTS delivery
+            NATURALNESS IMPROVEMENTS:
+            - Add realistic speech hesitations and corrections
+            - Include character-appropriate emotional reactions
+            - Enhance conversational flow and pacing
+            - Improve speech patterns for TTS delivery
 
-PERSONA PRESERVATION:
-- Keep character name, background, and company consistent
-- Maintain established speech patterns and quirks
-- Preserve emotional state and motivations
-- Ensure cultural and linguistic consistency
+            PERSONA PRESERVATION:
+            - Keep character name, background, and company consistent
+            - Maintain established speech patterns and quirks
+            - Preserve emotional state and motivations
+            - Ensure cultural and linguistic consistency
 
-QUALITY ENHANCEMENT:
-- Improve clarity and engagement
-- Enhance humor while maintaining believability
-- Optimize for natural speech synthesis
-- Strengthen scenario credibility
+            QUALITY ENHANCEMENT:
+            - Improve clarity and engagement
+            - Enhance humor while maintaining believability
+            - Optimize for natural speech synthesis
+            - Strengthen scenario credibility
 
-Your enhanced voice lines should feel like natural improvements that the original character would actually say, not completely different content.
-"""
+            Your enhanced voice lines should feel like natural improvements that the original character would actually say, not completely different content.
+        """
     
 
     
@@ -107,8 +107,8 @@ Your enhanced voice lines should feel like natural improvements that the origina
         # Build complete system prompt
         system_prompt = self._build_enhancement_system_prompt(scenario_data, voice_line_type, scenario_analysis)
         
-        # Create LLM with structured output
-        llm = ChatOpenAI(model=self.model_name, temperature=0.6).with_structured_output(IndividualVoiceLineEnhancementResult)
+        # Create LLM with structured output - higher temperature for more natural speech variation
+        llm = ChatOpenAI(model=self.model_name, temperature=0.8).with_structured_output(IndividualVoiceLineEnhancementResult)
         
         # Create enhancement prompt
         enhancement_prompt = ChatPromptTemplate.from_messages([
@@ -135,13 +135,20 @@ Your enhanced voice lines should feel like natural improvements that the origina
             Please enhance the voice line to:
             1. Address the specific feedback provided
             2. Maintain {persona_name}'s character consistency
-            3. Improve naturalness and TTS delivery
+            3. Improve naturalness and TTS delivery with human speech patterns
             4. Preserve the cultural and linguistic context
             5. Keep the core intent while improving execution
             6. Return ONLY the enhanced spoken text without quotation marks or formatting
+            7. ADD natural speech elements: hesitations, self-corrections, SSML breaks, thinking out loud
+            
+            CRITICAL: Make it sound MORE naturally human with realistic imperfections:
+            - Natural hesitations: "Uhh...", "Well...", "Let's see..."
+            - Self-corrections: "I mean... actually..."
+            - SSML breaks: <break time="0.3s" /> for natural pauses
+            - Thinking out loud: "Now where did I... ah yes"
             
             IMPORTANT: Generate only clean spoken dialogue without quotes, brackets, or formatting!
-            The enhanced voice line should sound like something {persona_name} would naturally say, just better.
+            The enhanced voice line should sound like something {persona_name} would naturally say, just better and more human.
             """)
         ])
         
@@ -163,7 +170,7 @@ Your enhanced voice lines should feel like natural improvements that the origina
         
         console_logger.info(f"Enhanced voice line for {scenario_analysis.persona_name} with quality score: {result.quality_score}")
         
-        # Clean up any quotation marks that might have slipped through
+        # Clean up any quotation marks that might have slipped through (but preserve SSML tags)
         cleaned_text = result.enhanced_text.strip('"\'')
         
         return IndividualVoiceLineEnhancementResult(
