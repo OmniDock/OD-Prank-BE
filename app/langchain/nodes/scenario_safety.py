@@ -7,7 +7,6 @@ from app.schemas.scenario import ScenarioCreateRequest
 from app.core.logging import console_logger
 from app.langchain.scenarios.state import VoiceLineState
 
-
 class SafetyCheckResult(BaseModel):
     """Structured output for safety checks"""
     is_safe: bool = Field(description="Whether the content is safe")
