@@ -28,18 +28,21 @@ class ScenarioSafetyChecker:
     def __init__(self, model_name: str = "gpt-4o"):
         
         self.llm = ChatOpenAI(model=model_name, temperature=0.1).with_structured_output(SafetyCheckResult)
+        '''
+        '''
         
         self.base_safety_prompt = """ 
                 
                 You are an expert content safety moderator for a prank call application. 
 
-                Your role is to evaluate prank scenarios for potential safety issues while maintaining a balance between fun and harm prevention.
+                Your role is to evaluate prank scenarios for if its possible to create a version of this scenario that does not violate any of the safety criteria below but 
+                still adheres to the scenario description while resulting in a funny conversation.
+                Categorize as unsafe only if there is no plausible way of creating a version of the scenario that does not violate any of the safety criteria.
 
                 SAFETY CRITERIA:
                 - Harassment: Repeated unwanted contact, bullying, intimidation
-                - Illegal: Activities that violate laws (fraud, threats, impersonation of authorities)
-                - Harmful targeting: Attacking vulnerable groups, protected characteristics
-                - Excessive cruelty: Causing genuine distress, psychological harm
+                - Illegal: If the call itself involves fraud, threats, impersonation of official authorities or real organizations / persons 
+                - Excessive cruelty: Causing psychological harm
                 - Privacy violation: Sharing personal information
                 - Discrimination: Content based on race, gender, religion, etc.
                 - Offensive language: Profanity, slurs, inappropriate content

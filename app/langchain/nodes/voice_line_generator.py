@@ -1,6 +1,7 @@
 # OD-Prank-BE/app/langchain/nodes/voice_line_generator_v2.py
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 from pydantic import BaseModel, Field
 from typing import List
 
@@ -95,16 +96,16 @@ class VoiceLineGenerator:
         
         # Create LLM with structured output - higher temperature for more natural speech variation
         llm = ChatOpenAI(model=self.model_name, temperature=0.7).with_structured_output(VoiceLineGenerationResult)
-        
+              
         # Create prompt template
         generation_prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             ("user", """
             Generate {count} {voice_line_type} voice lines for this prank scenario.
             
-            CRITICAL: These are {voice_line_type} voice lines - NOT opening lines!
+            CRITICAL: These are {voice_line_type} voice lines - NOT opening lines! Keep established details coherent between voice lines.
             - OPENING: First contact, introduce yourself and purpose (USE target name)
-            - QUESTION: Ask follow-up questions during ongoing conversation (AVOID overusing name)
+            - QUESTION: Ask inital question and follow-up questions during ongoing conversation(AVOID overusing name)
             - RESPONSE: React to target's questions/objections in mid-conversation (AVOID overusing name)
             - CLOSING: End the call, wrap up the conversation (USE target name for farewell)
             

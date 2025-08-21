@@ -81,7 +81,7 @@ class ScenarioAnalyzer:
 
             Please provide:
             1. A specific character persona with name and background
-            2. Realistic company/service context
+            2. Realistic organization/service context
             3. Character-specific speech patterns and quirks
             4. Believability anchors and escalation strategy
             5. Cultural adaptation for the target language
@@ -171,3 +171,5 @@ TYPE-SPECIFIC GUIDANCE - CLOSING:
         }
         
         return base_context + type_specific.get(voice_line_type, "")
+
+
