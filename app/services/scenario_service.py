@@ -93,28 +93,24 @@ class ScenarioService:
             voice_lines_data.append({
                 "text": voice_line_state.text,
                 "type": voice_line_state.type.value,
-                "storage_url": None  
             })
         
         for voice_line_state in results['question_voice_lines']:
             voice_lines_data.append({
                 "text": voice_line_state.text,
                 "type": voice_line_state.type.value,
-                "storage_url": None
             })
         
         for voice_line_state in results['response_voice_lines']:
             voice_lines_data.append({
                 "text": voice_line_state.text,
                 "type": voice_line_state.type.value,
-                "storage_url": None
             })
         
         for voice_line_state in results['closing_voice_lines']:
             voice_lines_data.append({
                 "text": voice_line_state.text,
                 "type": voice_line_state.type.value,
-                "storage_url": None
             })
         
         console_logger.info(f"Extracted {len(voice_lines_data)} voice lines for database storage")
