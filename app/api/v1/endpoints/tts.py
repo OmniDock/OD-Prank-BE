@@ -4,7 +4,9 @@ from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
 from app.services.tts_service import TTSService
 from app.repositories.scenario_repository import ScenarioRepository
-from app.core.utils.enums import ElevenLabsVoiceIdEnum, VoiceLineAudioStatusEnum
+from app.core.utils.enums import VoiceLineAudioStatusEnum, ElevenLabsModelEnum, LanguageEnum, GenderEnum
+from app.core.config import settings
+from app.core.utils.voices_catalog import get_voices_catalog
 from app.schemas.tts import SingleTTSRequest, BatchTTSRequest, ScenarioTTSRequest, RegenerateTTSRequest, TTSResult, TTSResponse, VoiceListResponse
 from sqlalchemy import select
 from app.models.voice_line_audio import VoiceLineAudio
@@ -15,26 +17,20 @@ router = APIRouter(tags=["tts"])
 # Endpoints
 @router.get("/voices", response_model=VoiceListResponse)
 async def get_available_voices():
-    """Get list of available voices organized by language and gender"""
-    voices = {
-        "english": {
-            "male": [
-                {"id": ElevenLabsVoiceIdEnum.ENGLISH_MALE_JARNATHAN.value, "name": "Jarnathan", "description": "Well-rounded, young American voice"},
-            ],
-            "female": [
-                {"id": ElevenLabsVoiceIdEnum.ENGLISH_FEMALE_CHELSEA.value, "name": "Chelsea", "description": "Pleasant, British, engaging"},
-            ]
-        },
-        "german": {
-            "male": [
-                {"id": ElevenLabsVoiceIdEnum.GERMAN_MALE_FELIX.value, "name": "Felix", "description": "Strong, documentary style"},
-            ],
-            "female": [
-                {"id": ElevenLabsVoiceIdEnum.GERMAN_FEMALE_SUSI.value, "name": "Susi", "description": "Soft, news presenter style"},
-            ]
-        }
-    }
-    
+    """Get flat list of curated voices with enums for language and gender"""
+    base_public = f"{settings.SUPABASE_URL}/storage/v1/object/public/voice-lines/public/voice-previews"
+    catalog = get_voices_catalog()
+    voices = []
+    for v in catalog:
+        voices.append({
+            "id": v["id"],
+            "name": v.get("name"),
+            "description": v.get("description"),
+            "languages": v.get("languages", []),
+            "gender": v.get("gender"),
+            "preview_url": f"{base_public}/{v['id']}.mp3",
+        })
+
     return VoiceListResponse(voices=voices)
 
 @router.post("/generate/single", response_model=TTSResult)
@@ -56,7 +52,8 @@ async def generate_single_voice_line(
         tts_service = TTSService()
         selected_voice_id = tts_service.select_voice_id(request.voice_id, request.language, request.gender)
         voice_settings = tts_service.default_voice_settings()
-        content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, request.model, voice_settings)
+        forced_model = ElevenLabsModelEnum.ELEVEN_TTV_V3
+        content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, forced_model, voice_settings)
 
         # Try reuse existing READY asset
         result = await db_session.execute(
@@ -86,7 +83,7 @@ async def generate_single_voice_line(
             voice_id=selected_voice_id,
             language=request.language,
             gender=request.gender,
-            model=request.model,
+            model=forced_model,
             voice_settings=voice_settings,
         )
 
@@ -96,13 +93,13 @@ async def generate_single_voice_line(
                 voice_line_id=request.voice_line_id,
                 voice_id=selected_voice_id,
                 gender=request.gender,
-                model_id=request.model,
+                model_id=forced_model,
                 voice_settings=voice_settings,
                 storage_path=storage_path,
                 duration_ms=None,
                 size_bytes=None,
                 text_hash=tts_service.compute_text_hash(voice_line.text),
-                settings_hash=tts_service.compute_settings_hash(selected_voice_id, request.model, voice_settings),
+                settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
                 content_hash=content_hash,
                 status=VoiceLineAudioStatusEnum.READY,
                 error=None,
@@ -155,7 +152,8 @@ async def generate_batch_voice_lines(
             try:
                 selected_voice_id = tts_service.select_voice_id(request.voice_id, request.language, request.gender)
                 voice_settings = tts_service.default_voice_settings()
-                content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, request.model, voice_settings)
+                forced_model = ElevenLabsModelEnum.ELEVEN_TTV_V3
+                content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, forced_model, voice_settings)
 
                 # Reuse check
                 r = await db_session.execute(
@@ -185,7 +183,7 @@ async def generate_batch_voice_lines(
                     voice_id=selected_voice_id,
                     language=request.language,
                     gender=request.gender,
-                    model=request.model,
+                    model=forced_model,
                     voice_settings=voice_settings,
                 )
                 
@@ -194,13 +192,13 @@ async def generate_batch_voice_lines(
                         voice_line_id=voice_line.id,
                         voice_id=selected_voice_id,
                         gender=request.gender,
-                        model_id=request.model,
+                        model_id=forced_model,
                         voice_settings=voice_settings,
                         storage_path=storage_path,
                         duration_ms=None,
                         size_bytes=None,
                         text_hash=tts_service.compute_text_hash(voice_line.text),
-                        settings_hash=tts_service.compute_settings_hash(selected_voice_id, request.model, voice_settings),
+                        settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
                         content_hash=content_hash,
                         status=VoiceLineAudioStatusEnum.READY,
                         error=None,
@@ -273,7 +271,8 @@ async def generate_scenario_voice_lines(
             try:
                 selected_voice_id = tts_service.select_voice_id(request.voice_id, scenario_language, request.gender)
                 voice_settings = tts_service.default_voice_settings()
-                content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, request.model, voice_settings)
+                forced_model = ElevenLabsModelEnum.ELEVEN_TTV_V3
+                content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, forced_model, voice_settings)
 
                 # Reuse check
                 r = await db_session.execute(
@@ -303,7 +302,7 @@ async def generate_scenario_voice_lines(
                     voice_id=selected_voice_id,
                     language=scenario_language,
                     gender=request.gender,
-                    model=request.model,
+                    model=forced_model,
                     voice_settings=voice_settings,
                 )
                 
@@ -312,13 +311,13 @@ async def generate_scenario_voice_lines(
                         voice_line_id=voice_line.id,
                         voice_id=selected_voice_id,
                         gender=request.gender,
-                        model_id=request.model,
+                        model_id=forced_model,
                         voice_settings=voice_settings,
                         storage_path=storage_path,
                         duration_ms=None,
                         size_bytes=None,
                         text_hash=tts_service.compute_text_hash(voice_line.text),
-                        settings_hash=tts_service.compute_settings_hash(selected_voice_id, request.model, voice_settings),
+                        settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
                         content_hash=content_hash,
                         status=VoiceLineAudioStatusEnum.READY,
                         error=None,
@@ -379,7 +378,8 @@ async def regenerate_voice_line_audio(
         tts_service = TTSService()
         selected_voice_id = tts_service.select_voice_id(request.voice_id, request.language, request.gender)
         voice_settings = tts_service.default_voice_settings()
-        content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, request.model, voice_settings)
+        forced_model = ElevenLabsModelEnum.ELEVEN_TTV_V3
+        content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, forced_model, voice_settings)
 
         # Reuse if available
         r = await db_session.execute(
@@ -408,7 +408,7 @@ async def regenerate_voice_line_audio(
             voice_id=selected_voice_id,
             language=request.language,
             gender=request.gender,
-            model=request.model,
+            model=forced_model,
             voice_settings=voice_settings,
         )
 
@@ -417,13 +417,13 @@ async def regenerate_voice_line_audio(
                 voice_line_id=request.voice_line_id,
                 voice_id=selected_voice_id,
                 gender=request.gender,
-                model_id=request.model,
+                model_id=forced_model,
                 voice_settings=voice_settings,
                 storage_path=new_storage_path,
                 duration_ms=None,
                 size_bytes=None,
                 text_hash=tts_service.compute_text_hash(voice_line.text),
-                settings_hash=tts_service.compute_settings_hash(selected_voice_id, request.model, voice_settings),
+                settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
                 content_hash=content_hash,
                 status=VoiceLineAudioStatusEnum.READY,
                 error=None,

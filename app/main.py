@@ -1,13 +1,26 @@
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.services.preview_tts_service import PreviewTTSService
+from app.core.utils.voices_catalog import get_voices_catalog
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: ensure voice previews
+    service = PreviewTTSService()
+    catalog = get_voices_catalog()
+    await service.ensure_previews_for_catalog(catalog)
+    yield
+    # Shutdown: nothing to clean up
 
 
 app = FastAPI(
     title="Omnidock Prank Call Backend",
     description="Backend for the Omnidock Prank Call App",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

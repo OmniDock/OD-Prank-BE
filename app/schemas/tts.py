@@ -45,6 +45,15 @@ class TTSResponse(BaseModel):
     failed_count: int
     results: List[TTSResult]
 
+class VoiceItem(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    languages: List[LanguageEnum]
+    gender: GenderEnum
+    preview_url: Optional[str] = None
+
+
 class VoiceListResponse(BaseModel):
-    voices: dict
+    voices: List[VoiceItem]
     
