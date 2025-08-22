@@ -449,6 +449,7 @@ async def regenerate_voice_line_audio(
 async def get_voice_line_audio_url(
     voice_line_id: int,
     expires_in: int = 3600 * 12,  # 12 hours default
+    voice_id: str | None = None,
     user: AuthUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
 ):
@@ -462,19 +463,33 @@ async def get_voice_line_audio_url(
         if not voice_line:
             raise HTTPException(status_code=404, detail="Voice line not found or access denied")
         
-        # Find latest READY asset for this voice line
-        r = await db_session.execute(
-            select(VoiceLineAudio).where(
-                VoiceLineAudio.voice_line_id == voice_line_id,
-                VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY,
-            ).order_by(VoiceLineAudio.created_at.desc()).limit(1)
-        )
+        tts_service = TTSService()
+
+        if voice_id:
+            # Find latest READY asset for this voice and current text (match by text_hash)
+            text_hash = tts_service.compute_text_hash(voice_line.text)
+            r = await db_session.execute(
+                select(VoiceLineAudio).where(
+                    VoiceLineAudio.voice_line_id == voice_line_id,
+                    VoiceLineAudio.voice_id == voice_id,
+                    VoiceLineAudio.text_hash == text_hash,
+                    VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY,
+                ).order_by(VoiceLineAudio.created_at.desc()).limit(1)
+            )
+        else:
+            # Fallback: latest READY asset regardless of voice
+            r = await db_session.execute(
+                select(VoiceLineAudio).where(
+                    VoiceLineAudio.voice_line_id == voice_line_id,
+                    VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY,
+                ).order_by(VoiceLineAudio.created_at.desc()).limit(1)
+            )
+
         asset: VoiceLineAudio | None = r.scalar_one_or_none()
         if not asset or not asset.storage_path:
             raise HTTPException(status_code=404, detail="No audio file found for this voice line")
 
         # Generate fresh signed URL
-        tts_service = TTSService()
         signed_url = await tts_service.get_audio_url(asset.storage_path, expires_in)
         
         if not signed_url:

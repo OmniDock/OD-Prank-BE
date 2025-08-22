@@ -58,6 +58,7 @@ class ScenarioResponse(BaseModel):
     title: str
     description: Optional[str] = None
     language: LanguageEnum
+    preferred_voice_id: Optional[str] = None
     target_name: str
     is_safe: bool
     is_not_safe_reason: Optional[str] = None

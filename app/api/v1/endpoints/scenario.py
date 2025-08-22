@@ -4,7 +4,8 @@ from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, 
 from fastapi import Body
 from app.services.scenario_service import ScenarioService
 from app.core.database import AsyncSession, get_db_session
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 
 router = APIRouter(tags=["scenario"])
 
@@ -74,3 +75,25 @@ async def enhance_voice_lines(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to enhance voice lines: {str(e)}")
+
+
+class ScenarioUpdatePreferredVoice(BaseModel):
+    preferred_voice_id: str
+
+
+@router.patch("/{scenario_id}/preferred-voice", response_model=ScenarioResponse)
+async def update_scenario_preferred_voice(
+    scenario_id: int,
+    payload: ScenarioUpdatePreferredVoice = Body(...),
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    """Set or change the scenario's preferred voice id"""
+    try:
+        service = ScenarioService(db_session)
+        updated = await service.set_preferred_voice(user, scenario_id, payload.preferred_voice_id)
+        return updated
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update preferred voice: {str(e)}")

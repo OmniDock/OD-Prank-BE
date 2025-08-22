@@ -23,15 +23,15 @@ class PreviewTTSService:
         
         # Longer, expressive prank-call style previews with textual cues (eleven_v3)
         self.preview_text_default_en = (
-            "[loudly] Good evening! [whispering] Tiny emergency… [normal] "
-            "[confident] Quick check: Are you the legendary keeper of leftovers? "
-            "[playful] Perfect. Then press one imaginary button now… [long pause] Excellent. "
+            "[loudly] Good evening! [coughing] Tiny emergency… [normal] "
+            "[confident] Quick check: What has two thumbs and makes bad jokes? "
+            "[sarcastic] Not me, guy? [laughs softly] [long pause]  "
             "[annoyed] Jokes aside — Ready when you are!"
         )
         self.preview_text_default_de = (
-            "[loudly] Guten Abend! [whispering] Mini-Notfall… [normal] "
-            "[confident] Kurzer Test: Bist du der legendäre Hüter der Reste? "
-            "[playful] Großartig. Dann drück jetzt einen imaginären Knopf… [pause] Hervorragend. "
+            "[loudly] Ijooo! [coughing] Mini-Notfall… [normal] "
+            "[confident] Kurzer Test: Was hat zwei Daumen und vermasselt ständig Witze? "
+            "[sarcastic] Ich nicht? [laughs softly] [long pause]  "
             "[annoyed] Spaß beiseite –. Bereit, wenn du’s bist!"
         )
 

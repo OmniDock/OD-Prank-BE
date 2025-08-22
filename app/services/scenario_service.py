@@ -275,5 +275,13 @@ class ScenarioService:
             await self.repository.rollback()
             raise
 
+    async def set_preferred_voice(self, user: AuthUser, scenario_id: int, preferred_voice_id: str) -> ScenarioResponse:
+        """Set or change scenario's preferred voice id"""
+        updated = await self.repository.update_scenario_preferred_voice(scenario_id, user.id, preferred_voice_id)
+        if not updated:
+            raise ValueError("Scenario not found or access denied")
+        await self.repository.commit()
+        return ScenarioResponse.model_validate(updated)
+
 
 
