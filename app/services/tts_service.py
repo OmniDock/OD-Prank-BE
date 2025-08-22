@@ -25,7 +25,7 @@ class TTSService:
 
     async def generate_audio(self, text: str, voice_id: str = None, 
                            language: LanguageEnum = None, gender: GenderEnum = None,
-                           model: ElevenLabsModelEnum = ElevenLabsModelEnum.MULTILINGUAL_V2) -> bytes:
+                           model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3) -> bytes:
         """
         Generate audio from text using ElevenLabs TTS
         
@@ -166,7 +166,7 @@ class TTSService:
     async def generate_and_store_audio(self, text: str, voice_line_id: int, user_id: str,
                                      voice_id: str = None, language: LanguageEnum = None, 
                                      gender: GenderEnum = None,
-                                     model: ElevenLabsModelEnum = ElevenLabsModelEnum.MULTILINGUAL_V2) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
+                                     model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
         """
         Generate TTS audio and store it in one operation
         
@@ -214,7 +214,7 @@ class TTSService:
     async def regenerate_audio(self, old_storage_path: str, new_text: str, voice_line_id: int, 
                              user_id: str, voice_id: str = None, language: LanguageEnum = None, 
                              gender: GenderEnum = None,
-                             model: ElevenLabsModelEnum = ElevenLabsModelEnum.MULTILINGUAL_V2) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
+                             model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
         """
         Regenerate audio (delete old, create new) with user-dependent storage
         
