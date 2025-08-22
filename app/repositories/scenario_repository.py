@@ -109,20 +109,28 @@ class ScenarioRepository:
     async def update_scenario_preferred_voice(self, scenario_id: int, user_id: str, preferred_voice_id: str) -> Optional[Scenario]:
         """Update scenario's preferred voice id with RLS check"""
         console_logger.info(f"Updating scenario {scenario_id} preferred_voice_id for user {user_id}")
-        query = (
+        base_query = (
             select(Scenario)
             .where(Scenario.id == scenario_id)
             .where(Scenario.user_id == user_id)
         )
-        result = await self.db_session.execute(query)
+        result = await self.db_session.execute(base_query)
         scenario = result.scalar_one_or_none()
         if not scenario:
             console_logger.warning(f"Scenario {scenario_id} not found or access denied for user {user_id}")
             return None
         scenario.preferred_voice_id = preferred_voice_id
         await self.db_session.flush()
-        await self.db_session.refresh(scenario)
-        return scenario
+        # Re-load scenario with eager-loaded voice_lines to avoid MissingGreenlet during serialization
+        reload_query = (
+            select(Scenario)
+            .options(selectinload(Scenario.voice_lines))
+            .where(Scenario.id == scenario_id)
+            .where(Scenario.user_id == user_id)
+        )
+        reloaded = await self.db_session.execute(reload_query)
+        loaded_scenario = reloaded.scalar_one_or_none()
+        return loaded_scenario or scenario
 
     async def get_voice_line_by_id_with_user_check(self, voice_line_id: int, user_id: str) -> Optional[VoiceLine]:
         """Get a voice line by ID with RLS check through scenario"""

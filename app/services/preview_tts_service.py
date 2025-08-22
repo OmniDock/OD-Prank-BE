@@ -28,6 +28,7 @@ class PreviewTTSService:
             "[sarcastic] Not me, guy? [laughs softly] [long pause]  "
             "[annoyed] Jokes aside — Ready when you are!"
         )
+        
         self.preview_text_default_de = (
             "[loudly] Ijooo! [coughing] Mini-Notfall… [normal] "
             "[confident] Kurzer Test: Was hat zwei Daumen und vermasselt ständig Witze? "
