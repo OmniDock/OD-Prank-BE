@@ -6,7 +6,7 @@ from app.services.tts_service import TTSService
 from app.repositories.scenario_repository import ScenarioRepository
 from app.core.utils.enums import VoiceLineAudioStatusEnum, ElevenLabsModelEnum, LanguageEnum, GenderEnum
 from app.core.config import settings
-from app.core.utils.voices_catalog import get_voices_catalog
+from app.core.utils.voices_catalog import get_voices_catalog, PREVIEW_VERSION
 from app.schemas.tts import SingleTTSRequest, BatchTTSRequest, ScenarioTTSRequest, RegenerateTTSRequest, TTSResult, TTSResponse, VoiceListResponse
 from sqlalchemy import select
 from app.models.voice_line_audio import VoiceLineAudio
@@ -18,7 +18,7 @@ router = APIRouter(tags=["tts"])
 @router.get("/voices", response_model=VoiceListResponse)
 async def get_available_voices():
     """Get flat list of curated voices with enums for language and gender"""
-    base_public = f"{settings.SUPABASE_URL}/storage/v1/object/public/voice-lines/public/voice-previews"
+    base_public = f"{settings.SUPABASE_URL}/storage/v1/object/public/voice-lines/public/voice-previews/{PREVIEW_VERSION}"
     catalog = get_voices_catalog()
     voices = []
     for v in catalog:

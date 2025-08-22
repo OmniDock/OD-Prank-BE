@@ -4,6 +4,7 @@ from app.core.config import settings
 from app.core.logging import console_logger
 from app.core.utils.enums import ElevenLabsModelEnum
 from app.services.tts_service import TTSService
+from app.core.utils.voices_catalog import PREVIEW_VERSION
 
 
 class PreviewTTSService:
@@ -18,15 +19,20 @@ class PreviewTTSService:
 
     def __init__(self) -> None:
         self.bucket_name = "voice-lines"
-        self.public_prefix = "public/voice-previews"
-        # Emotional, slightly longer preview texts suited for eleven_v3 with textual cues
+        self.public_prefix = f"public/voice-previews/{PREVIEW_VERSION}"
+        
+        # Longer, expressive prank-call style previews with textual cues (eleven_v3)
         self.preview_text_default_en = (
-            "[warmly] Hey there! [laughs softly] Let's make this fun… "
-            "Ready to try something new?"
+            "[loudly] Good evening! [whispering] Tiny emergency… [normal] "
+            "[confident] Quick check: Are you the legendary keeper of leftovers? "
+            "[playful] Perfect. Then press one imaginary button now… [long pause] Excellent. "
+            "[annoyed] Jokes aside — Ready when you are!"
         )
         self.preview_text_default_de = (
-            "(warm) Hey! [lacht leise] Lass uns das richtig gut machen… "
-            "Bereit für etwas Neues?"
+            "[loudly] Guten Abend! [whispering] Mini-Notfall… [normal] "
+            "[confident] Kurzer Test: Bist du der legendäre Hüter der Reste? "
+            "[playful] Großartig. Dann drück jetzt einen imaginären Knopf… [pause] Hervorragend. "
+            "[annoyed] Spaß beiseite –. Bereit, wenn du’s bist!"
         )
 
         # Storage and TTS
