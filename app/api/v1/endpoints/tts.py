@@ -4,8 +4,10 @@ from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
 from app.services.tts_service import TTSService
 from app.repositories.scenario_repository import ScenarioRepository
-from app.core.utils.enums import ElevenLabsVoiceIdEnum
+from app.core.utils.enums import ElevenLabsVoiceIdEnum, VoiceLineAudioStatusEnum
 from app.schemas.tts import SingleTTSRequest, BatchTTSRequest, ScenarioTTSRequest, RegenerateTTSRequest, TTSResult, TTSResponse, VoiceListResponse
+from sqlalchemy import select
+from app.models.voice_line_audio import VoiceLineAudio
 
 router = APIRouter(tags=["tts"])
 
@@ -50,31 +52,70 @@ async def generate_single_voice_line(
         if not voice_line:
             raise HTTPException(status_code=404, detail="Voice line not found or access denied")
         
-        # Generate TTS
+        # Prepare hashing & reuse
         tts_service = TTSService()
+        selected_voice_id = tts_service.select_voice_id(request.voice_id, request.language, request.gender)
+        voice_settings = tts_service.default_voice_settings()
+        content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, request.model, voice_settings)
+
+        # Try reuse existing READY asset
+        result = await db_session.execute(
+            select(VoiceLineAudio).where(
+                VoiceLineAudio.voice_line_id == request.voice_line_id,
+                VoiceLineAudio.content_hash == content_hash,
+                VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY,
+            ).limit(1)
+        )
+        existing: VoiceLineAudio | None = result.scalar_one_or_none()
+
+        if existing and existing.storage_path:
+            signed_url = await tts_service.get_audio_url(existing.storage_path)
+            return TTSResult(
+                voice_line_id=request.voice_line_id,
+                success=True,
+                signed_url=signed_url,
+                storage_path=existing.storage_path,
+                error_message=None,
+            )
+
+        # Generate new audio
         success, signed_url, storage_path, error_msg = await tts_service.generate_and_store_audio(
             text=voice_line.text,
             voice_line_id=request.voice_line_id,
             user_id=str(user.id),
-            voice_id=request.voice_id,
+            voice_id=selected_voice_id,
             language=request.language,
             gender=request.gender,
-            model=request.model
+            model=request.model,
+            voice_settings=voice_settings,
         )
-        
-        if success:
-            # Update voice line with storage info
-            await repository.update_voice_line_storage(
-                request.voice_line_id, signed_url, storage_path, user.id
+
+        if success and storage_path:
+            # Persist new asset (history)
+            asset = VoiceLineAudio(
+                voice_line_id=request.voice_line_id,
+                voice_id=selected_voice_id,
+                gender=request.gender,
+                model_id=request.model,
+                voice_settings=voice_settings,
+                storage_path=storage_path,
+                duration_ms=None,
+                size_bytes=None,
+                text_hash=tts_service.compute_text_hash(voice_line.text),
+                settings_hash=tts_service.compute_settings_hash(selected_voice_id, request.model, voice_settings),
+                content_hash=content_hash,
+                status=VoiceLineAudioStatusEnum.READY,
+                error=None,
             )
+            db_session.add(asset)
             await repository.commit()
-        
+
         return TTSResult(
             voice_line_id=request.voice_line_id,
             success=success,
             signed_url=signed_url,
             storage_path=storage_path,
-            error_message=error_msg
+            error_message=error_msg,
         )
         
     except HTTPException:
@@ -112,21 +153,59 @@ async def generate_batch_voice_lines(
         # Process each voice line
         for voice_line in voice_lines:
             try:
+                selected_voice_id = tts_service.select_voice_id(request.voice_id, request.language, request.gender)
+                voice_settings = tts_service.default_voice_settings()
+                content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, request.model, voice_settings)
+
+                # Reuse check
+                r = await db_session.execute(
+                    select(VoiceLineAudio).where(
+                        VoiceLineAudio.voice_line_id == voice_line.id,
+                        VoiceLineAudio.content_hash == content_hash,
+                        VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY,
+                    ).limit(1)
+                )
+                existing: VoiceLineAudio | None = r.scalar_one_or_none()
+
+                if existing and existing.storage_path:
+                    signed_url = await tts_service.get_audio_url(existing.storage_path)
+                    results.append(TTSResult(
+                        voice_line_id=voice_line.id,
+                        success=True,
+                        signed_url=signed_url,
+                        storage_path=existing.storage_path,
+                        error_message=None,
+                    ))
+                    continue
+
                 success, signed_url, storage_path, error_msg = await tts_service.generate_and_store_audio(
                     text=voice_line.text,
                     voice_line_id=voice_line.id,
                     user_id=str(user.id),
-                    voice_id=request.voice_id,
+                    voice_id=selected_voice_id,
                     language=request.language,
                     gender=request.gender,
-                    model=request.model
+                    model=request.model,
+                    voice_settings=voice_settings,
                 )
                 
-                if success:
-                    # Update voice line with storage info
-                    await repository.update_voice_line_storage(
-                        voice_line.id, signed_url, storage_path, user.id
+                if success and storage_path:
+                    asset = VoiceLineAudio(
+                        voice_line_id=voice_line.id,
+                        voice_id=selected_voice_id,
+                        gender=request.gender,
+                        model_id=request.model,
+                        voice_settings=voice_settings,
+                        storage_path=storage_path,
+                        duration_ms=None,
+                        size_bytes=None,
+                        text_hash=tts_service.compute_text_hash(voice_line.text),
+                        settings_hash=tts_service.compute_settings_hash(selected_voice_id, request.model, voice_settings),
+                        content_hash=content_hash,
+                        status=VoiceLineAudioStatusEnum.READY,
+                        error=None,
                     )
+                    db_session.add(asset)
                 
                 results.append(TTSResult(
                     voice_line_id=voice_line.id,
@@ -143,7 +222,7 @@ async def generate_batch_voice_lines(
                     error_message=f"Generation failed: {str(e)}"
                 ))
         
-        # Commit all successful updates
+        # Commit all successful asset inserts
         await repository.commit()
         
         successful_count = sum(1 for r in results if r.success)
@@ -192,21 +271,59 @@ async def generate_scenario_voice_lines(
         # Process each voice line
         for voice_line in voice_lines:
             try:
+                selected_voice_id = tts_service.select_voice_id(request.voice_id, scenario_language, request.gender)
+                voice_settings = tts_service.default_voice_settings()
+                content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, request.model, voice_settings)
+
+                # Reuse check
+                r = await db_session.execute(
+                    select(VoiceLineAudio).where(
+                        VoiceLineAudio.voice_line_id == voice_line.id,
+                        VoiceLineAudio.content_hash == content_hash,
+                        VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY,
+                    ).limit(1)
+                )
+                existing: VoiceLineAudio | None = r.scalar_one_or_none()
+
+                if existing and existing.storage_path:
+                    signed_url = await tts_service.get_audio_url(existing.storage_path)
+                    results.append(TTSResult(
+                        voice_line_id=voice_line.id,
+                        success=True,
+                        signed_url=signed_url,
+                        storage_path=existing.storage_path,
+                        error_message=None,
+                    ))
+                    continue
+
                 success, signed_url, storage_path, error_msg = await tts_service.generate_and_store_audio(
                     text=voice_line.text,
                     voice_line_id=voice_line.id,
                     user_id=str(user.id),
-                    voice_id=request.voice_id,
+                    voice_id=selected_voice_id,
                     language=scenario_language,
                     gender=request.gender,
-                    model=request.model
+                    model=request.model,
+                    voice_settings=voice_settings,
                 )
                 
-                if success:
-                    # Update voice line with storage info
-                    await repository.update_voice_line_storage(
-                        voice_line.id, signed_url, storage_path, user.id
+                if success and storage_path:
+                    asset = VoiceLineAudio(
+                        voice_line_id=voice_line.id,
+                        voice_id=selected_voice_id,
+                        gender=request.gender,
+                        model_id=request.model,
+                        voice_settings=voice_settings,
+                        storage_path=storage_path,
+                        duration_ms=None,
+                        size_bytes=None,
+                        text_hash=tts_service.compute_text_hash(voice_line.text),
+                        settings_hash=tts_service.compute_settings_hash(selected_voice_id, request.model, voice_settings),
+                        content_hash=content_hash,
+                        status=VoiceLineAudioStatusEnum.READY,
+                        error=None,
                     )
+                    db_session.add(asset)
                 
                 results.append(TTSResult(
                     voice_line_id=voice_line.id,
@@ -223,7 +340,7 @@ async def generate_scenario_voice_lines(
                     error_message=f"Generation failed: {str(e)}"
                 ))
         
-        # Commit all successful updates
+        # Commit all successful asset inserts
         await repository.commit()
         
         successful_count = sum(1 for r in results if r.success)
@@ -258,32 +375,68 @@ async def regenerate_voice_line_audio(
         if not voice_line:
             raise HTTPException(status_code=404, detail="Voice line not found or access denied")
         
-        # Regenerate TTS
+        # Generate (with reuse); keep history (no delete)
         tts_service = TTSService()
-        success, new_signed_url, new_storage_path, error_msg = await tts_service.regenerate_audio(
-            old_storage_path=voice_line.storage_path,
-            new_text=voice_line.text,
+        selected_voice_id = tts_service.select_voice_id(request.voice_id, request.language, request.gender)
+        voice_settings = tts_service.default_voice_settings()
+        content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, request.model, voice_settings)
+
+        # Reuse if available
+        r = await db_session.execute(
+            select(VoiceLineAudio).where(
+                VoiceLineAudio.voice_line_id == request.voice_line_id,
+                VoiceLineAudio.content_hash == content_hash,
+                VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY,
+            ).limit(1)
+        )
+        existing: VoiceLineAudio | None = r.scalar_one_or_none()
+
+        if existing and existing.storage_path:
+            signed_url = await tts_service.get_audio_url(existing.storage_path)
+            return TTSResult(
+                voice_line_id=request.voice_line_id,
+                success=True,
+                signed_url=signed_url,
+                storage_path=existing.storage_path,
+                error_message=None,
+            )
+
+        success, new_signed_url, new_storage_path, error_msg = await tts_service.generate_and_store_audio(
+            text=voice_line.text,
             voice_line_id=request.voice_line_id,
             user_id=str(user.id),
-            voice_id=request.voice_id,
+            voice_id=selected_voice_id,
             language=request.language,
             gender=request.gender,
-            model=request.model
+            model=request.model,
+            voice_settings=voice_settings,
         )
-        
-        if success:
-            # Update voice line with new storage info
-            await repository.update_voice_line_storage(
-                request.voice_line_id, new_signed_url, new_storage_path, user.id
+
+        if success and new_storage_path:
+            asset = VoiceLineAudio(
+                voice_line_id=request.voice_line_id,
+                voice_id=selected_voice_id,
+                gender=request.gender,
+                model_id=request.model,
+                voice_settings=voice_settings,
+                storage_path=new_storage_path,
+                duration_ms=None,
+                size_bytes=None,
+                text_hash=tts_service.compute_text_hash(voice_line.text),
+                settings_hash=tts_service.compute_settings_hash(selected_voice_id, request.model, voice_settings),
+                content_hash=content_hash,
+                status=VoiceLineAudioStatusEnum.READY,
+                error=None,
             )
+            db_session.add(asset)
             await repository.commit()
-        
+
         return TTSResult(
             voice_line_id=request.voice_line_id,
             success=success,
             signed_url=new_signed_url,
             storage_path=new_storage_path,
-            error_message=error_msg
+            error_message=error_msg,
         )
         
     except HTTPException:
@@ -295,7 +448,7 @@ async def regenerate_voice_line_audio(
 @router.get("/audio-url/{voice_line_id}")
 async def get_voice_line_audio_url(
     voice_line_id: int,
-    expires_in: int = 3600,  # 1 hour default
+    expires_in: int = 3600 * 12,  # 12 hours default
     user: AuthUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
 ):
@@ -309,12 +462,20 @@ async def get_voice_line_audio_url(
         if not voice_line:
             raise HTTPException(status_code=404, detail="Voice line not found or access denied")
         
-        if not voice_line.storage_path:
+        # Find latest READY asset for this voice line
+        r = await db_session.execute(
+            select(VoiceLineAudio).where(
+                VoiceLineAudio.voice_line_id == voice_line_id,
+                VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY,
+            ).order_by(VoiceLineAudio.created_at.desc()).limit(1)
+        )
+        asset: VoiceLineAudio | None = r.scalar_one_or_none()
+        if not asset or not asset.storage_path:
             raise HTTPException(status_code=404, detail="No audio file found for this voice line")
-        
+
         # Generate fresh signed URL
         tts_service = TTSService()
-        signed_url = await tts_service.get_audio_url(voice_line.storage_path, expires_in)
+        signed_url = await tts_service.get_audio_url(asset.storage_path, expires_in)
         
         if not signed_url:
             raise HTTPException(status_code=500, detail="Failed to generate audio URL")

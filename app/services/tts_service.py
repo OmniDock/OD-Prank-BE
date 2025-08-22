@@ -5,9 +5,12 @@ from supabase import create_client, Client
 from app.core.config import settings
 from app.core.logging import console_logger
 import uuid
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 from datetime import datetime, timezone
 from app.core.utils.enums import ElevenLabsModelEnum, ElevenLabsVoiceIdEnum, LanguageEnum, GenderEnum, get_voice_id
+import hashlib
+import json
+import re
 
 class TTSService: 
     """Unified TTS generation and storage service with user-dependent private storage"""
@@ -23,9 +26,51 @@ class TTSService:
         )
         self.bucket_name = "voice-lines"
 
+    def select_voice_id(self, voice_id: Optional[str], language: Optional[LanguageEnum], gender: Optional[GenderEnum]) -> str:
+        if voice_id:
+            return voice_id
+        if language and gender:
+            return get_voice_id(language, gender)
+        return ElevenLabsVoiceIdEnum.GERMAN_MALE_FELIX.value
+
+    def default_voice_settings(self) -> Dict:
+        return {
+            "stability": 0.50,
+            "similarity_boost": 0.75,
+            "style": 0.0,
+            "speed": 1.0,
+            "use_speaker_boost": True,
+        }
+
+    def _normalize_text(self, text: str) -> str:
+        t = text.strip()
+        t = re.sub(r"\s+", " ", t)
+        return t
+
+    def _sha256(self, s: str) -> str:
+        return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+    def compute_text_hash(self, text: str) -> str:
+        return self._sha256(self._normalize_text(text))
+
+    def compute_settings_hash(self, voice_id: str, model_id: ElevenLabsModelEnum, voice_settings: Optional[Dict]) -> str:
+        payload = {
+            "voice_id": voice_id,
+            "model_id": model_id.value if isinstance(model_id, ElevenLabsModelEnum) else model_id,
+            "voice_settings": voice_settings or self.default_voice_settings(),
+        }
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return self._sha256(canonical)
+
+    def compute_content_hash(self, text: str, voice_id: str, model_id: ElevenLabsModelEnum, voice_settings: Optional[Dict]) -> str:
+        th = self.compute_text_hash(text)
+        sh = self.compute_settings_hash(voice_id, model_id, voice_settings)
+        return self._sha256(f"{th}|{sh}")
+
     async def generate_audio(self, text: str, voice_id: str = None, 
                            language: LanguageEnum = None, gender: GenderEnum = None,
-                           model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3) -> bytes:
+                           model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,
+                           voice_settings: Optional[Dict] = None) -> bytes:
         """
         Generate audio from text using ElevenLabs TTS
         
@@ -38,26 +83,16 @@ class TTSService:
         """
         try:
             # Determine voice ID
-            if voice_id:
-                selected_voice_id = voice_id
-            elif language and gender:
-                selected_voice_id = get_voice_id(language, gender)
-            else:
-                selected_voice_id = ElevenLabsVoiceIdEnum.GERMAN_MALE_FELIX.value 
+            selected_voice_id = self.select_voice_id(voice_id, language, gender)
             
             console_logger.info(f"Generating audio with voice {selected_voice_id}, model {model.value}")
             console_logger.info(f"Text: {text[:50]}...")
             
+            vs_dict = voice_settings or self.default_voice_settings()
             audio_generator = self.client.text_to_speech.convert(
                 text=text,
                 voice_id=selected_voice_id,
-                voice_settings=VoiceSettings(
-                    stability=0.50,        
-                    similarity_boost=0.75,  
-                    style=0.0,
-                    speed=1.0,
-                    use_speaker_boost=True 
-                ),
+                voice_settings=VoiceSettings(**vs_dict),
                 model_id=model.value
             )
             
@@ -166,7 +201,8 @@ class TTSService:
     async def generate_and_store_audio(self, text: str, voice_line_id: int, user_id: str,
                                      voice_id: str = None, language: LanguageEnum = None, 
                                      gender: GenderEnum = None,
-                                     model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
+                                     model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,
+                                     voice_settings: Optional[Dict] = None) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
         """
         Generate TTS audio and store it in one operation
         
@@ -177,7 +213,7 @@ class TTSService:
             console_logger.info(f"Generating and storing audio for voice line {voice_line_id} (user: {user_id})")
             
             # Step 1: Generate audio with voice selection
-            audio_data = await self.generate_audio(text, voice_id, language, gender, model)
+            audio_data = await self.generate_audio(text, voice_id, language, gender, model, voice_settings)
             
             # Step 2: Store audio with user-dependent path
             signed_url, storage_path = await self.store_audio_file(audio_data, voice_line_id, user_id)
@@ -214,7 +250,8 @@ class TTSService:
     async def regenerate_audio(self, old_storage_path: str, new_text: str, voice_line_id: int, 
                              user_id: str, voice_id: str = None, language: LanguageEnum = None, 
                              gender: GenderEnum = None,
-                             model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
+                             model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,
+                             voice_settings: Optional[Dict] = None) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
         """
         Regenerate audio (delete old, create new) with user-dependent storage
         
@@ -226,7 +263,7 @@ class TTSService:
             
             # Generate new audio first
             success, new_signed_url, new_storage_path, error_msg = await self.generate_and_store_audio(
-                new_text, voice_line_id, user_id, voice_id, language, gender, model
+                new_text, voice_line_id, user_id, voice_id, language, gender, model, voice_settings
             )
             
             if success and new_signed_url:
