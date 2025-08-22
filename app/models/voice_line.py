@@ -14,13 +14,16 @@ class VoiceLine(Base, TimestampMixin):
     text: Mapped[str] = mapped_column(Text, nullable=False) 
     type: Mapped[VoiceLineTypeEnum] = mapped_column(Enum(VoiceLineTypeEnum), nullable=False)  
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    
-    # Storage - User-dependent private storage only
-    storage_url: Mapped[str] = mapped_column(String(500), nullable=True)  # Signed URL (temporary)
-    storage_path: Mapped[str] = mapped_column(String(255), nullable=True)  # Internal storage path (permanent)
 
     # Relationship back to scenario
     scenario: Mapped["Scenario"] = relationship("Scenario", back_populates="voice_lines")
+    
+    # Audio assets (history of generated TTS results for this voice line)
+    audios = relationship(
+        "VoiceLineAudio",
+        back_populates="voice_line",
+        cascade="all, delete-orphan"
+    )
     
     def __repr__(self):
         return f"<VoiceLine(id={self.id}, scenario_id={self.scenario_id}, type='{self.type}')>"

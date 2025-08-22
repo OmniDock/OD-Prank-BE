@@ -42,6 +42,13 @@ class ElevenLabsModelEnum(enum.Enum):
     ELEVEN_TTV_V3 = "eleven_v3"            # Ultra-low latency, 32 languages
 
 
+# Voice line audio asset status
+class VoiceLineAudioStatusEnum(enum.Enum):
+    PENDING = "PENDING"
+    READY = "READY"
+    FAILED = "FAILED"
+
+
 # Helper function to get voice ID based on language and gender
 def get_voice_id(language: LanguageEnum, gender: GenderEnum) -> str:
     """Get the default voice ID for a language and gender combination"""
