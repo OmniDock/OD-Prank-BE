@@ -186,11 +186,6 @@ class ScenarioRepository:
         result = await self.db_session.execute(query)
         voice_line = result.scalar_one_or_none()
         
-        if voice_line:
-            console_logger.info(f"Found voice line {voice_line_id}")
-        else:
-            console_logger.warning(f"Voice line {voice_line_id} not found or access denied for user {user_id}")
-        
         return voice_line
 
     async def get_voice_lines_by_ids_with_user_check(self, voice_line_ids: List[int], user_id: str) -> List[VoiceLine]:

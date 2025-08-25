@@ -273,39 +273,61 @@ async def generate_batch_voice_lines(
                     ))
                     continue
 
-                success, signed_url, storage_path, error_msg = await tts_service.generate_and_store_audio(
-                    text=voice_line.text,
+                # If a matching PENDING exists, avoid duplicate
+                in_progress_result = await db_session.execute(
+                    select(VoiceLineAudio).where(
+                        VoiceLineAudio.voice_line_id == voice_line.id,
+                        VoiceLineAudio.content_hash == content_hash,
+                        VoiceLineAudio.status == VoiceLineAudioStatusEnum.PENDING,
+                    ).limit(1)
+                )
+                in_progress: VoiceLineAudio | None = in_progress_result.scalar_one_or_none()
+                if in_progress:
+                    results.append(TTSResult(
+                        voice_line_id=voice_line.id,
+                        success=False,
+                        signed_url=None,
+                        storage_path=None,
+                        error_message="Audio generation already in progress",
+                    ))
+                    continue
+
+                # Create PENDING record
+                processing_asset = VoiceLineAudio(
+                    voice_line_id=voice_line.id,
+                    voice_id=selected_voice_id,
+                    model_id=forced_model,
+                    voice_settings=voice_settings,
+                    storage_path=None,
+                    duration_ms=None,
+                    size_bytes=None,
+                    text_hash=tts_service.compute_text_hash(voice_line.text),
+                    settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
+                    content_hash=content_hash,
+                    status=VoiceLineAudioStatusEnum.PENDING,
+                    error=None,
+                )
+                db_session.add(processing_asset)
+                await db_session.commit()
+
+                # Start background generation
+                background_tasks.add_task(
+                    background_generate_and_store_audio,
                     voice_line_id=voice_line.id,
                     user_id=str(user.id),
+                    text=voice_line.text,
                     voice_id=selected_voice_id,
-                    language=None,
                     model=forced_model,
                     voice_settings=voice_settings,
+                    content_hash=content_hash,
                 )
-                
-                if success and storage_path:
-                    asset = VoiceLineAudio(
-                        voice_line_id=voice_line.id,
-                        voice_id=selected_voice_id,
-                        model_id=forced_model,
-                        voice_settings=voice_settings,
-                        storage_path=storage_path,
-                        duration_ms=None,
-                        size_bytes=None,
-                        text_hash=tts_service.compute_text_hash(voice_line.text),
-                        settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
-                        content_hash=content_hash,
-                        status=VoiceLineAudioStatusEnum.READY,
-                        error=None,
-                    )
-                    db_session.add(asset)
-                
+
                 results.append(TTSResult(
                     voice_line_id=voice_line.id,
-                    success=success,
-                    signed_url=signed_url,
-                    storage_path=storage_path,
-                    error_message=error_msg
+                    success=True,
+                    signed_url=None,
+                    storage_path=None,
+                    error_message="Audio generation started in background",
                 ))
                 
             except Exception as e:
@@ -315,8 +337,7 @@ async def generate_batch_voice_lines(
                     error_message=f"Generation failed: {str(e)}"
                 ))
         
-        # Commit all successful asset inserts
-        await repository.commit()
+        # Nothing else to commit here (each PENDING insert committed immediately)
         
         successful_count = sum(1 for r in results if r.success)
         
@@ -337,6 +358,7 @@ async def generate_batch_voice_lines(
 @router.post("/generate/scenario", response_model=TTSResponse)
 async def generate_scenario_voice_lines(
     request: ScenarioTTSRequest,
+    background_tasks: BackgroundTasks,
     user: AuthUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
 ):
@@ -392,39 +414,61 @@ async def generate_scenario_voice_lines(
                     ))
                     continue
 
-                success, signed_url, storage_path, error_msg = await tts_service.generate_and_store_audio(
-                    text=voice_line.text,
+                # If a matching PENDING exists, avoid duplicate
+                in_progress_result = await db_session.execute(
+                    select(VoiceLineAudio).where(
+                        VoiceLineAudio.voice_line_id == voice_line.id,
+                        VoiceLineAudio.content_hash == content_hash,
+                        VoiceLineAudio.status == VoiceLineAudioStatusEnum.PENDING,
+                    ).limit(1)
+                )
+                in_progress: VoiceLineAudio | None = in_progress_result.scalar_one_or_none()
+                if in_progress:
+                    results.append(TTSResult(
+                        voice_line_id=voice_line.id,
+                        success=False,
+                        signed_url=None,
+                        storage_path=None,
+                        error_message="Audio generation already in progress",
+                    ))
+                    continue
+
+                # Create PENDING record
+                processing_asset = VoiceLineAudio(
+                    voice_line_id=voice_line.id,
+                    voice_id=selected_voice_id,
+                    model_id=forced_model,
+                    voice_settings=voice_settings,
+                    storage_path=None,
+                    duration_ms=None,
+                    size_bytes=None,
+                    text_hash=tts_service.compute_text_hash(voice_line.text),
+                    settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
+                    content_hash=content_hash,
+                    status=VoiceLineAudioStatusEnum.PENDING,
+                    error=None,
+                )
+                db_session.add(processing_asset)
+                await db_session.commit()
+
+                # Start background generation
+                background_tasks.add_task(
+                    background_generate_and_store_audio,
                     voice_line_id=voice_line.id,
                     user_id=str(user.id),
+                    text=voice_line.text,
                     voice_id=selected_voice_id,
-                    language=None,
                     model=forced_model,
                     voice_settings=voice_settings,
+                    content_hash=content_hash,
                 )
-                
-                if success and storage_path:
-                    asset = VoiceLineAudio(
-                        voice_line_id=voice_line.id,
-                        voice_id=selected_voice_id,
-                        model_id=forced_model,
-                        voice_settings=voice_settings,
-                        storage_path=storage_path,
-                        duration_ms=None,
-                        size_bytes=None,
-                        text_hash=tts_service.compute_text_hash(voice_line.text),
-                        settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
-                        content_hash=content_hash,
-                        status=VoiceLineAudioStatusEnum.READY,
-                        error=None,
-                    )
-                    db_session.add(asset)
-                
+
                 results.append(TTSResult(
                     voice_line_id=voice_line.id,
-                    success=success,
-                    signed_url=signed_url,
-                    storage_path=storage_path,
-                    error_message=error_msg
+                    success=True,
+                    signed_url=None,
+                    storage_path=None,
+                    error_message="Audio generation started in background",
                 ))
                 
             except Exception as e:
@@ -434,8 +478,7 @@ async def generate_scenario_voice_lines(
                     error_message=f"Generation failed: {str(e)}"
                 ))
         
-        # Commit all successful asset inserts
-        await repository.commit()
+        # Nothing else to commit here (each PENDING insert committed immediately)
         
         successful_count = sum(1 for r in results if r.success)
         
@@ -456,6 +499,7 @@ async def generate_scenario_voice_lines(
 @router.post("/regenerate", response_model=TTSResult)
 async def regenerate_voice_line_audio(
     request: RegenerateTTSRequest,
+    background_tasks: BackgroundTasks,
     user: AuthUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
 ):
@@ -498,40 +542,59 @@ async def regenerate_voice_line_audio(
                 error_message=None,
             )
 
-        success, new_signed_url, new_storage_path, error_msg = await tts_service.generate_and_store_audio(
-            text=voice_line.text,
+        # If a matching PENDING exists, avoid duplicate
+        in_progress_result = await db_session.execute(
+            select(VoiceLineAudio).where(
+                VoiceLineAudio.voice_line_id == request.voice_line_id,
+                VoiceLineAudio.content_hash == content_hash,
+                VoiceLineAudio.status == VoiceLineAudioStatusEnum.PENDING,
+            ).limit(1)
+        )
+        in_progress: VoiceLineAudio | None = in_progress_result.scalar_one_or_none()
+        if in_progress:
+            return TTSResult(
+                voice_line_id=request.voice_line_id,
+                success=False,
+                signed_url=None,
+                storage_path=None,
+                error_message="Audio generation already in progress",
+            )
+
+        # Create PENDING record and start background generation
+        processing_asset = VoiceLineAudio(
+            voice_line_id=request.voice_line_id,
+            voice_id=selected_voice_id,
+            model_id=forced_model,
+            voice_settings=voice_settings,
+            storage_path=None,
+            duration_ms=None,
+            size_bytes=None,
+            text_hash=tts_service.compute_text_hash(voice_line.text),
+            settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
+            content_hash=content_hash,
+            status=VoiceLineAudioStatusEnum.PENDING,
+            error=None,
+        )
+        db_session.add(processing_asset)
+        await db_session.commit()
+
+        background_tasks.add_task(
+            background_generate_and_store_audio,
             voice_line_id=request.voice_line_id,
             user_id=str(user.id),
+            text=voice_line.text,
             voice_id=selected_voice_id,
-            language=None,
             model=forced_model,
             voice_settings=voice_settings,
+            content_hash=content_hash,
         )
-
-        if success and new_storage_path:
-            asset = VoiceLineAudio(
-                voice_line_id=request.voice_line_id,
-                voice_id=selected_voice_id,
-                model_id=forced_model,
-                voice_settings=voice_settings,
-                storage_path=new_storage_path,
-                duration_ms=None,
-                size_bytes=None,
-                text_hash=tts_service.compute_text_hash(voice_line.text),
-                settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
-                content_hash=content_hash,
-                status=VoiceLineAudioStatusEnum.READY,
-                error=None,
-            )
-            db_session.add(asset)
-            await repository.commit()
 
         return TTSResult(
             voice_line_id=request.voice_line_id,
-            success=success,
-            signed_url=new_signed_url,
-            storage_path=new_storage_path,
-            error_message=error_msg,
+            success=True,
+            signed_url=None,
+            storage_path=None,
+            error_message="Audio generation started in background",
         )
         
     except HTTPException:
@@ -583,7 +646,7 @@ async def get_voice_line_audio_url(
         if not asset or not asset.storage_path:
             # If no READY asset, check if generation is in progress and return PENDING
             if voice_id:
-                # Match PENDING for same voice and current text
+                # Prefer matching by current text_hash; if not found, relax to any PENDING for this voice_id
                 pending_r = await db_session.execute(
                     select(VoiceLineAudio).where(
                         VoiceLineAudio.voice_line_id == voice_line_id,
@@ -592,6 +655,16 @@ async def get_voice_line_audio_url(
                         VoiceLineAudio.status == VoiceLineAudioStatusEnum.PENDING,
                     ).order_by(VoiceLineAudio.created_at.desc()).limit(1)
                 )
+                pending_asset: VoiceLineAudio | None = pending_r.scalar_one_or_none()
+                if not pending_asset:
+                    pending_r_relaxed = await db_session.execute(
+                        select(VoiceLineAudio).where(
+                            VoiceLineAudio.voice_line_id == voice_line_id,
+                            VoiceLineAudio.voice_id == voice_id,
+                            VoiceLineAudio.status == VoiceLineAudioStatusEnum.PENDING,
+                        ).order_by(VoiceLineAudio.created_at.desc()).limit(1)
+                    )
+                    pending_asset = pending_r_relaxed.scalar_one_or_none()
             else:
                 # Fallback: any PENDING for this voice line
                 pending_r = await db_session.execute(
@@ -600,8 +673,8 @@ async def get_voice_line_audio_url(
                         VoiceLineAudio.status == VoiceLineAudioStatusEnum.PENDING,
                     ).order_by(VoiceLineAudio.created_at.desc()).limit(1)
                 )
+                pending_asset: VoiceLineAudio | None = pending_r.scalar_one_or_none()
 
-            pending_asset: VoiceLineAudio | None = pending_r.scalar_one_or_none()
             if pending_asset:
                 return JSONResponse(status_code=202, content={"status": VoiceLineAudioStatusEnum.PENDING.value})
 
