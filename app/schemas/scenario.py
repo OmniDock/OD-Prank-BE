@@ -37,6 +37,20 @@ class ScenarioCreateRequest(BaseModel):
         }
 
 
+class VoiceLineAudioResponse(BaseModel):
+    """Schema for voice line audio response"""
+    id: int
+    voice_id: str
+    storage_path: str
+    signed_url: Optional[str] = None
+    duration_ms: Optional[int] = None
+    size_bytes: Optional[int] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
 class VoiceLineResponse(BaseModel):
     """Schema for voice line response"""
     id: int
@@ -45,6 +59,8 @@ class VoiceLineResponse(BaseModel):
     order_index: int
     created_at: datetime
     updated_at: datetime
+    # Audio information for the preferred voice (if available)
+    preferred_audio: Optional[VoiceLineAudioResponse] = None
     
     class Config:
         from_attributes = True

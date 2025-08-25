@@ -1,9 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from typing import List, Optional
 from app.models.scenario import Scenario
 from app.models.voice_line import VoiceLine
+from app.models.voice_line_audio import VoiceLineAudio
+from app.core.utils.enums import VoiceLineAudioStatusEnum
 from app.core.logging import console_logger
 
 
@@ -47,7 +49,8 @@ class ScenarioRepository:
         return voice_lines
     
     async def get_scenario_by_id(self, scenario_id: int, user_id: str) -> Optional[Scenario]:
-        """Get a scenario by ID with voice lines (with RLS check)"""
+        """Get a scenario by ID with voice lines and preferred voice audios (with RLS check)"""
+        # First, get the scenario with voice lines
         query = (
             select(Scenario)
             .options(selectinload(Scenario.voice_lines))
@@ -56,7 +59,44 @@ class ScenarioRepository:
         )
         
         result = await self.db_session.execute(query)
-        return result.scalar_one_or_none()
+        scenario = result.scalar_one_or_none()
+        
+        if not scenario or not scenario.preferred_voice_id:
+            return scenario
+        
+        # If scenario has a preferred voice, load the corresponding audios for all voice lines
+        console_logger.info(f"Loading preferred voice audios for scenario {scenario_id} with voice {scenario.preferred_voice_id}")
+        
+        # Get all voice line IDs for this scenario
+        voice_line_ids = [vl.id for vl in scenario.voice_lines]
+        
+        if voice_line_ids:
+            # Query for READY audios that match the preferred voice
+            audio_query = (
+                select(VoiceLineAudio)
+                .where(
+                    and_(
+                        VoiceLineAudio.voice_line_id.in_(voice_line_ids),
+                        VoiceLineAudio.voice_id == scenario.preferred_voice_id,
+                        VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY
+                    )
+                )
+            )
+            
+            audio_result = await self.db_session.execute(audio_query)
+            audios = audio_result.scalars().all()
+            
+            # Create a mapping from voice_line_id to audio
+            audio_map = {audio.voice_line_id: audio for audio in audios}
+            
+            # Attach the audio to each voice line for easy access
+            for voice_line in scenario.voice_lines:
+                if voice_line.id in audio_map:
+                    # Temporarily store the preferred audio on the voice line object
+                    voice_line._preferred_audio = audio_map[voice_line.id]
+                    console_logger.debug(f"Attached preferred audio to voice line {voice_line.id}")
+        
+        return scenario
     
     async def get_user_scenarios(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Scenario]:
         """Get scenarios for a user"""

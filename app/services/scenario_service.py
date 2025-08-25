@@ -1,10 +1,11 @@
 from app.langchain.scenarios.initial_processor import InitialScenarioProcessor
 from app.langchain.scenarios.state import ScenarioProcessorState, VoiceLineState
-from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse
+from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, VoiceLineResponse, VoiceLineAudioResponse
 from app.core.auth import AuthUser
 from app.repositories.scenario_repository import ScenarioRepository
 from app.core.database import AsyncSession
 from app.core.logging import console_logger
+from app.services.tts_service import TTSService
 from typing import List, Optional
 from pprint import pprint 
 
@@ -114,12 +115,66 @@ class ScenarioService:
     
     
     async def get_scenario(self, user: AuthUser, scenario_id: int) -> ScenarioResponse:
-        """Get a scenario by ID"""
+        """Get a scenario by ID with preferred voice audios if available"""
         scenario = await self.repository.get_scenario_by_id(scenario_id, user.id)
         if not scenario:
             raise ValueError(f"Scenario {scenario_id} not found or access denied")
         
-        return ScenarioResponse.model_validate(scenario)
+        # Convert to dict for manipulation
+        scenario_dict = {
+            "id": scenario.id,
+            "title": scenario.title,
+            "description": scenario.description,
+            "language": scenario.language,
+            "preferred_voice_id": scenario.preferred_voice_id,
+            "target_name": scenario.target_name,
+            "scenario_analysis": scenario.scenario_analysis,
+            "is_safe": scenario.is_safe,
+            "is_not_safe_reason": scenario.is_not_safe_reason,
+            "is_public": scenario.is_public,
+            "is_active": scenario.is_active,
+            "created_at": scenario.created_at,
+            "updated_at": scenario.updated_at,
+            "voice_lines": []
+        }
+        
+        # Process voice lines and include audio information if available
+        tts_service = TTSService() if scenario.preferred_voice_id else None
+        
+        for voice_line in scenario.voice_lines:
+            voice_line_dict = {
+                "id": voice_line.id,
+                "text": voice_line.text,
+                "type": voice_line.type,
+                "order_index": voice_line.order_index,
+                "created_at": voice_line.created_at,
+                "updated_at": voice_line.updated_at,
+                "preferred_audio": None
+            }
+            
+            # Check if this voice line has a preferred audio attached
+            if hasattr(voice_line, '_preferred_audio') and voice_line._preferred_audio and tts_service:
+                audio = voice_line._preferred_audio
+                try:
+                    # Generate signed URL for the audio
+                    signed_url = await tts_service.get_audio_url(audio.storage_path)
+                    if signed_url:
+                        voice_line_dict["preferred_audio"] = {
+                            "id": audio.id,
+                            "voice_id": audio.voice_id,
+                            "storage_path": audio.storage_path,
+                            "signed_url": signed_url,
+                            "duration_ms": audio.duration_ms,
+                            "size_bytes": audio.size_bytes,
+                            "created_at": audio.created_at
+                        }
+                        console_logger.debug(f"Added preferred audio URL for voice line {voice_line.id}")
+                except Exception as e:
+                    console_logger.warning(f"Failed to generate signed URL for voice line {voice_line.id}: {str(e)}")
+            
+            scenario_dict["voice_lines"].append(voice_line_dict)
+        
+        return ScenarioResponse.model_validate(scenario_dict)
     
     
     async def get_user_scenarios(self, user: AuthUser, limit: int = 50, offset: int = 0) -> List[ScenarioResponse]:
