@@ -38,11 +38,11 @@ class TTSService:
     def default_voice_settings(self) -> Dict:
         """Optimierte Einstellungen für ElevenLabs v3 mit Audio-Tags und Akzenten"""
         return {
-            "stability": 0.50,  # Reduziert für mehr Expressivität mit Audio-Tags
-            "similarity_boost": 0.80,  # Erhöht für bessere Charakterkonsistenz
-            "style": 0.20,  # Erhöht für natürlichere Emotionen und Akzente
-            "speed": 1.15,  # Minimal langsamer für bessere Tag-Verarbeitung
-            "use_speaker_boost": True,
+            "stability": 0.5,  # Reduziert für mehr Expressivität mit Audio-Tags
+            "similarity_boost": 0.75,  # Erhöht für bessere Charakterkonsistenz
+            "style": 0.0,  # Erhöht für natürlichere Emotionen und Akzente
+            "speed": 1,  # Minimal langsamer für bessere Tag-Verarbeitung
+            "use_speaker_boost": False,
         }
 
     def _normalize_text(self, text: str) -> str:
