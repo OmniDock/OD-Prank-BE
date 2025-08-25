@@ -21,14 +21,14 @@ OPENING_VOICE_LINES_PROMPT = """
     [GREETING] + [AUTHORITY/COMPANY] + [SPECIFIC REASON] + [COOPERATION REQUEST]
 
     YOUTH-OPTIMIZED EXAMPLES (German context, Marcophono-inspired):
-    - [slight accent] "Hey there! Giuseppe from Technical Support. Your account is doing some really weird stuff right now... can we check this together?"
-    - "Hi {target_name}! [exhales] Kevin from DHL here. Your package has become... well, it's missing. Need your help real quick."
-    - [nervous] "Hello! This is Ahmed from Building WiFi Support. The internet in your building is acting up right now... you available?"
+    - [slight accent] "Hey there! Giuseppe from Technical Support. Your account is acting weird... can we check this?"
+    - "Hi {target_name}! [exhales] Kevin from DHL here. Your package is... missing. Need help real quick."
+    - [nervous] "Hello! Ahmed from WiFi Support. The internet is acting up... you available?"
 
     YOUTH-OPTIMIZED EXAMPLES (English context, Marcophono-style):
-    - [casual] "Hi! Tyler here from Instagram Support. Your account is doing some weird stuff... got a minute to fix this?"
-    - "Hey {target_name}! [slight accent] Maria from UberEats Support. Your order is... completely lost somehow. Can you help me locate it?"
-    - [nervous] "Hello! Jake from WiFi Support. The internet is having issues today... you free to help out?"
+    - [casual] "Hi! Tyler here from Instagram Support. Your account is doing weird stuff... got a minute?"
+    - "Hey {target_name}! [slight accent] Maria from UberEats Support. Your order is... lost. Can you help?"
+    - [nervous] "Hello! Jake from WiFi Support. The internet has issues... you free?"
 
     AVOID:
     - Vague introductions: "Hi, how are you?"

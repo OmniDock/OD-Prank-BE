@@ -225,6 +225,9 @@ class ScenarioService:
                 try:
                     console_logger.info(f"Processing voice line {voice_line.id}")
                     
+                    # Delete existing audio files for this voice line before enhancement
+                    await self._delete_voice_line_audios(voice_line.id)
+                    
                     # Create scenario data for the processor
                     from app.schemas.scenario import ScenarioCreateRequest
                     scenario_data = ScenarioCreateRequest(
@@ -234,13 +237,20 @@ class ScenarioService:
                         language=scenario.language
                     )
                     
+                    # Convert scenario_analysis from JSON back to ScenarioAnalysisResult
+                    scenario_analysis = None
+                    if scenario.scenario_analysis:
+                        from app.langchain.nodes.scenario_analyzer import ScenarioAnalysisResult
+                        scenario_analysis = ScenarioAnalysisResult.model_validate(scenario.scenario_analysis)
+                    
                     # Process enhancement with LangChain
                     enhancement_result = await processor.process_voice_line_enhancement(
                         voice_line_id=voice_line.id,
                         original_text=voice_line.text,
                         user_feedback=user_feedback,
                         scenario_data=scenario_data,
-                        voice_line_type=voice_line.type
+                        voice_line_type=voice_line.type,
+                        scenario_analysis=scenario_analysis
                     )
                     
                     # Check if enhancement was successful and safe
@@ -333,6 +343,26 @@ class ScenarioService:
             raise ValueError("Scenario not found or access denied")
         await self.repository.commit()
         return ScenarioResponse.model_validate(updated)
+
+    async def _delete_voice_line_audios(self, voice_line_id: int) -> None:
+        """Delete all audio records for a specific voice line"""
+        try:
+            from sqlalchemy import select, delete
+            from app.models.voice_line_audio import VoiceLineAudio
+            
+            # Delete all VoiceLineAudio records for this voice line
+            delete_stmt = delete(VoiceLineAudio).where(VoiceLineAudio.voice_line_id == voice_line_id)
+            result = await self.repository.db_session.execute(delete_stmt)
+            
+            deleted_count = result.rowcount
+            if deleted_count > 0:
+                console_logger.info(f"Deleted {deleted_count} audio records for voice line {voice_line_id}")
+            else:
+                console_logger.info(f"No audio records found to delete for voice line {voice_line_id}")
+                
+        except Exception as e:
+            console_logger.error(f"Failed to delete audio records for voice line {voice_line_id}: {str(e)}")
+            # Don't raise the exception - enhancement should continue even if audio deletion fails
 
 
 

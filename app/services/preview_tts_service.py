@@ -23,17 +23,17 @@ class PreviewTTSService:
         
         # Longer, expressive prank-call style previews with textual cues (eleven_v3)
         self.preview_text_default_en = (
-            "[loudly] Good evening! [coughing] Tiny emergency… [normal] "
-            "[confident] Quick check: What has two thumbs and makes bad jokes? "
-            "[sarcastic][strict indian accent] Not me, guy? [laughs softly] [long pause]  "
-            "[annoyed] Jokes aside — Ready when you are!"
+            "[exhales] Hey there! Giuseppe from WiFi Support. [confused] Your internet is... "
+            "acting really weird right now. [whispers] Quick question though... "
+            "[curious] do you guys like pineapple pizza? [slight accent] Mama mia, "
+            "[laughs] that's important for the... uh... connection quality!"
         )
         
         self.preview_text_default_de = (
-            "[loudly] Guten Abend! [coughing] Mini-Notfall… [normal] "
-            "[confident] Kurzer Test: Was hat zwei Daumen und vermasselt ständig Witze? "
-            "[strict french accent] Ich nicht? [laughs softly] [long pause]  "
-            "[annoyed] Spaß beiseite –. Bereit, wenn du’s bist!"
+            "[sighs] Hallo! Giuseppe hier von der Technik. [confused] Ihr Internet macht "
+            "gerade echt komische Sachen. [whispers] Aber mal ehrlich... "
+            "[curious] mögt ihr eigentlich Ananas-Pizza? [slight accent] Madonna mia, "
+            "[laughs] das ist wichtig für die... äh... Verbindungsqualität!"
         )
 
         # Storage and TTS
@@ -82,8 +82,6 @@ class PreviewTTSService:
         audio_bytes = await self.tts_service.generate_audio(
             text=text,
             voice_id=voice_id,
-            language=None,
-            gender=None,
             model=model,
             voice_settings=vs,
         )

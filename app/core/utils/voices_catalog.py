@@ -8,7 +8,7 @@ from app.core.utils.enums import (
 
 # Central curated voices catalog used by API and preview generation
 # Bump this when we change preview texts/settings to force new preview files
-PREVIEW_VERSION = "v7"
+PREVIEW_VERSION = "v8"
 # Each item: id, name, description, languages (order matters; first is primary), gender
 VOICES_CATALOG: List[Dict[str, Any]] = [
     {

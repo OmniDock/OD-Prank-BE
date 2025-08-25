@@ -40,14 +40,16 @@ class IndividualVoiceLineEnhancementProcessor:
         return workflow.compile()
 
     async def process_voice_line_enhancement(self, voice_line_id: int, original_text: str, 
-                                           user_feedback: str, scenario_data, voice_line_type) -> IndividualVoiceLineEnhancementState:
+                                           user_feedback: str, scenario_data, voice_line_type, 
+                                           scenario_analysis=None) -> IndividualVoiceLineEnhancementState:
         """Process individual voice line enhancement - public method"""
         state = IndividualVoiceLineEnhancementState(
             voice_line_id=voice_line_id,
             original_text=original_text,
             user_feedback=user_feedback,
             scenario_data=scenario_data,
-            voice_line_type=voice_line_type
+            voice_line_type=voice_line_type,
+            scenario_analysis=scenario_analysis
         )
         
         result = await self.workflow.ainvoke(state)
@@ -138,7 +140,8 @@ class IndividualVoiceLineEnhancementProcessor:
             # Use the overall safety check method
             result = await self.safety_checker.check_overall_safety(
                 state.scenario_data,
-                [voice_line_for_safety]
+                [voice_line_for_safety],
+                state.scenario_analysis
             )
             
             return {
