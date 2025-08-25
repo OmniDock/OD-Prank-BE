@@ -11,6 +11,7 @@ from app.core.utils.enums import ElevenLabsModelEnum, ElevenLabsVoiceIdEnum, Lan
 import hashlib
 import json
 import re
+import asyncio
 
 class TTSService: 
     """Unified TTS generation and storage service with user-dependent private storage"""
@@ -26,12 +27,10 @@ class TTSService:
         )
         self.bucket_name = "voice-lines"
 
-    def select_voice_id(self, voice_id: Optional[str], language: Optional[LanguageEnum], gender: Optional[GenderEnum]) -> str:
+    def select_voice_id(self, voice_id: Optional[str]) -> str:
         """Voice-Auswahl optimiert für Youth-Appeal und Akzent-Fähigkeiten"""
         if voice_id:
             return voice_id
-        if language and gender:
-            return get_voice_id(language, gender)
         # Default zu expressiveren Stimmen für junge Zielgruppe
         return ElevenLabsVoiceIdEnum.GERMAN_MALE_FELIX.value
 
@@ -94,7 +93,6 @@ class TTSService:
         return processed.strip()
 
     async def generate_audio(self, text: str, voice_id: str = None, 
-                           language: LanguageEnum = None, gender: GenderEnum = None,
                            model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,
                            voice_settings: Optional[Dict] = None) -> bytes:
         """
@@ -102,14 +100,14 @@ class TTSService:
         
         Args:
             text: Text to convert to speech
-            voice_id: Specific voice ID (overrides language/gender selection)
+            voice_id: Specific voice ID
             language: Language for voice selection
             gender: Gender for voice selection  
             model: ElevenLabs model to use (default: Eleven v3)
         """
         try:
             # Determine voice ID
-            selected_voice_id = self.select_voice_id(voice_id, language, gender)
+            selected_voice_id = self.select_voice_id(voice_id)
             
             # Pre-process text for better v3 performance
             processed_text = self._preprocess_text_for_v3(text)
@@ -119,15 +117,19 @@ class TTSService:
             console_logger.info(f"Processed text: {processed_text[:50]}...")
             
             vs_dict = voice_settings or self.default_voice_settings()
-            audio_generator = self.client.text_to_speech.convert(
-                text=processed_text,
-                voice_id=selected_voice_id,
-                voice_settings=VoiceSettings(**vs_dict),
-                model_id=model.value
-            )
-            
-            # Convert generator to bytes
-            audio_bytes = b''.join(audio_generator)
+
+            def _convert_sync() -> bytes:
+                # ElevenLabs SDK is synchronous; run in a thread to avoid blocking the event loop
+                generator = self.client.text_to_speech.convert(
+                    text=processed_text,
+                    voice_id=selected_voice_id,
+                    voice_settings=VoiceSettings(**vs_dict),
+                    model_id=model.value
+                )
+                return b"".join(generator)
+
+            # Offload blocking work to a thread
+            audio_bytes = await asyncio.to_thread(_convert_sync)
             
             console_logger.info("Audio generation successful")
             return audio_bytes
@@ -161,26 +163,32 @@ class TTSService:
             console_logger.info(f"Storing private audio file: {file_path}")
             console_logger.info(f"Audio data size: {len(audio_data)} bytes")
             
-            # Upload to Supabase Storage
-            response = self.storage_client.storage.from_(self.bucket_name).upload(
-                path=file_path,
-                file=audio_data,
-                file_options={
-                    "content-type": "audio/mpeg",
-                    "cache-control": "3600",
-                    "upsert": "false"
-                }
-            )
+            # Upload to Supabase Storage (blocking client) in a thread
+            def _upload_sync():
+                return self.storage_client.storage.from_(self.bucket_name).upload(
+                    path=file_path,
+                    file=audio_data,
+                    file_options={
+                        "content-type": "audio/mpeg",
+                        "cache-control": "3600",
+                        "upsert": "false"
+                    }
+                )
+
+            response = await asyncio.to_thread(_upload_sync)
             
             # Modern Supabase client doesn't have .error attribute
             # Instead, check if upload was successful by examining the response
             console_logger.info(f"Upload successful, response: {response}")
             
             # Generate signed URL for private access (valid for 1 hour)
-            signed_url_response = self.storage_client.storage.from_(self.bucket_name).create_signed_url(
-                path=file_path,
-                expires_in=3600  # 1 hour
-            )
+            def _signed_url_sync():
+                return self.storage_client.storage.from_(self.bucket_name).create_signed_url(
+                    path=file_path,
+                    expires_in=3600  # 1 hour
+                )
+
+            signed_url_response = await asyncio.to_thread(_signed_url_sync)
             
             # Extract signed URL from response
             if hasattr(signed_url_response, 'data') and signed_url_response.data:
@@ -213,10 +221,13 @@ class TTSService:
             expires_in: Expiration time for signed URLs (seconds, default 1 hour)
         """
         try:
-            signed_url_response = self.storage_client.storage.from_(self.bucket_name).create_signed_url(
-                path=storage_path,
-                expires_in=expires_in
-            )
+            def _signed_url_sync():
+                return self.storage_client.storage.from_(self.bucket_name).create_signed_url(
+                    path=storage_path,
+                    expires_in=expires_in
+                )
+
+            signed_url_response = await asyncio.to_thread(_signed_url_sync)
             
             # Handle different response formats
             if hasattr(signed_url_response, 'data') and signed_url_response.data:
@@ -231,9 +242,7 @@ class TTSService:
             return None
 
     async def generate_and_store_audio(self, text: str, voice_line_id: int, user_id: str,
-                                     voice_id: str = None, language: LanguageEnum = None, 
-                                     gender: GenderEnum = None,
-                                     model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,
+                                     voice_id: str = None, model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,
                                      voice_settings: Optional[Dict] = None) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
         """
         Generate TTS audio and store it in one operation
@@ -245,7 +254,7 @@ class TTSService:
             console_logger.info(f"Generating and storing audio for voice line {voice_line_id} (user: {user_id})")
             
             # Step 1: Generate audio with voice selection
-            audio_data = await self.generate_audio(text, voice_id, language, gender, model, voice_settings)
+            audio_data = await self.generate_audio(text, voice_id, model, voice_settings)
             
             # Step 2: Store audio with user-dependent path
             signed_url, storage_path = await self.store_audio_file(audio_data, voice_line_id, user_id)
@@ -268,7 +277,10 @@ class TTSService:
         try:
             console_logger.info(f"Deleting audio file: {storage_path}")
             
-            response = self.storage_client.storage.from_(self.bucket_name).remove([storage_path])
+            def _remove_sync():
+                return self.storage_client.storage.from_(self.bucket_name).remove([storage_path])
+
+            _ = await asyncio.to_thread(_remove_sync)
             
             # Modern Supabase client doesn't have .error attribute
             # If no exception is raised, consider it successful
@@ -280,8 +292,7 @@ class TTSService:
             return False
 
     async def regenerate_audio(self, old_storage_path: str, new_text: str, voice_line_id: int, 
-                             user_id: str, voice_id: str = None, language: LanguageEnum = None, 
-                             gender: GenderEnum = None,
+                             user_id: str, voice_id: str = None, 
                              model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,
                              voice_settings: Optional[Dict] = None) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
         """
@@ -295,7 +306,7 @@ class TTSService:
             
             # Generate new audio first
             success, new_signed_url, new_storage_path, error_msg = await self.generate_and_store_audio(
-                new_text, voice_line_id, user_id, voice_id, language, gender, model, voice_settings
+                new_text, voice_line_id, user_id, voice_id, model, voice_settings
             )
             
             if success and new_signed_url:

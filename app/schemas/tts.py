@@ -6,29 +6,21 @@ from app.core.utils.enums import LanguageEnum, GenderEnum, ElevenLabsModelEnum
 class SingleTTSRequest(BaseModel):
     voice_line_id: int
     voice_id: Optional[str] = None
-    language: Optional[LanguageEnum] = None
-    gender: Optional[GenderEnum] = None
     model: Optional[ElevenLabsModelEnum] = ElevenLabsModelEnum.ELEVEN_TTV_V3
 
 class BatchTTSRequest(BaseModel):
     voice_line_ids: List[int] = Field(..., min_items=1, max_items=50)  # Limit batch size
     voice_id: Optional[str] = None
-    language: Optional[LanguageEnum] = None
-    gender: Optional[GenderEnum] = None
     model: Optional[ElevenLabsModelEnum] = ElevenLabsModelEnum.ELEVEN_TTV_V3
 
 class ScenarioTTSRequest(BaseModel):
     scenario_id: int
     voice_id: Optional[str] = None
-    language: Optional[LanguageEnum] = None
-    gender: Optional[GenderEnum] = None
     model: Optional[ElevenLabsModelEnum] = ElevenLabsModelEnum.ELEVEN_TTV_V3
 
 class RegenerateTTSRequest(BaseModel):
     voice_line_id: int
     voice_id: Optional[str] = None
-    language: Optional[LanguageEnum] = None
-    gender: Optional[GenderEnum] = None
     model: Optional[ElevenLabsModelEnum] = ElevenLabsModelEnum.ELEVEN_TTV_V3
 
 class TTSResult(BaseModel):

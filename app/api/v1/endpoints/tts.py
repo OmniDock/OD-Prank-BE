@@ -1,15 +1,17 @@
 # app/api/v1/endpoints/tts.py
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import JSONResponse
 from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
 from app.services.tts_service import TTSService
 from app.repositories.scenario_repository import ScenarioRepository
-from app.core.utils.enums import VoiceLineAudioStatusEnum, ElevenLabsModelEnum, LanguageEnum, GenderEnum
+from app.core.utils.enums import VoiceLineAudioStatusEnum, ElevenLabsModelEnum
 from app.core.config import settings
 from app.core.utils.voices_catalog import get_voices_catalog, PREVIEW_VERSION
 from app.schemas.tts import SingleTTSRequest, BatchTTSRequest, ScenarioTTSRequest, RegenerateTTSRequest, TTSResult, TTSResponse, VoiceListResponse
 from sqlalchemy import select
 from app.models.voice_line_audio import VoiceLineAudio
+from app.core.logging import console_logger
 
 router = APIRouter(tags=["tts"])
 
@@ -20,8 +22,6 @@ async def background_generate_and_store_audio(
     user_id: str,
     text: str,
     voice_id: str,
-    language: str,
-    gender: str,
     model: ElevenLabsModelEnum,
     voice_settings: dict,
     content_hash: str
@@ -46,8 +46,6 @@ async def background_generate_and_store_audio(
                     voice_line_id=voice_line_id,
                     user_id=user_id,
                     voice_id=voice_id,
-                    language=language,
-                    gender=gender,
                     model=model,
                     voice_settings=voice_settings,
                 )
@@ -57,7 +55,6 @@ async def background_generate_and_store_audio(
                     asset = VoiceLineAudio(
                         voice_line_id=voice_line_id,
                         voice_id=voice_id,
-                        gender=gender,
                         model_id=model,
                         voice_settings=voice_settings,
                         storage_path=storage_path,
@@ -67,7 +64,6 @@ async def background_generate_and_store_audio(
                         settings_hash=tts_service.compute_settings_hash(voice_id, model, voice_settings),
                         content_hash=content_hash,
                         status=VoiceLineAudioStatusEnum.READY,
-                        user_id=user_id,
                     )
                     
                     db_session.add(asset)
@@ -124,7 +120,10 @@ async def generate_single_voice_line(
         
         # Prepare hashing & reuse
         tts_service = TTSService()
-        selected_voice_id = tts_service.select_voice_id(request.voice_id, request.language, request.gender)
+        if not request.voice_id:
+            raise HTTPException(status_code=400, detail="voice_id is required")
+        
+        selected_voice_id = request.voice_id
         voice_settings = tts_service.default_voice_settings()
         forced_model = ElevenLabsModelEnum.ELEVEN_TTV_V3
         content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, forced_model, voice_settings)
@@ -137,6 +136,8 @@ async def generate_single_voice_line(
                 VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY,
             ).limit(1)
         )
+
+
         existing: VoiceLineAudio | None = result.scalar_one_or_none()
 
         if existing and existing.storage_path:
@@ -154,7 +155,7 @@ async def generate_single_voice_line(
             select(VoiceLineAudio).where(
                 VoiceLineAudio.voice_line_id == request.voice_line_id,
                 VoiceLineAudio.content_hash == content_hash,
-                VoiceLineAudio.status == VoiceLineAudioStatusEnum.PROCESSING,
+                VoiceLineAudio.status == VoiceLineAudioStatusEnum.PENDING,
             ).limit(1)
         )
         in_progress: VoiceLineAudio | None = in_progress_result.scalar_one_or_none()
@@ -172,7 +173,6 @@ async def generate_single_voice_line(
         processing_asset = VoiceLineAudio(
             voice_line_id=request.voice_line_id,
             voice_id=selected_voice_id,
-            gender=request.gender,
             model_id=forced_model,
             voice_settings=voice_settings,
             storage_path=None,  # Will be set when completed
@@ -181,7 +181,7 @@ async def generate_single_voice_line(
             text_hash=tts_service.compute_text_hash(voice_line.text),
             settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
             content_hash=content_hash,
-            status=VoiceLineAudioStatusEnum.PROCESSING,
+            status=VoiceLineAudioStatusEnum.PENDING,
             error=None,
         )
         
@@ -195,8 +195,6 @@ async def generate_single_voice_line(
             user_id=str(user.id),
             text=voice_line.text,
             voice_id=selected_voice_id,
-            language=request.language,
-            gender=request.gender,
             model=forced_model,
             voice_settings=voice_settings,
             content_hash=content_hash,
@@ -242,10 +240,14 @@ async def generate_batch_voice_lines(
         
         results = []
         
+        # Require voice_id for batch generation
+        if not request.voice_id:
+            raise HTTPException(status_code=400, detail="voice_id is required")
+
         # Process each voice line
         for voice_line in voice_lines:
             try:
-                selected_voice_id = tts_service.select_voice_id(request.voice_id, request.language, request.gender)
+                selected_voice_id = request.voice_id
                 voice_settings = tts_service.default_voice_settings()
                 forced_model = ElevenLabsModelEnum.ELEVEN_TTV_V3
                 content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, forced_model, voice_settings)
@@ -276,8 +278,7 @@ async def generate_batch_voice_lines(
                     voice_line_id=voice_line.id,
                     user_id=str(user.id),
                     voice_id=selected_voice_id,
-                    language=request.language,
-                    gender=request.gender,
+                    language=None,
                     model=forced_model,
                     voice_settings=voice_settings,
                 )
@@ -286,7 +287,6 @@ async def generate_batch_voice_lines(
                     asset = VoiceLineAudio(
                         voice_line_id=voice_line.id,
                         voice_id=selected_voice_id,
-                        gender=request.gender,
                         model_id=forced_model,
                         voice_settings=voice_settings,
                         storage_path=storage_path,
@@ -358,13 +358,15 @@ async def generate_scenario_voice_lines(
         tts_service = TTSService()
         results = []
         
-        # Use scenario language if not specified in request
-        scenario_language = request.language or scenario.language
+        # Determine voice to use: request.voice_id or scenario preferred
+        selected_default_voice_id = request.voice_id or scenario.preferred_voice_id
+        if not selected_default_voice_id:
+            raise HTTPException(status_code=400, detail="voice_id is required (or set preferred voice on scenario)")
         
         # Process each voice line
         for voice_line in voice_lines:
             try:
-                selected_voice_id = tts_service.select_voice_id(request.voice_id, scenario_language, request.gender)
+                selected_voice_id = selected_default_voice_id
                 voice_settings = tts_service.default_voice_settings()
                 forced_model = ElevenLabsModelEnum.ELEVEN_TTV_V3
                 content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, forced_model, voice_settings)
@@ -395,8 +397,7 @@ async def generate_scenario_voice_lines(
                     voice_line_id=voice_line.id,
                     user_id=str(user.id),
                     voice_id=selected_voice_id,
-                    language=scenario_language,
-                    gender=request.gender,
+                    language=None,
                     model=forced_model,
                     voice_settings=voice_settings,
                 )
@@ -405,7 +406,6 @@ async def generate_scenario_voice_lines(
                     asset = VoiceLineAudio(
                         voice_line_id=voice_line.id,
                         voice_id=selected_voice_id,
-                        gender=request.gender,
                         model_id=forced_model,
                         voice_settings=voice_settings,
                         storage_path=storage_path,
@@ -471,7 +471,9 @@ async def regenerate_voice_line_audio(
         
         # Generate (with reuse); keep history (no delete)
         tts_service = TTSService()
-        selected_voice_id = tts_service.select_voice_id(request.voice_id, request.language, request.gender)
+        if not request.voice_id:
+            raise HTTPException(status_code=400, detail="voice_id is required")
+        selected_voice_id = request.voice_id
         voice_settings = tts_service.default_voice_settings()
         forced_model = ElevenLabsModelEnum.ELEVEN_TTV_V3
         content_hash = tts_service.compute_content_hash(voice_line.text, selected_voice_id, forced_model, voice_settings)
@@ -501,8 +503,7 @@ async def regenerate_voice_line_audio(
             voice_line_id=request.voice_line_id,
             user_id=str(user.id),
             voice_id=selected_voice_id,
-            language=request.language,
-            gender=request.gender,
+            language=None,
             model=forced_model,
             voice_settings=voice_settings,
         )
@@ -511,7 +512,6 @@ async def regenerate_voice_line_audio(
             asset = VoiceLineAudio(
                 voice_line_id=request.voice_line_id,
                 voice_id=selected_voice_id,
-                gender=request.gender,
                 model_id=forced_model,
                 voice_settings=voice_settings,
                 storage_path=new_storage_path,
@@ -550,9 +550,8 @@ async def get_voice_line_audio_url(
 ):
     """Get a fresh signed URL for accessing voice line audio"""
     try:
+
         repository = ScenarioRepository(db_session)
-        
-        # Verify user owns the voice line
         voice_line = await repository.get_voice_line_by_id_with_user_check(voice_line_id, user.id)
         
         if not voice_line:
@@ -582,6 +581,30 @@ async def get_voice_line_audio_url(
 
         asset: VoiceLineAudio | None = r.scalar_one_or_none()
         if not asset or not asset.storage_path:
+            # If no READY asset, check if generation is in progress and return PENDING
+            if voice_id:
+                # Match PENDING for same voice and current text
+                pending_r = await db_session.execute(
+                    select(VoiceLineAudio).where(
+                        VoiceLineAudio.voice_line_id == voice_line_id,
+                        VoiceLineAudio.voice_id == voice_id,
+                        VoiceLineAudio.text_hash == tts_service.compute_text_hash(voice_line.text),
+                        VoiceLineAudio.status == VoiceLineAudioStatusEnum.PENDING,
+                    ).order_by(VoiceLineAudio.created_at.desc()).limit(1)
+                )
+            else:
+                # Fallback: any PENDING for this voice line
+                pending_r = await db_session.execute(
+                    select(VoiceLineAudio).where(
+                        VoiceLineAudio.voice_line_id == voice_line_id,
+                        VoiceLineAudio.status == VoiceLineAudioStatusEnum.PENDING,
+                    ).order_by(VoiceLineAudio.created_at.desc()).limit(1)
+                )
+
+            pending_asset: VoiceLineAudio | None = pending_r.scalar_one_or_none()
+            if pending_asset:
+                return JSONResponse(status_code=202, content={"status": VoiceLineAudioStatusEnum.PENDING.value})
+
             raise HTTPException(status_code=404, detail="No audio file found for this voice line")
 
         # Generate fresh signed URL

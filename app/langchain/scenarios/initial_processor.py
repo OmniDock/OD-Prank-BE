@@ -30,10 +30,10 @@ class InitialScenarioProcessor:
     def with_default_counts(cls) -> "InitialScenarioProcessor":
         """Create processor with default target counts for each voice line type"""
         default_counts = {
-            VoiceLineTypeEnum.OPENING: 3,
-            VoiceLineTypeEnum.QUESTION: 5,
-            VoiceLineTypeEnum.RESPONSE: 5,
-            VoiceLineTypeEnum.CLOSING: 2
+            VoiceLineTypeEnum.OPENING: 1,
+            VoiceLineTypeEnum.QUESTION: 1,
+            VoiceLineTypeEnum.RESPONSE: 1,
+            VoiceLineTypeEnum.CLOSING: 1
         }
         return cls(default_counts)
 

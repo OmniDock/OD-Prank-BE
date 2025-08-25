@@ -1,7 +1,7 @@
 from sqlalchemy import String, Text, Integer, ForeignKey, Enum, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, TimestampMixin
-from app.core.utils.enums import GenderEnum, ElevenLabsModelEnum, VoiceLineAudioStatusEnum
+from app.core.utils.enums import ElevenLabsModelEnum, VoiceLineAudioStatusEnum
 
 
 class VoiceLineAudio(Base, TimestampMixin):
@@ -12,7 +12,6 @@ class VoiceLineAudio(Base, TimestampMixin):
 
     # TTS selection & settings
     voice_id: Mapped[str] = mapped_column(String(100), nullable=False)
-    gender: Mapped[GenderEnum] = mapped_column(Enum(GenderEnum), nullable=True)
     model_id: Mapped[ElevenLabsModelEnum] = mapped_column(Enum(ElevenLabsModelEnum), nullable=False)
     voice_settings = mapped_column(JSON, nullable=True)
 
