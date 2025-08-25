@@ -43,7 +43,6 @@ class VoiceLineResponse(BaseModel):
     text: str
     type: VoiceLineTypeEnum
     order_index: int
-    storage_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     

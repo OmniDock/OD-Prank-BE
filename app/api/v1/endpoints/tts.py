@@ -14,6 +14,79 @@ from app.models.voice_line_audio import VoiceLineAudio
 router = APIRouter(tags=["tts"])
 
 
+# Background task functions
+async def background_generate_and_store_audio(
+    voice_line_id: int,
+    user_id: str,
+    text: str,
+    voice_id: str,
+    language: str,
+    gender: str,
+    model: ElevenLabsModelEnum,
+    voice_settings: dict,
+    content_hash: str
+):
+    """Background task to generate and store TTS audio"""
+    try:
+        from app.core.database import get_db_session
+        from app.models.voice_line_audio import VoiceLineAudio
+        from app.core.utils.enums import VoiceLineAudioStatusEnum
+        
+        console_logger = __import__('app.core.logging', fromlist=['console_logger']).console_logger
+        console_logger.info(f"Background TTS generation started for voice line {voice_line_id}")
+        
+        # Create new database session for background task
+        async for db_session in get_db_session():
+            try:
+                tts_service = TTSService()
+                
+                # Generate and store audio
+                success, signed_url, storage_path, error_msg = await tts_service.generate_and_store_audio(
+                    text=text,
+                    voice_line_id=voice_line_id,
+                    user_id=user_id,
+                    voice_id=voice_id,
+                    language=language,
+                    gender=gender,
+                    model=model,
+                    voice_settings=voice_settings,
+                )
+                
+                if success and storage_path:
+                    # Create and persist the audio record
+                    asset = VoiceLineAudio(
+                        voice_line_id=voice_line_id,
+                        voice_id=voice_id,
+                        gender=gender,
+                        model_id=model,
+                        voice_settings=voice_settings,
+                        storage_path=storage_path,
+                        duration_ms=None,
+                        size_bytes=None,
+                        text_hash=tts_service.compute_text_hash(text),
+                        settings_hash=tts_service.compute_settings_hash(voice_id, model, voice_settings),
+                        content_hash=content_hash,
+                        status=VoiceLineAudioStatusEnum.READY,
+                        user_id=user_id,
+                    )
+                    
+                    db_session.add(asset)
+                    await db_session.commit()
+                    console_logger.info(f"Background TTS generation completed successfully for voice line {voice_line_id}")
+                else:
+                    console_logger.error(f"Background TTS generation failed for voice line {voice_line_id}: {error_msg}")
+                    
+            except Exception as e:
+                console_logger.error(f"Background TTS generation error for voice line {voice_line_id}: {str(e)}")
+                await db_session.rollback()
+            finally:
+                await db_session.close()
+                break
+                
+    except Exception as e:
+        console_logger.error(f"Background TTS task setup failed for voice line {voice_line_id}: {str(e)}")
+
+
 # Endpoints
 @router.get("/voices", response_model=VoiceListResponse)
 async def get_available_voices():
@@ -36,6 +109,7 @@ async def get_available_voices():
 @router.post("/generate/single", response_model=TTSResult)
 async def generate_single_voice_line(
     request: SingleTTSRequest,
+    background_tasks: BackgroundTasks,
     user: AuthUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
 ):
@@ -75,44 +149,65 @@ async def generate_single_voice_line(
                 error_message=None,
             )
 
-        # Generate new audio
-        success, signed_url, storage_path, error_msg = await tts_service.generate_and_store_audio(
-            text=voice_line.text,
+        # Check if generation is already in progress
+        in_progress_result = await db_session.execute(
+            select(VoiceLineAudio).where(
+                VoiceLineAudio.voice_line_id == request.voice_line_id,
+                VoiceLineAudio.content_hash == content_hash,
+                VoiceLineAudio.status == VoiceLineAudioStatusEnum.PROCESSING,
+            ).limit(1)
+        )
+        in_progress: VoiceLineAudio | None = in_progress_result.scalar_one_or_none()
+
+        if in_progress:
+            return TTSResult(
+                voice_line_id=request.voice_line_id,
+                success=False,
+                signed_url=None,
+                storage_path=None,
+                error_message="Audio generation already in progress",
+            )
+
+        # Create processing record to prevent duplicate requests
+        processing_asset = VoiceLineAudio(
+            voice_line_id=request.voice_line_id,
+            voice_id=selected_voice_id,
+            gender=request.gender,
+            model_id=forced_model,
+            voice_settings=voice_settings,
+            storage_path=None,  # Will be set when completed
+            duration_ms=None,
+            size_bytes=None,
+            text_hash=tts_service.compute_text_hash(voice_line.text),
+            settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
+            content_hash=content_hash,
+            status=VoiceLineAudioStatusEnum.PROCESSING,
+            error=None,
+        )
+        
+        db_session.add(processing_asset)
+        await db_session.commit()
+
+        # Start background generation
+        background_tasks.add_task(
+            background_generate_and_store_audio,
             voice_line_id=request.voice_line_id,
             user_id=str(user.id),
+            text=voice_line.text,
             voice_id=selected_voice_id,
             language=request.language,
             gender=request.gender,
             model=forced_model,
             voice_settings=voice_settings,
+            content_hash=content_hash,
         )
-
-        if success and storage_path:
-            # Persist new asset (history)
-            asset = VoiceLineAudio(
-                voice_line_id=request.voice_line_id,
-                voice_id=selected_voice_id,
-                gender=request.gender,
-                model_id=forced_model,
-                voice_settings=voice_settings,
-                storage_path=storage_path,
-                duration_ms=None,
-                size_bytes=None,
-                text_hash=tts_service.compute_text_hash(voice_line.text),
-                settings_hash=tts_service.compute_settings_hash(selected_voice_id, forced_model, voice_settings),
-                content_hash=content_hash,
-                status=VoiceLineAudioStatusEnum.READY,
-                error=None,
-            )
-            db_session.add(asset)
-            await repository.commit()
 
         return TTSResult(
             voice_line_id=request.voice_line_id,
-            success=success,
-            signed_url=signed_url,
-            storage_path=storage_path,
-            error_message=error_msg,
+            success=True,
+            signed_url=None,  # Will be available once background task completes
+            storage_path=None,
+            error_message="Audio generation started in background",
         )
         
     except HTTPException:
