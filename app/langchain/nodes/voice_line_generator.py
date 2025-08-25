@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from typing import List
 
 from app.schemas.scenario import ScenarioCreateRequest
-from app.core.utils.enums import VoiceLineTypeEnum, LanguageEnum
+from app.core.utils.enums import VoiceLineTypeEnum
 from app.core.logging import console_logger
 
 # Import the new prompt structure
@@ -16,7 +16,8 @@ from app.langchain.prompts.voice_line_prompts import (
     QUESTION_VOICE_LINES_PROMPT,
     CLOSING_VOICE_LINES_PROMPT
 )
-from app.langchain.nodes.scenario_analyzer import  PersonaContextBuilder, ScenarioAnalysisResult
+from app.langchain.scenarios.state import ScenarioAnalysisResult
+from app.langchain.prompts.persona_context_builder import PersonaContextBuilder
 
 
 class VoiceLineGenerationResult(BaseModel):
@@ -29,7 +30,7 @@ class VoiceLineGenerationResult(BaseModel):
 class VoiceLineGenerator:
     """Enhanced voice line generator with dynamic persona analysis and separated prompts"""
     
-    def __init__(self, model_name: str = "gpt-4o"):
+    def __init__(self, model_name: str = "gpt-4.1"):
         self.model_name = model_name
         
     def _get_voice_line_prompt(self, voice_line_type: VoiceLineTypeEnum) -> str:
@@ -80,15 +81,11 @@ class VoiceLineGenerator:
             voice_line_type: VoiceLineTypeEnum, 
             count: int,
             scenario_analysis: ScenarioAnalysisResult,
-            language: LanguageEnum = LanguageEnum.GERMAN
         ) -> VoiceLineGenerationResult:
-        """Generate voice lines with shared scenario analysis"""
+
+        """Generate voice lines with shared scenario analysis"""    
         console_logger.info(f"Generating {count} {voice_line_type.value} voice lines using shared persona analysis")
         console_logger.info(f"Voice line type: {voice_line_type.value}, Persona: {scenario_analysis.persona_name if scenario_analysis else 'None'}")
-        
-        # Use provided scenario analysis
-        if not scenario_analysis:
-            raise ValueError("Scenario analysis is required for voice line generation")
         
         # Build complete system prompt
         system_prompt = self._build_complete_system_prompt(scenario_data, voice_line_type, scenario_analysis)
@@ -100,48 +97,48 @@ class VoiceLineGenerator:
         generation_prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             ("user", """
-            Generate {count} {voice_line_type} voice lines for this prank scenario.
-            
-            CRITICAL: These are {voice_line_type} voice lines - NOT opening lines!
-            - OPENING: First contact, introduce yourself and purpose (USE target name)
-            - QUESTION: Ask follow-up questions during ongoing conversation (AVOID overusing name)
-            - RESPONSE: React to target's questions/objections in mid-conversation (AVOID overusing name)
-            - CLOSING: End the call, wrap up the conversation (USE target name for farewell)
-            
-            NAME USAGE RULES:
-            - OPENING & CLOSING: Include target name naturally
-            - QUESTION & RESPONSE: Avoid using target name unless absolutely necessary
-            - Don't repeat the name excessively - it sounds robotic and unnatural!
-            
-            IMPORTANT: Generate ONLY the spoken text without quotation marks or any formatting!
-            
-            CRITICAL: Make the dialogue sound NATURALLY HUMAN with realistic speech patterns:
-            - Include natural hesitations: "Uhh...", "Well...", "Let's see..."
-            - Use self-corrections: "I mean... actually, let me put it this way..."
-            - Add thinking out loud: "Now where did I put... ah yes, here it is"
-            - Include SSML breaks for natural pauses: <break time="0.3s" />
-            - Use incomplete thoughts: "So the thing is... well, you know what I mean"
-            - Add natural restarts: "What I'm trying to— sorry, let me start over"
-            
-            Use the persona analysis and context provided to create natural, engaging dialogue that:
-            1. Maintains character consistency
-            2. Sounds completely natural when spoken with human imperfections
-            3. Fits the cultural and linguistic context
-            4. Follows the escalation strategy outlined
-            5. Incorporates the character's speech patterns and quirks
-            6. MATCHES THE SPECIFIC {voice_line_type} CONTEXT - not a fresh introduction!
-            7. NO quotation marks, brackets - just pure spoken dialogue!
-            8. MUST include realistic speech patterns and natural hesitations!
-            
-            SCENARIO DETAILS:
-            Title: {title}
-            Description: {description}
-            Target Name: {target_name}
-            Language: {language}
-            
-            Remember: You are {persona_name} from {company_service}. Stay in character!
-            Generate {voice_line_type} lines that fit naturally in the middle of an ongoing conversation!
-            Return only clean spoken text without any quotation marks or formatting!
+                Generate {count} {voice_line_type} voice lines for this prank scenario.
+                
+                CRITICAL: These are {voice_line_type} voice lines - NOT opening lines! (Marcophono-style)
+                - OPENING: First contact, introduce yourself and purpose (USE target name)
+                - QUESTION: Ask follow-up questions during ongoing conversation (AVOID overusing name)
+                - RESPONSE: React to target's questions/objections in mid-conversation (AVOID overusing name)
+                - CLOSING: End the call, wrap up the conversation (USE target name for farewell)
+                
+                NAME USAGE RULES:
+                - OPENING & CLOSING: Include target name naturally
+                - QUESTION & RESPONSE: Avoid using target name unless absolutely necessary
+                - Don't repeat the name excessively - it sounds robotic and unnatural!
+                
+                IMPORTANT: Generate ONLY the spoken text without quotation marks. Square-bracket audio tags (e.g., [sighs], [curious]) are allowed.
+                
+                YOUTH-OPTIMIZED: Make dialogue natural AND funny for 14-30 year olds (Marcophono-inspired):
+                - Natural hesitations: "Uh...", "Like...", "Hmm...", "Wait what..."
+                - Casual corrections: "I mean... uh, hold on..."
+                - Thinking aloud: "Where did I put... oh here!", "Wait... that's weird"
+                - Audio tags + punctuation: [confused] for confusion, ... for pauses, — for cuts
+                - Incomplete thoughts: "The thing is... well, you know?"
+                - Natural restarts: "What I was trying to say— forget it, dude"
+                
+                Use persona analysis for natural, engaging dialogue that:
+                1. Maintains character consistency with moderate youth appeal
+                2. Sounds natural with human imperfections AND is genuinely funny
+                3. Appeals to younger audiences without overwhelming slang
+                4. Follows escalation strategy (believable → absurd)
+                5. Incorporates character speech patterns with ACCENTS
+                6. Matches the specific {voice_line_type} CONTEXT
+                7. Uses audio tags sparingly (1-2 per line) for realism
+                8. Has natural speech patterns and hesitations!
+                
+                SCENARIO DETAILS:
+                Title: {title}
+                Description: {description}
+                Target Name: {target_name}
+                Language: {language}
+                
+                Remember: You are {persona_name} from {company_service} - stay in character but make it FUNNY!
+                Generate {voice_line_type} lines that fit naturally in ongoing conversations!
+                Return only spoken text (no quotation marks), audio tags in [square brackets] are allowed.
             """)
         ])
         
@@ -159,7 +156,7 @@ class VoiceLineGenerator:
             "company_service": scenario_analysis.company_service
         })
         
-        # Clean up any quotation marks that might have slipped through (but preserve SSML tags)
+        # Clean up any quotation marks that might have slipped through (audio tags are preserved)
         cleaned_voice_lines = [line.strip('"\'') for line in result.voice_lines]
         
         # Trim to requested count

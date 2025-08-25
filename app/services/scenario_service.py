@@ -22,14 +22,11 @@ class ScenarioService:
             # Step 1: Process scenario with LangChain
             initial_processor = InitialScenarioProcessor.with_default_counts()
             results = await initial_processor.process_scenario(scenario_data)
-            
 
-            console_logger.info(results)
-            
             # Step 2: Determine safety status from results
-            is_safe = results['overall_safety_passed']
+            is_safe = results['overall_safety_check'].is_safe
             # Use overall safety issues if available, otherwise fall back to initial safety issues
-            all_safety_issues = results['overall_safety_issues'] if results['overall_safety_issues'] else results['initial_safety_issues']
+            all_safety_issues = results['overall_safety_check'].issues if results['overall_safety_check'].issues else results['initial_safety_check'].issues
             safety_issues = "; ".join(all_safety_issues) if all_safety_issues else None
             
             # Step 3: Create scenario in database
@@ -59,11 +56,9 @@ class ScenarioService:
             
             # Step 7: Create processing summary
             processing_summary = {
-                "initial_safety_passed": results['initial_safety_passed'],
-                "initial_safety_attempts": results['initial_safety_attempts'],
-                "overall_safety_passed": results['overall_safety_passed'],
-                "overall_diversity_passed": results['overall_diversity_passed'],
-                "processing_complete": results['processing_complete'],
+                "initial_safety_check": results['initial_safety_check'],
+                "overall_safety_check": results['overall_safety_check'],
+                "scenario_analysis": results['scenario_analysis'],
                 "total_voice_lines_generated": len(voice_lines_data),
                 "voice_line_counts": {
                     voice_type: len([vl for vl in voice_lines_data if vl['type'] == voice_type])

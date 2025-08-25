@@ -27,18 +27,21 @@ class TTSService:
         self.bucket_name = "voice-lines"
 
     def select_voice_id(self, voice_id: Optional[str], language: Optional[LanguageEnum], gender: Optional[GenderEnum]) -> str:
+        """Voice-Auswahl optimiert für Youth-Appeal und Akzent-Fähigkeiten"""
         if voice_id:
             return voice_id
         if language and gender:
             return get_voice_id(language, gender)
+        # Default zu expressiveren Stimmen für junge Zielgruppe
         return ElevenLabsVoiceIdEnum.GERMAN_MALE_FELIX.value
 
     def default_voice_settings(self) -> Dict:
+        """Optimierte Einstellungen für ElevenLabs v3 mit Audio-Tags und Akzenten"""
         return {
-            "stability": 0.50,
-            "similarity_boost": 0.75,
-            "style": 0.0,
-            "speed": 1.0,
+            "stability": 0.50,  # Reduziert für mehr Expressivität mit Audio-Tags
+            "similarity_boost": 0.80,  # Erhöht für bessere Charakterkonsistenz
+            "style": 0.20,  # Erhöht für natürlichere Emotionen und Akzente
+            "speed": 1.15,  # Minimal langsamer für bessere Tag-Verarbeitung
             "use_speaker_boost": True,
         }
 
@@ -63,9 +66,32 @@ class TTSService:
         return self._sha256(canonical)
 
     def compute_content_hash(self, text: str, voice_id: str, model_id: ElevenLabsModelEnum, voice_settings: Optional[Dict]) -> str:
-        th = self.compute_text_hash(text)
+        # Use processed text for consistent hashing
+        processed_text = self._preprocess_text_for_v3(text)
+        th = self.compute_text_hash(processed_text)
         sh = self.compute_settings_hash(voice_id, model_id, voice_settings)
         return self._sha256(f"{th}|{sh}")
+    
+    def _preprocess_text_for_v3(self, text: str) -> str:
+        """Optimizes text for ElevenLabs v3 audio tags and accents (Marcophono-style)"""
+        # Normalize text
+        processed = self._normalize_text(text)
+        
+        # Optimize audio tag spacing for better performance
+        processed = re.sub(r'\[(\w+)\]\s*', r'[\1] ', processed)
+        
+        # Optimize punctuation for better timing
+        processed = re.sub(r'\.\.\.(\w)', r'... \1', processed)
+        processed = re.sub(r'—(\w)', r'— \1', processed)
+        
+        # Ensure audio tags are correctly formatted
+        processed = re.sub(r'\[\s*(\w+)\s*\]', r'[\1]', processed)
+        
+        # Enhance accent markers for better v3 performance
+        processed = re.sub(r'\bmamma mia\b', 'mamma mia', processed, flags=re.IGNORECASE)
+        processed = re.sub(r'\bvallah\b', 'vallah', processed, flags=re.IGNORECASE)
+        
+        return processed.strip()
 
     async def generate_audio(self, text: str, voice_id: str = None, 
                            language: LanguageEnum = None, gender: GenderEnum = None,
@@ -85,12 +111,16 @@ class TTSService:
             # Determine voice ID
             selected_voice_id = self.select_voice_id(voice_id, language, gender)
             
+            # Pre-process text for better v3 performance
+            processed_text = self._preprocess_text_for_v3(text)
+            
             console_logger.info(f"Generating audio with voice {selected_voice_id}, model {model.value}")
-            console_logger.info(f"Text: {text[:50]}...")
+            console_logger.info(f"Original text: {text[:50]}...")
+            console_logger.info(f"Processed text: {processed_text[:50]}...")
             
             vs_dict = voice_settings or self.default_voice_settings()
             audio_generator = self.client.text_to_speech.convert(
-                text=text,
+                text=processed_text,
                 voice_id=selected_voice_id,
                 voice_settings=VoiceSettings(**vs_dict),
                 model_id=model.value
@@ -104,6 +134,8 @@ class TTSService:
             
         except Exception as e:
             console_logger.error(f"TTS generation failed: {str(e)}")
+            console_logger.error(f"Failed text: {text[:100]}...")
+            console_logger.error(f"Voice ID: {selected_voice_id}, Model: {model.value}")
             raise
 
     def _get_storage_path(self, user_id: str, voice_line_id: int) -> str:

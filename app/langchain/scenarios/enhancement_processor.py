@@ -86,7 +86,7 @@ class IndividualVoiceLineEnhancementProcessor:
         class EnhancementResult(BaseModel):
             enhanced_text: str = Field(description="Enhanced voice line based on feedback")
         
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.6).with_structured_output(EnhancementResult)
+        llm = ChatOpenAI(model="gpt-4.1", temperature=0.6).with_structured_output(EnhancementResult)
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", """You are an expert prank call script writer. Enhance voice lines based on user feedback.

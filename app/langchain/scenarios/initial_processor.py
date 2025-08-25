@@ -11,8 +11,9 @@ from app.langchain.nodes.scenario_safety import ScenarioSafetyChecker
 from app.langchain.nodes.voice_line_generator import VoiceLineGenerator
 from app.langchain.nodes.scenario_analyzer import ScenarioAnalyzer, ScenarioAnalysisResult
 
+
 # State
-from .state import ScenarioProcessorState, VoiceLineState
+from .state import ScenarioProcessorState, VoiceLineState, SafetyCheckResult
 
 
 class InitialScenarioProcessor: 
@@ -107,24 +108,28 @@ class InitialScenarioProcessor:
         try:
             result = await self.scenario_safety.check_initial_safety(state.scenario_data)
             return {
-                "initial_safety_passed": result.is_safe,
-                "initial_safety_issues": result.issues,
-                "initial_safety_attempts": state.initial_safety_attempts + 1
+                "initial_safety_check": result
             }
         except Exception as e:
             return {
-                "initial_safety_passed": False,
-                "initial_safety_issues": [f"Safety check failed: {str(e)}"],
-                "initial_safety_attempts": state.initial_safety_attempts + 1
+                "initial_safety_check": SafetyCheckResult(
+                    is_safe=False,
+                    confidence=0.0,
+                    severity="critical",
+                    issues=[f"Safety check failed: {str(e)}"],
+                    categories=[],
+                    recommendation="reject",
+                    reasoning=f"Safety check failed: {str(e)}"
+                )
             }
     
     async def _initial_safety_router(self, state: ScenarioProcessorState) -> str:
         """Route based on safety assessment"""
-        if state.initial_safety_passed:
+        if state.initial_safety_check.is_safe:
             console_logger.info("Safety check passed, proceeding with scenario analysis")
             return "continue"
         else:
-            console_logger.warning(f"Safety check failed: {state.initial_safety_issues}")
+            console_logger.warning(f"Safety check failed: {state.initial_safety_check.issues}")
             return "end"
     
     async def _scenario_analysis_node(self, state: ScenarioProcessorState) -> ScenarioProcessorState:
@@ -136,18 +141,18 @@ class InitialScenarioProcessor:
             return {
                 "scenario_analysis": analysis_result
             }
+        
         except Exception as e:
             console_logger.error(f"Scenario analysis failed: {str(e)}")
-            # Return empty analysis - nodes should handle gracefully
             return {
                 "scenario_analysis": None
             }
         
+
     async def _voice_line_generation_parallel_node(self, state: ScenarioProcessorState) -> str:
         """Route based on voice line generation"""
         return state
     
-
     async def _generate_opening_node(self, state: ScenarioProcessorState) -> ScenarioProcessorState:
         """Generate opening voice lines"""
         try:
@@ -164,7 +169,6 @@ class InitialScenarioProcessor:
                 voice_line = VoiceLineState(
                     text=text,
                     type=VoiceLineTypeEnum.OPENING,
-                    generation_attempt=1
                 )
                 new_voice_lines.append(voice_line)
             
@@ -196,7 +200,6 @@ class InitialScenarioProcessor:
                 voice_line = VoiceLineState(
                     text=text,
                     type=VoiceLineTypeEnum.QUESTION,
-                    generation_attempt=1
                 )
                 new_voice_lines.append(voice_line)
             
@@ -227,7 +230,6 @@ class InitialScenarioProcessor:
                 voice_line = VoiceLineState(
                     text=text,
                     type=VoiceLineTypeEnum.RESPONSE,
-                    generation_attempt=1
                 )
                 new_voice_lines.append(voice_line)
             
@@ -258,7 +260,6 @@ class InitialScenarioProcessor:
                 voice_line = VoiceLineState(
                     text=text,
                     type=VoiceLineTypeEnum.CLOSING,
-                    generation_attempt=1
                 )
                 new_voice_lines.append(voice_line)
             
@@ -286,16 +287,23 @@ class InitialScenarioProcessor:
         try:
             result = await self.scenario_safety.check_overall_safety(
                 state.scenario_data,
-                state.opening_voice_lines + state.question_voice_lines + state.response_voice_lines + state.closing_voice_lines
+                state.opening_voice_lines + state.question_voice_lines + state.response_voice_lines + state.closing_voice_lines,
+                state.scenario_analysis
             )
-            
+            # At the end, be slightly stricter: allow and modify pass, review passes with issues flagged
             return {
-                "overall_safety_passed": result.is_safe,
-                "overall_safety_issues": result.issues
+                "overall_safety_check": result
             }
         except Exception as e:
             return {
-                "overall_safety_passed": False,
-                "overall_safety_issues": [f"Safety check failed: {str(e)}"]
+                "overall_safety_check": SafetyCheckResult(
+                    is_safe=False,
+                    confidence=0.0,
+                    severity="critical",
+                    issues=[f"Safety check failed: {str(e)}"],
+                    categories=[],
+                    recommendation="reject",
+                    reasoning=f"Safety check failed: {str(e)}"
+                )
             }
 

@@ -2,6 +2,7 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
+import re
 
 from app.schemas.scenario import ScenarioCreateRequest
 from app.core.utils.enums import VoiceLineTypeEnum
@@ -9,7 +10,8 @@ from app.core.logging import console_logger
 
 # Import the new prompt structure
 from app.langchain.prompts.base_prompts import BASE_SYSTEM_PROMPT, get_language_specific_context, get_emotional_state_context
-from app.langchain.nodes.scenario_analyzer import PersonaContextBuilder, ScenarioAnalysisResult
+from app.langchain.scenarios.state import ScenarioAnalysisResult
+from app.langchain.prompts.persona_context_builder import PersonaContextBuilder
 
 
 class IndividualVoiceLineEnhancementResult(BaseModel):
@@ -23,20 +25,20 @@ class IndividualVoiceLineEnhancementResult(BaseModel):
 class VoiceLineEnhancer:
     """Enhanced voice line enhancer with dynamic persona analysis and context awareness"""
     
-    def __init__(self, model_name: str = "gpt-4o"):
+    def __init__(self, model_name: str = "gpt-4.1"):
         self.model_name = model_name
         
         self.enhancement_system_prompt = """
-            VOICE LINE ENHANCEMENT SPECIALIST
+            VOICE LINE ENHANCEMENT SPECIALIST FOR YOUTH HUMOR
 
-            You are an expert at enhancing prank call voice lines based on user feedback while maintaining character authenticity and natural speech patterns.
+            You are an expert at enhancing prank call voice lines for 14-30 year olds based on user feedback while maintaining character authenticity and youth-appealing speech patterns. Use Marcophono-style humor but create original content.
 
-            ENHANCEMENT PRINCIPLES:
-            1. MAINTAIN PERSONA CONSISTENCY: Keep the character's established voice, quirks, and background
-            2. INCORPORATE FEEDBACK THOUGHTFULLY: Address user requests while preserving believability
-            3. ENHANCE NATURALNESS: Make speech more human-like and conversational
-            4. PRESERVE CULTURAL CONTEXT: Maintain language-appropriate formality and references
-            5. IMPROVE TTS OPTIMIZATION: Enhance for better speech synthesis delivery
+            ENHANCEMENT PRINCIPLES FOR YOUTH TARGET GROUP:
+            1. MAINTAIN PERSONA + YOUTH APPEAL: Keep character but make funnier for young people
+            2. FEEDBACK INTEGRATION: Implement user requests without losing credibility
+            3. NATURAL SPEECH: Make speech more human AND funnier for 14-30 year olds
+            4. MODERN CONTEXT: Maintain contemporary language and references (balanced)
+            5. ELEVENLABS V3 OPTIMIZATION: For better audio tag and accent performance
 
             ENHANCEMENT STRATEGIES:
 
@@ -46,11 +48,11 @@ class VoiceLineEnhancer:
             - Enhance without breaking the established persona
             - Maintain the original intent while improving execution
 
-            NATURALNESS IMPROVEMENTS:
-            - Add realistic speech hesitations and corrections
-            - Include character-appropriate emotional reactions
-            - Enhance conversational flow and pacing
-            - Improve speech patterns for TTS delivery
+            YOUTH-NATURALNESS IMPROVEMENTS:
+            - Natural hesitations ("Uh...", "Like...", "Wait what...")
+            - Character-specific emotional reactions with audio tags
+            - Improve conversational flow with casual, modern language
+            - Optimize speech patterns for ElevenLabs v3 with accents
 
             PERSONA PRESERVATION:
             - Keep character name, background, and company consistent
@@ -141,14 +143,14 @@ class VoiceLineEnhancer:
             6. Return ONLY the enhanced spoken text without quotation marks or formatting
             7. ADD natural speech elements: hesitations, self-corrections, SSML breaks, thinking out loud
             
-            CRITICAL: Make it sound MORE naturally human with realistic imperfections:
-            - Natural hesitations: "Uhh...", "Well...", "Let's see..."
-            - Self-corrections: "I mean... actually..."
-            - SSML breaks: <break time="0.3s" /> for natural pauses
-            - Thinking out loud: "Now where did I... ah yes"
+            CRITICAL: Make it naturally human AND funny for youth:
+            - Natural hesitations: "Uh...", "Like...", "Hmm...", "Wait what..."
+            - Casual corrections: "I mean... uh, hold on..."
+            - Audio tags instead of SSML: [thinking], [confused], [realizes] for natural pauses
+            - Thinking aloud casually: "Where did I put... oh here!"
             
-            IMPORTANT: Generate only clean spoken dialogue without quotes, brackets, or formatting!
-            The enhanced voice line should sound like something {persona_name} would naturally say, just better and more human.
+            IMPORTANT: Generate only clean spoken dialogue without quotation marks!
+            The enhanced voice line should sound like something {persona_name} would naturally say, just better and funnier for young people.
             """)
         ])
         
@@ -170,8 +172,11 @@ class VoiceLineEnhancer:
         
         console_logger.info(f"Enhanced voice line for {scenario_analysis.persona_name} with quality score: {result.quality_score}")
         
-        # Clean up any quotation marks that might have slipped through (but preserve SSML tags)
+        # Clean up any quotation marks that might have slipped through (but preserve Audio tags)
         cleaned_text = result.enhanced_text.strip('"\'')
+        
+        # Ensure Audio-Tags are properly formatted
+        cleaned_text = re.sub(r'\[\s*(\w+)\s*\]', r'[\1]', cleaned_text)
         
         return IndividualVoiceLineEnhancementResult(
             enhanced_text=cleaned_text,
