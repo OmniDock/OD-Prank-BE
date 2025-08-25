@@ -25,14 +25,14 @@ class PreviewTTSService:
         self.preview_text_default_en = (
             "[loudly] Good evening! [coughing] Tiny emergency… [normal] "
             "[confident] Quick check: What has two thumbs and makes bad jokes? "
-            "[sarcastic] Not me, guy? [laughs softly] [long pause]  "
+            "[sarcastic][strict indian accent] Not me, guy? [laughs softly] [long pause]  "
             "[annoyed] Jokes aside — Ready when you are!"
         )
         
         self.preview_text_default_de = (
-            "[loudly] Ijooo! [coughing] Mini-Notfall… [normal] "
+            "[loudly] Guten Abend! [coughing] Mini-Notfall… [normal] "
             "[confident] Kurzer Test: Was hat zwei Daumen und vermasselt ständig Witze? "
-            "[sarcastic] Ich nicht? [laughs softly] [long pause]  "
+            "[strict french accent] Ich nicht? [laughs softly] [long pause]  "
             "[annoyed] Spaß beiseite –. Bereit, wenn du’s bist!"
         )
 

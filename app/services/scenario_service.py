@@ -36,6 +36,7 @@ class ScenarioService:
                 "description": scenario_data.description,
                 "language": scenario_data.language,
                 "target_name": scenario_data.target_name,
+                "scenario_analysis": results['scenario_analysis'].model_dump() if results['scenario_analysis'] else None,
                 "is_safe": is_safe,
                 "is_not_safe_reason": safety_issues,
                 "is_public": False,  # Default to private

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from app.core.utils.enums import LanguageEnum, VoiceLineTypeEnum
 
@@ -60,6 +60,7 @@ class ScenarioResponse(BaseModel):
     language: LanguageEnum
     preferred_voice_id: Optional[str] = None
     target_name: str
+    scenario_analysis: Optional[Dict[str, Any]] = None
     is_safe: bool
     is_not_safe_reason: Optional[str] = None
     is_public: bool

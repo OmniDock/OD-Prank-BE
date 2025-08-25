@@ -8,7 +8,7 @@ from app.core.utils.enums import (
 
 # Central curated voices catalog used by API and preview generation
 # Bump this when we change preview texts/settings to force new preview files
-PREVIEW_VERSION = "v5"
+PREVIEW_VERSION = "v6"
 # Each item: id, name, description, languages (order matters; first is primary), gender
 VOICES_CATALOG: List[Dict[str, Any]] = [
     {
@@ -38,6 +38,34 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Soft, news presenter style",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.FEMALE,
+    },
+    {
+        "id": ElevenLabsVoiceIdEnum.GERMAN_MALE_SIMON.value,
+        "name": "Simon",
+        "description": "Young, Conversational",
+        "languages": [LanguageEnum.GERMAN],
+        "gender": GenderEnum.MALE,
+    },
+    {
+        "id": ElevenLabsVoiceIdEnum.GERMAN_FEMALE_LAURA.value,
+        "name": "Laura",
+        "description": "Young, Conversational",
+        "languages": [LanguageEnum.GERMAN],
+        "gender": GenderEnum.FEMALE,
+    },
+    {
+        "id": ElevenLabsVoiceIdEnum.MALE_MARK.value,
+        "name": "Mark",
+        "description": "Young, Conversational",
+        "languages": [LanguageEnum.GERMAN, LanguageEnum.ENGLISH],
+        "gender": GenderEnum.MALE,
+    },
+    {
+        "id": ElevenLabsVoiceIdEnum.ENGLISH_MALE_YASH.value,
+        "name": "Yash",
+        "description": "Young, Conversational",
+        "languages": [LanguageEnum.ENGLISH],
+        "gender": GenderEnum.MALE,
     },
 ]
 

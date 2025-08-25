@@ -1,8 +1,8 @@
 from sqlalchemy import String, Text, Integer, Boolean, UUID, Enum
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, TimestampMixin
-from typing import List
+from typing import List, Optional, Dict, Any
 from app.core.utils.enums import LanguageEnum
 
 
@@ -18,6 +18,9 @@ class Scenario(Base, TimestampMixin):
     language: Mapped[LanguageEnum] = mapped_column(Enum(LanguageEnum), nullable=False)
     preferred_voice_id: Mapped[str] = mapped_column(String(100), nullable=True)
     target_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Scenario analysis from LangChain processing (stored as JSON)
+    scenario_analysis: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     is_safe: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_not_safe_reason: Mapped[str] = mapped_column(Text, nullable=True)

@@ -28,11 +28,15 @@ class ElevenLabsVoiceIdEnum(enum.Enum):
     # English Voices
     ENGLISH_MALE_JARNATHAN = "c6SfcYrb2t09NHXiT80T"     # Well-rounded, young American voice
     ENGLISH_FEMALE_CHELSEA = "NHRgOEwqx5WZNClv5sat"  # Pleasant, British, engaging
-    
+    ENGLISH_MALE_YASH = "sXXU5CoXEMsIqocfPUh2"
     # German Voices (using multilingual voices optimized for German)
     GERMAN_MALE_FELIX = "pqHfZKP75CvOlQylNhV4"        # Strong, documentary style
     GERMAN_FEMALE_SUSI = "v3V1d2rk6528UrLKRuy8"     # Soft, news presenter style
 
+    GERMAN_MALE_SIMON = "K5ZVtkkBnuPY6YqXs70E"
+    GERMAN_FEMALE_LAURA = "zKHQdbB8oaQ7roNTiDTK"
+
+    MALE_MARK = "UgBBYS2sOqTuMpoF3BR0"
 
 class ElevenLabsModelEnum(enum.Enum):
     """ElevenLabs model options"""
