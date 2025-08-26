@@ -29,7 +29,7 @@ class VoiceLineEnhancer:
         self.model_name = model_name
         
         self.enhancement_system_prompt = """
-            VOICE LINE ENHANCEMENT SPECIALIST FOR YOUTH HUMOR
+            VOICE LINE ENHANCEMENT SPECIALIST FOR ADUIO BASED HUMOR 
 
             You are an expert at enhancing prank call voice lines for 14-30 year olds based on user feedback while maintaining character authenticity and youth-appealing speech patterns. Use Marcophono-style humor but create original content.
 

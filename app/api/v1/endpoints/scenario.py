@@ -10,6 +10,22 @@ from pydantic import BaseModel
 router = APIRouter(tags=["scenario"])
 
 
+@router.post('/followup', response_model=None)
+async def follow_up_questions(
+    scenario_create_request: ScenarioCreateRequest = Body(...),
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+    ) -> ScenarioCreateResponse:
+    """Create a new scenario with LangChain processing and save to database"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        result = await scenario_service.create_scenario(user, scenario_create_request)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create follow up questions: {str(e)}")
+    
+
+
 @router.post("/", response_model=ScenarioCreateResponse)
 async def create_scenario(
     scenario_create_request: ScenarioCreateRequest = Body(...),

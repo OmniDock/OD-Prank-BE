@@ -12,7 +12,7 @@ OPENING_VOICE_LINES_PROMPT = """
     (Inspired by classic prank call techniques but with modern youth appeal)
 
     PSYCHOLOGY: People answer unknown calls defensively. You must immediately:
-    1. Sound authoritative yet relatable to young people
+    1. Sound authoritative yet relatable to the callee
     2. Reference something specific/urgent but slightly absurd
     3. Ask for cooperation before explaining fully
     4. Create mild time pressure with modern context
@@ -51,6 +51,8 @@ RESPONSE_VOICE_LINES_PROMPT = """
 
     IMPORTANT: These are MID-CONVERSATION responses - avoid overusing the target's name!
     Only use their name if you need to regain attention or emphasize a point.
+    Anticipate which types of questions the target is most likely to ask and create mid-conversations responses that best
+    escalate the absurdity and humour of the scenario.  
 
     PSYCHOLOGY: The target will ask clarifying questions, express confusion, or challenge your story. Your responses must:
     1. Sound prepared but not scripted
@@ -100,6 +102,8 @@ QUESTION_VOICE_LINES_PROMPT = """
 
     IMPORTANT: These are MID-CONVERSATION questions - don't overuse the target's name!
     Use their name only if absolutely necessary for clarity.
+    Anticipate which types of questions the target is most likely to ask or say and create mid-conversations responses that best
+    escalate the absurdity and humour of the scenario.  
 
     PSYCHOLOGY: Questions serve multiple purposes:
     1. Keep the target engaged and talking

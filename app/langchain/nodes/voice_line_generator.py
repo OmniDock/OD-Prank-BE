@@ -112,7 +112,7 @@ class VoiceLineGenerator:
                 
                 IMPORTANT: Generate ONLY the spoken text without quotation marks. Square-bracket audio tags (e.g., [sighs], [curious]) are allowed.
                 
-                YOUTH-OPTIMIZED: Make dialogue natural AND funny for 14-30 year olds (Marcophono-inspired):
+                YOUTH-OPTIMIZED: Make dialogue natural AND funny (Marcophono-inspired):
                 - Natural hesitations: "Uh...", "Like...", "Hmm...", "Wait what..."
                 - Casual corrections: "I mean... uh, hold on..."
                 - Thinking aloud: "Where did I put... oh here!", "Wait... that's weird"
