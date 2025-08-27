@@ -100,12 +100,21 @@ class ScenarioCreateResponse(BaseModel):
 
 class ScenarioFollowUpResponse(BaseModel):
     '''Schema for follow up question response for scenario enhancement'''
-    questions: str
-    original_request: ScenarioCreateResponse
+    original_request: ScenarioCreateRequest
+    questions: List[str]
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
 
+
+class ScenarioEnhancementRequest(BaseModel):
+    """Schema for scenario enhancement request with questions and answers"""
+    original_request: ScenarioCreateRequest
+    questions: List[str]
+    answers: List[str]
+
+    class Config:
+        from_attributes = True
 
 class VoiceLineEnhancementRequest(BaseModel):
     """Schema for voice line enhancement request"""

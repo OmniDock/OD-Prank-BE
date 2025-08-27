@@ -103,7 +103,6 @@ class ScenarioSafetyChecker:
         })
 
         return result
-    
 
     async def check_overall_safety(self, scenario_data: ScenarioCreateRequest, voice_lines: List[VoiceLineState], scenario_analysis: ScenarioAnalysisResult) -> SafetyCheckResult:
         """Check scenario safety with structured output"""

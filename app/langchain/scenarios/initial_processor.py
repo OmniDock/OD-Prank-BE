@@ -306,4 +306,3 @@ class InitialScenarioProcessor:
                     reasoning=f"Safety check failed: {str(e)}"
                 )
             }
-

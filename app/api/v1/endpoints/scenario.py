@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.auth import get_current_user, AuthUser
-from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, VoiceLineEnhancementRequest, VoiceLineEnhancementResponse
+from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, ScenarioFollowUpResponse, ScenarioEnhancementRequest, VoiceLineEnhancementRequest, VoiceLineEnhancementResponse
 from fastapi import Body
 from app.services.scenario_service import ScenarioService
 from app.core.database import AsyncSession, get_db_session
@@ -8,22 +8,6 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 router = APIRouter(tags=["scenario"])
-
-
-@router.post('/followup', response_model=None)
-async def follow_up_questions(
-    scenario_create_request: ScenarioCreateRequest = Body(...),
-    user: AuthUser = Depends(get_current_user),
-    db_session: AsyncSession = Depends(get_db_session),
-    ) -> ScenarioCreateResponse:
-    """Create a new scenario with LangChain processing and save to database"""
-    try:
-        scenario_service = ScenarioService(db_session)
-        result = await scenario_service.create_scenario(user, scenario_create_request)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create follow up questions: {str(e)}")
-    
 
 
 @router.post("/", response_model=ScenarioCreateResponse)
@@ -55,6 +39,39 @@ async def get_scenario(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get scenario: {str(e)}")
+
+
+
+@router.post('/followup', response_model=ScenarioFollowUpResponse)
+async def follow_up_questions(
+    scenario_create_request: ScenarioCreateRequest = Body(...),
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> ScenarioFollowUpResponse:
+    """Generate follow-up questions for scenario enhancement"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        result = await scenario_service.generate_follow_up_questions(scenario_create_request)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate follow up questions: {str(e)}")
+
+
+@router.post('/enhance', response_model=ScenarioCreateResponse)
+async def enhance_scenario(
+    enhancement_request: ScenarioEnhancementRequest = Body(...),
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> ScenarioCreateResponse:
+    """Enhance a scenario with user answers to follow-up questions"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        result = await scenario_service.enhance_scenario_with_answers(user, enhancement_request)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to enhance scenario: {str(e)}")
+    
+
 
 
 @router.get("/", response_model=List[ScenarioResponse])

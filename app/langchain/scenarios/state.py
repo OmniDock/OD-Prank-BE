@@ -54,6 +54,14 @@ class VoiceLineState(BaseModel):
     type: VoiceLineTypeEnum
 
 
+class ScenarioEnhancementState(BaseModel):
+    scenario_data: ScenarioCreateRequest
+    follow_up_questions: Optional[str] = None
+    answers: Optional[str] = None
+    inital_safety_check: Optional[SafetyCheckResult] = None
+    answer_safety_check: Optional[SafetyCheckResult] = None
+    enhanced_scenario_data: Optional[ScenarioCreateRequest] = None
+
 
 class ScenarioProcessorState(BaseModel):
     """State object passed between nodes in the workflow"""
@@ -80,6 +88,10 @@ class ScenarioProcessorState(BaseModel):
         use_enum_values = True  
 
 
+
+class ScenarioEnhancementProcessorState(BaseModel):
+    scenario_data: ScenarioCreateRequest
+    follow_up_questions: str
 
 
 class IndividualVoiceLineEnhancementState(BaseModel):
