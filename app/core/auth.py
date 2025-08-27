@@ -21,8 +21,6 @@ class AuthUser:
             )
         self.email = email
         self.metadata = metadata or {}
-
-        console_logger.info(f"AuthUser initialized: {self.id}, {self.email}")
     
     def __str__(self):
         return f"AuthUser(id={self.id}, email={self.email})"

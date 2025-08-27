@@ -104,7 +104,6 @@ class AudioPreloadService:
         Args:
             user_id: User ID for authentication and caching
             scenario_id: Scenario ID to preload
-            preferred_voice_id: Optional voice ID filter (only preload audio for this voice)
             
         Returns:
             Tuple[success: bool, message: str, stats: Dict[str, Any]]
@@ -152,23 +151,25 @@ class AudioPreloadService:
             audio_files_to_load = []
             
             for voice_line in voice_lines:
-                # Find the best audio for this voice line
-                best_audio = None
-                
+                # Choose most recent READY audio that matches preferred_voice_id if provided,
+                # otherwise fallback to most recent READY audio.
+                best_preferred = None
+                best_any = None
+
                 for audio in voice_line.audios:
                     if audio.status != VoiceLineAudioStatusEnum.READY:
                         continue
-                    
-                    # If preferred voice is specified, only use that voice
-                    if preferred_voice_id and audio.voice_id != preferred_voice_id:
-                        continue
-                    
-                    # Take the most recent ready audio
-                    if best_audio is None or audio.created_at > best_audio.created_at:
-                        best_audio = audio
-                
-                if best_audio and best_audio.storage_path:
-                    audio_files_to_load.append((voice_line, best_audio))
+
+                    if best_any is None or audio.created_at > best_any.created_at:
+                        best_any = audio
+
+                    if preferred_voice_id and audio.voice_id == preferred_voice_id:
+                        if best_preferred is None or audio.created_at > best_preferred.created_at:
+                            best_preferred = audio
+
+                chosen = best_preferred or best_any
+                if chosen and chosen.storage_path:
+                    audio_files_to_load.append((voice_line, chosen))
             
             if not audio_files_to_load:
                 return False, "No ready audio files found for preloading", {"audio_count": 0}

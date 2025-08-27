@@ -3,13 +3,16 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 import httpx
+import base64
+import io
+import json
+import audioop
+from pydub import AudioSegment
 
 from app.core.config import settings
 from app.core.logging import console_logger
 from app.core.database import AsyncSession
 from app.services.audio_preload_service import AudioPreloadService, PreloadedAudio
-from app.services.tts_service import TTSService
-from app.core.utils.enums import VoiceLineTypeEnum
 
 
 @dataclass
@@ -18,10 +21,12 @@ class CallSession:
     scenario_id: int
     to_number: str
     from_number: str
-    call_id: Optional[str] = None
+    call_leg_id: Optional[str] = None
     call_control_id: Optional[str] = None
+    call_session_id: Optional[str] = None
     playlist: List[PreloadedAudio] = field(default_factory=list)
     current_index: int = 0
+    stream_mode: bool = True
 
 
 class TelnyxService:
@@ -31,15 +36,17 @@ class TelnyxService:
     # In-memory sessions keyed by call_control_id
     _sessions: Dict[str, CallSession] = {}
 
+    def get_session(self, call_control_id: str) -> Optional[CallSession]:
+        return self._sessions.get(call_control_id)
+    
     def __init__(self):
-        self.tts_service = TTSService()
+        pass
 
     async def _ensure_playlist(
         self,
         db_session: AsyncSession,
         user_id: str,
         scenario_id: int,
-        preferred_voice_id: Optional[str] = None,
     ) -> List[PreloadedAudio]:
         """
         Ensure audio is preloaded and return ordered playlist for the scenario.
@@ -47,7 +54,7 @@ class TelnyxService:
         preload = AudioPreloadService(db_session)
         cache = preload.get_preloaded_audio(user_id, scenario_id)
         if not cache:
-            ok, msg, _ = await preload.preload_scenario_audio(user_id, scenario_id, preferred_voice_id)
+            ok, msg, _ = await preload.preload_scenario_audio(user_id, scenario_id)
             if not ok:
                 raise RuntimeError(f"Preload failed: {msg}")
             cache = preload.get_preloaded_audio(user_id, scenario_id) or {}
@@ -63,29 +70,22 @@ class TelnyxService:
         user_id: str,
         scenario_id: int,
         to_number: str,
-        from_number: Optional[str] = None,
-        preferred_voice_id: Optional[str] = None,
     ) -> Tuple[str, str]:
         """
         Create an outbound call via Telnyx Call Control.
         Returns (call_id, call_control_id)
         """
-        from_number = from_number or settings.TELNYX_PHONE_NUMBER
+        from_number = settings.TELNYX_PHONE_NUMBER
 
-        playlist = await self._ensure_playlist(db_session, user_id, scenario_id, preferred_voice_id)
+        playlist = await self._ensure_playlist(db_session, user_id, scenario_id)
         if not playlist:
             raise RuntimeError("No READY audio found to play.")
-
-        webhook_url = f"{settings.TELNYX_WEBHOOK_BASE_URL}{settings.API_V1_STR}/telnyx/webhook"
 
         payload = {
             "to": to_number,
             "from": from_number,
-            # Either application_id (Call Control App) or connection_id (SIP connection)
-            # Prefer Application for Call Control
-            "application_id": settings.TELNYX_APPLICATION_ID,
-            # Explicit webhook override if needed
-            "webhook_url": webhook_url,
+            "connection_id": settings.TELNYX_APPLICATION_ID, 
+            "webhook_url": f"{settings.TELNYX_WEBHOOK_BASE_URL}{settings.API_V1_STR}/telnyx/webhook"
         }
 
         async with httpx.AsyncClient(timeout=20.0) as client:
@@ -95,10 +95,13 @@ class TelnyxService:
                 json=payload,
             )
             resp.raise_for_status()
-            data = resp.json()["data"]
+            data = resp.json()['data']
+            console_logger.info(f"Telnyx response: {data}")
 
-        call_id = data["id"]
-        call_control_id = data.get("call_control_id") or data.get("call_session_id")
+        call_leg_id = data["call_leg_id"]
+        call_control_id = data.get("call_control_id")
+        call_session_id = data.get("call_session_id")
+
         if not call_control_id:
             raise RuntimeError("Missing call_control_id from Telnyx response.")
 
@@ -107,15 +110,16 @@ class TelnyxService:
             scenario_id=scenario_id,
             to_number=to_number,
             from_number=from_number,
-            call_id=call_id,
+            call_leg_id=call_leg_id,
             call_control_id=call_control_id,
+            call_session_id=call_session_id,
             playlist=playlist,
             current_index=0,
         )
         self._sessions[call_control_id] = session
 
-        console_logger.info(f"Initiated call {call_id} (control_id={call_control_id}) to {to_number}")
-        return call_id, call_control_id
+        console_logger.info(f"Initiated call {call_leg_id} (control_id={call_control_id}) to {to_number}")
+        return call_leg_id, call_control_id, call_session_id
 
     async def handle_webhook_event(self, event: dict):
         """
@@ -124,6 +128,7 @@ class TelnyxService:
         event_type = event.get("data", {}).get("event_type") or event.get("event_type")
         payload = event.get("data", {})
         call_control_id = payload.get("payload", {}).get("call_control_id") or payload.get("call_control_id")
+
         if not call_control_id:
             console_logger.warning("Webhook without call_control_id; ignoring.")
             return
@@ -131,9 +136,8 @@ class TelnyxService:
         session = self._sessions.get(call_control_id)
         if event_type == "call.answered":
             console_logger.info(f"Call answered: {call_control_id}")
-            await self._play_current(session)
-        elif event_type in ("call.playback.ended", "call.playback.terminated"):
-            await self._play_next_or_hangup(session)
+            if session and session.stream_mode:
+                await self.fork_start(call_control_id, session_id=call_control_id)
         elif event_type in ("call.hangup", "call.ended"):
             console_logger.info(f"Call ended: {call_control_id}")
             self._sessions.pop(call_control_id, None)
@@ -141,70 +145,66 @@ class TelnyxService:
             # Add other events if needed
             pass
 
-    async def _play_current(self, session: CallSession):
-        if session.current_index >= len(session.playlist):
-            await self.hangup(session.call_control_id)
-            return
-        item = session.playlist[session.current_index]
-        # Get signed URL for Telnyx to pull; mp3 playback is supported by Telnyx
-        signed = await self.tts_service.get_audio_url(item.storage_path, expires_in=600)
-        if not signed:
-            console_logger.error(f"Failed to sign audio for line {item.voice_line_id}, skipping")
-            await self._play_next_or_hangup(session)
-            return
-
-        await self.playback_start(session.call_control_id, audio_url=signed)
-
-    async def _play_next_or_hangup(self, session: CallSession):
-        session.current_index += 1
-        if session.current_index < len(session.playlist):
-            await self._play_current(session)
-        else:
-            await self.hangup(session.call_control_id)
-
-    async def playback_start(self, call_control_id: str, *, audio_url: str):
-        """
-        Ask Telnyx to play an audio file into the call.
-        """
-        body = {"audio_url": audio_url}
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.post(
-                f"{self.BASE_URL}/calls/{call_control_id}/actions/playback_start",
-                headers={**self.AUTH_HEADER, "Content-Type": "application/json"},
-                json=body,
-            )
-            resp.raise_for_status()
-        console_logger.debug(f"Playback started on {call_control_id}")
-
-    async def hangup(self, call_control_id: str):
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.post(
-                f"{self.BASE_URL}/calls/{call_control_id}/actions/hangup",
-                headers=self.AUTH_HEADER,
-            )
-            resp.raise_for_status()
-        console_logger.info(f"Hung up call {call_control_id}")
-        self._sessions.pop(call_control_id, None)
-
     # Optional: start a media stream fork to our WS endpoint if you want real-time bidirectional audio
     async def fork_start(self, call_control_id: str, session_id: str):
         """
         Tell Telnyx to connect a media stream to our WS endpoint.
         """
-        ws_url = f"{settings.TUNNEL_URL}{settings.API_V1_STR}/telnyx/media/{session_id}"
+        # Build a WSS URL (convert http/https to ws/wss)
+        base = settings.TUNNEL_URL.replace("https://", "wss://").replace("http://", "ws://")
+        ws_url = f"{base}{settings.API_V1_STR}/telnyx/media/{call_control_id}"
+
         body = {
             "stream_url": ws_url,
-            "audio_format": "audio/pcm;rate=8000",
-            "channels": 1,
+            "stream_track": "both_tracks",
+            "stream_bidirectional_mode": "rtp",
+            "stream_bidirectional_codec": "PCMU"
         }
+
         async with httpx.AsyncClient(timeout=20.0) as client:
             resp = await client.post(
-                f"{self.BASE_URL}/calls/{call_control_id}/actions/fork_start",
+                f"{self.BASE_URL}/calls/{call_control_id}/actions/streaming_start",
                 headers={**self.AUTH_HEADER, "Content-Type": "application/json"},
                 json=body,
             )
+            if resp.status_code >= 400:
+                console_logger.error(f"Telnyx streaming_start error {resp.status_code}: {resp.text}")
             resp.raise_for_status()
         console_logger.info(f"Fork started for {call_control_id} -> {ws_url}")
+
+    async def stream_playlist_over_ws(self, ws, session: CallSession, stream_id: str):
+        """
+        Stream the first preloaded sound to Telnyx WS as PCMU (8kHz) frames.
+        Loops continuously until Telnyx hangs up (WS closes) or we drop the session.
+        """
+        try:
+            if not session.playlist:
+                return
+
+            # Decode the first MP3 once → mono 8kHz 16-bit PCM
+            item = session.playlist[0]
+            segment = AudioSegment.from_file(io.BytesIO(item.audio_data), format="mp3")
+            segment = segment.set_frame_rate(8000).set_channels(1).set_sample_width(2)
+
+            frame_ms = 20
+            # Loop until session removed (hangup) or WS closed
+            while self.get_session(session.call_control_id) is not None:
+                total_ms = len(segment)
+                for start_ms in range(0, total_ms, frame_ms):
+                    if self.get_session(session.call_control_id) is None:
+                        return
+                    chunk = segment[start_ms:start_ms + frame_ms]
+                    pcm16 = chunk.raw_data
+                    ulaw = audioop.lin2ulaw(pcm16, 2)
+                    payload = base64.b64encode(ulaw).decode("ascii")
+                    await ws.send_text(json.dumps({
+                        "event": "media",
+                        "stream_id": stream_id,
+                        "media": {"payload": payload}
+                    }))
+                    await asyncio.sleep(frame_ms / 1000.0)
+        except Exception as e:
+            console_logger.error(f"Error streaming audio over WS: {e}")
 
 # Module-level singleton
 telnyx_service = TelnyxService()

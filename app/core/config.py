@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     TUNNEL_URL: str = Field(default="")
     
     # Telnyx WebRTC (On-Demand Credentials)
-    TELNYX_CONNECTION_ID: str = Field(default="2769926201374934026")  # OD-Backend Credential Connection
+    TELNYX_CONNECTION_ID: str = Field(default="")  # OD-Backend Credential Connection
     TELNYX_SIP_USERNAME: str = Field(default="")  # SIP username for WebRTC (optional)
     TELNYX_SIP_PASSWORD: str = Field(default="")  # SIP password for WebRTC (optional)
     
