@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiohttp>=3.12.15",
     "alembic>=1.16.4",
     "asyncpg>=0.30.0",
     "elevenlabs>=2.10.0",
@@ -13,12 +14,15 @@ dependencies = [
     "langchain-core>=0.3.74",
     "langchain-openai>=0.3.30",
     "langgraph>=0.6.5",
+    "numpy>=2.3.2",
     "pydantic-settings>=2.10.1",
+    "pydub>=0.25.1",
     "python-dotenv>=1.1.1",
     "python-jose[cryptography]>=3.5.0",
     "sqlalchemy>=2.0.43",
     "sqlalchemy-continuum>=1.4.2",
     "structlog>=25.4.0",
     "supabase>=2.18.1",
+    "telnyx>=2.1.6",
     "uvicorn>=0.35.0",
 ]

@@ -1,0 +1,9 @@
+services:
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token eyJhIjoiYzYxYThjOWMyN2IzN2FjZDA2ZTM3M2VlNDU4OTA2MzUiLCJ0IjoiNTg3M2Q1YWYtMGE1Yi00ZDBkLWJiNjYtYzk0NjFiZTAzYjNlIiwicyI6Ik1qWTNNemcyWmpndE0yTXdZeTAwWkRneUxUazVNR1V0WkRka1lUY3haamd6TkRsbCJ9
+    restart: unless-stopped
+    environment:
+      - TELNYX_WEBHOOK_BASE_URL=https://api.od-prank.com
+    labels:
+      - "tunnel.url=https://api.od-prank.com"
