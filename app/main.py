@@ -5,6 +5,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.services.preview_tts_service import PreviewTTSService
 from app.core.utils.voices_catalog import get_voices_catalog
+from app.core.middleware import RequestLoggingMiddleware, ErrorHandlingMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,6 +23,9 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(ErrorHandlingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

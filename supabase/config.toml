@@ -103,13 +103,6 @@ file_size_limit = "50MiB"
 # allowed_mime_types = ["image/png", "image/jpeg"]
 # objects_path = "./images"
 
-# Add this section for the voice-lines bucket
-[storage.buckets.voice-lines]
-public = false
-file_size_limit = "50MiB"
-allowed_mime_types = ["audio/mpeg", "audio/mp3"]
-objects_path = "./voice-lines"
-
 [auth]
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used

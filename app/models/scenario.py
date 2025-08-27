@@ -35,12 +35,6 @@ class Scenario(Base, TimestampMixin):
         order_by="VoiceLine.order_index"
     )
     
-    call_sessions: Mapped[List["CallSession"]] = relationship(
-        "CallSession",
-        back_populates="scenario",
-        cascade="all, delete-orphan"
-    )
-    
     def __repr__(self):
         return f"<Scenario(id={self.id}, title='{self.title}', language='{self.language.value}')>"
 

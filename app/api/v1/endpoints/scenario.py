@@ -6,6 +6,7 @@ from app.services.scenario_service import ScenarioService
 from app.core.database import AsyncSession, get_db_session
 from typing import List, Optional
 from pydantic import BaseModel
+from app.core.logging import console_logger
 
 router = APIRouter(tags=["scenario"])
 
