@@ -49,9 +49,25 @@ class Settings(BaseSettings):
     ELEVENLABS_API_KEY: str = Field(default="")
     ELEVENLABS_AGENT_ID: str = Field(default="agent_6101k2hvvyege6k91757ph92vc64")
     
+    # Telnyx Voice API
+    TELNYX_API_KEY: str = Field(default="")
+    TELNYX_PHONE_NUMBER: str = Field(default="")
+    TELNYX_APPLICATION_ID: str = Field(default="")
+    TELNYX_WEBHOOK_SECRET: str = Field(default="")
+    TELNYX_WEBHOOK_BASE_URL: str = Field(default="")
+    TUNNEL_URL: str = Field(default="")
+    
+    # Telnyx WebRTC (On-Demand Credentials)
+    TELNYX_CONNECTION_ID: str = Field(default="2769926201374934026")  # OD-Backend Credential Connection
+    TELNYX_SIP_USERNAME: str = Field(default="")  # SIP username for WebRTC (optional)
+    TELNYX_SIP_PASSWORD: str = Field(default="")  # SIP password for WebRTC (optional)
+    
     # CORS
     BACKEND_CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8080")
     
+
+
+
     @property
     def cors_origins(self) -> List[str]:
         """Parse CORS origins from comma-separated string."""
