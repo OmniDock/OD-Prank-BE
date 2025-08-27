@@ -58,66 +58,47 @@ async def telnyx_webhook(req: Request):
 @router.websocket("/media/{call_control_id}")
 async def telnyx_media_ws(ws: WebSocket, call_control_id: str):
     await ws.accept()
-    stream_id = None
+    session = telnyx_service.get_session(call_control_id)
+    if not session:
+        await ws.close()
+        return
+    
     try:
-        while stream_id is None:
-            msg = await ws.receive_text()
-            data = json.loads(msg)
-            if isinstance(data, dict):
-                if data.get("event") in ("connected", "start"):
-                    stream_id = data.get("stream_id") or data.get("start", {}).get("stream_id") or data.get("media", {}).get("stream_id")
-
-        session = telnyx_service.get_session(call_control_id)
-        if not session:
-            return
-
-        async def pump_inbound():
+        # Handle initial connection
+        msg = await ws.receive_text()
+        data = json.loads(msg)
+        console_logger.info(f"Media WS connected: {data}")
+        
+        async def handle_inbound():
+            """Receive audio from Telnyx and broadcast to monitors"""
             while True:
                 msg = await ws.receive_text()
-                d = json.loads(msg)
-                if d.get("event") == "media":
-                    media = d.get("media", {}) or {}
-                    payload_b64 = media.get("payload")
-                    if not payload_b64:
-                        continue
-                    track = media.get("track") or "inbound"
-                    direction = "inbound" if track in ("inbound", "inbound_track") else "outbound"
-
-                    # Strip RTP header if present (stream_bidirectional_mode=rtp)
-                    try:
-                        raw = base64.b64decode(payload_b64)
-                        if len(raw) >= 12:
-                            b0 = raw[0]
-                            cc = b0 & 0x0F
-                            xbit = (b0 & 0x10) >> 4
-                            header_len = 12 + (cc * 4)
-                            # Handle RTP extension header
-                            if xbit and len(raw) >= header_len + 4:
-                                ext_len_words = int.from_bytes(raw[header_len+2:header_len+4], 'big')
-                                header_len += 4 + (ext_len_words * 4)
-                            if header_len < len(raw):
-                                ulaw_payload = raw[header_len:]
-                                payload_b64 = base64.b64encode(ulaw_payload).decode('ascii')
-                    except Exception:
-                        # Fallback: forward as-is
-                        pass
-
-                    await telnyx_service.broadcast(call_control_id, direction, payload_b64)
-
+                data = json.loads(msg)
+                                
+                if data.get("event") == "media":
+                    media = data.get("media", {})
+                    track = media.get("track", "inbound")
+                    payload = media.get("payload", "")
                     
-        await asyncio.gather(
-            pump_inbound(),
-            telnyx_service.stream_playlist_over_ws(ws, session, stream_id),
-        )
+                    # Broadcast inbound audio to monitors
+                    if track == "inbound" or track == "inbound_track":
+                        await telnyx_service.broadcast(
+                            call_control_id, 
+                            "inbound", 
+                            payload
+                        )
+                elif data.get("event") == "stop":
+                    break
+        
+        # Debug: inbound-only to verify callee audio without our playback
+        await handle_inbound()
+        
     except WebSocketDisconnect:
-        return
+        pass
     except Exception as e:
-        console_logger.error(f"WS error: {e}")
+        console_logger.error(f"Media WS error: {e}")
     finally:
-        try:
-            await ws.close()
-        except Exception:
-            pass
+        await ws.close()
 
 @router.websocket("/monitor/{call_control_id}")
 async def telnyx_monitor_ws(ws: WebSocket, call_control_id: str):

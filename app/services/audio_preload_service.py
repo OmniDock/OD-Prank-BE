@@ -105,17 +105,20 @@ class AudioPreloadService:
             console_logger.error(f"Error downloading audio for voice line {voice_line_id}: {str(e)}")
             return None
 
-    def _precompute_ulaw_chunks(self, mp3_bytes: bytes, *, chunk_ms: int = 200, sample_rate: int = 8000) -> Tuple[List[str], int, int]:
+    def _precompute_ulaw_chunks(self, mp3_bytes: bytes, *, chunk_ms: int = 40, sample_rate: int = 8000) -> Tuple[List[str], int, int]:
         """
         Prepare μ-law (PCMU) base64 chunks for smoother Telnyx streaming.
         - Downsample to 8kHz mono 16-bit PCM
-        - Slice into chunk_ms windows (default 200ms)
+        - Slice into chunk_ms windows (default 40ms for stability)
         - Convert each window to μ-law and base64-encode
         Returns: (chunks_b64, sample_rate, chunk_ms)
         """
         segment = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
+        # Apply normalization and quality improvements
         segment = segment.set_frame_rate(sample_rate).set_channels(1).set_sample_width(2)
-
+        # Normalize audio level for consistent volume
+        segment = segment.normalize()
+        
         chunks_b64: List[str] = []
         total_ms = len(segment)
         for start_ms in range(0, total_ms, chunk_ms):

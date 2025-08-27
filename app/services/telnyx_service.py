@@ -27,7 +27,6 @@ class CallSession:
     call_session_id: Optional[str] = None
     playlist: List[PreloadedAudio] = field(default_factory=list)
     current_index: int = 0
-    stream_mode: bool = True
 
 
 class TelnyxService:
@@ -63,9 +62,6 @@ class TelnyxService:
 
     def get_session(self, call_control_id: str) -> Optional[CallSession]:
         return self._sessions.get(call_control_id)
-    
-    def __init__(self):
-        pass
 
     async def _ensure_playlist(
         self,
@@ -95,10 +91,10 @@ class TelnyxService:
         user_id: str,
         scenario_id: int,
         to_number: str,
-    ) -> Tuple[str, str]:
+    ) -> Tuple[str, str, str]:
         """
         Create an outbound call via Telnyx Call Control.
-        Returns (call_id, call_control_id)
+        Returns (call_leg_id, call_control_id, call_session_id)
         """
         from_number = settings.TELNYX_PHONE_NUMBER
 
@@ -161,29 +157,21 @@ class TelnyxService:
         session = self._sessions.get(call_control_id)
         if event_type == "call.answered":
             console_logger.info(f"Call answered: {call_control_id}")
-            if session and session.stream_mode:
-                await self.fork_start(call_control_id, session_id=call_control_id)
+            if session:
+                await self.fork_start(call_control_id)
         elif event_type in ("call.hangup", "call.ended"):
             console_logger.info(f"Call ended: {call_control_id}")
             self._sessions.pop(call_control_id, None)
-        else:
-            # Add other events if needed
-            pass
 
-    # Optional: start a media stream fork to our WS endpoint if you want real-time bidirectional audio
-    async def fork_start(self, call_control_id: str, session_id: str):
-        """
-        Tell Telnyx to connect a media stream to our WS endpoint.
-        """
-        # Build a WSS URL (convert http/https to ws/wss)
+    async def fork_start(self, call_control_id: str):
         base = settings.TUNNEL_URL.replace("https://", "wss://").replace("http://", "ws://")
         ws_url = f"{base}{settings.API_V1_STR}/telnyx/media/{call_control_id}"
 
         body = {
             "stream_url": ws_url,
-            "stream_track": "both_tracks",
-            "stream_bidirectional_mode": "rtp",
-            "stream_bidirectional_codec": "PCMU"
+            "stream_track": "inbound_track",
+            "stream_codec": "PCMU",
+            "stream_bidirectional_mode": "mp3",
         }
 
         async with httpx.AsyncClient(timeout=20.0) as client:
@@ -197,47 +185,65 @@ class TelnyxService:
             resp.raise_for_status()
         console_logger.info(f"Fork started for {call_control_id} -> {ws_url}")
 
-    async def stream_playlist_over_ws(self, ws, session: CallSession, stream_id: str):
+    async def stream_playlist_over_ws(self, ws, session: CallSession):
         """
-        Stream the first preloaded sound to Telnyx WS as PCMU (8kHz) frames.
-        Loops continuously until Telnyx hangs up (WS closes) or we drop the session.
+        Stream audio to Telnyx and broadcast BOTH directions to monitors.
         """
         try:
             if not session.playlist:
                 return
 
-            # Use precomputed μ-law chunks if available, else compute on the fly with 200ms windows
+            # Use first audio file
             item = session.playlist[0]
+            
+            # Convert to 8kHz μ-law
+            segment = AudioSegment.from_file(io.BytesIO(item.audio_data), format="mp3")
+            segment = segment.set_frame_rate(8000).set_channels(1).set_sample_width(2).normalize()
+            
+            # Use 160-sample chunks (20ms at 8kHz) - standard for telephony
+            chunk_ms = 20
+            
+            # Convert entire audio to μ-law chunks
+            chunks = []
+            for i in range(0, len(segment), chunk_ms):
+                chunk = segment[i:i+chunk_ms]
+                if len(chunk) < chunk_ms:
+                    # Pad last chunk with silence
+                    chunk = chunk + AudioSegment.silent(duration=chunk_ms - len(chunk))
+                pcm = chunk.raw_data
+                ulaw = audioop.lin2ulaw(pcm, 2)
+                chunks.append(base64.b64encode(ulaw).decode('ascii'))
 
-            if getattr(item, "ulaw_chunks_b64", None):
-                chunks_b64 = item.ulaw_chunks_b64 or []
-                chunk_ms = item.ulaw_chunk_ms or 200
-            else:
-                # Fallback: precompute quickly from in-memory MP3
-                segment = AudioSegment.from_file(io.BytesIO(item.audio_data), format="mp3")
-                segment = segment.set_frame_rate(8000).set_channels(1).set_sample_width(2)
-                chunk_ms = 200
-                chunks_b64: List[str] = []
-                total_ms = len(segment)
-                for start_ms in range(0, total_ms, chunk_ms):
-                    chunk = segment[start_ms:start_ms + chunk_ms]
-                    pcm16 = chunk.raw_data
-                    ulaw = audioop.lin2ulaw(pcm16, 2)
-                    chunks_b64.append(base64.b64encode(ulaw).decode("ascii"))
-
-            # Loop until session removed (hangup) or WS closed
-            while self.get_session(session.call_control_id) is not None:
-                for payload in chunks_b64:
-                    if self.get_session(session.call_control_id) is None:
+            # Stream with precise timing
+            start_time = asyncio.get_event_loop().time()
+            total_chunks_sent = 0
+            
+            while self.get_session(session.call_control_id):
+                for chunk_b64 in chunks:
+                    if not self.get_session(session.call_control_id):
                         return
+                    
+                    # Send to Telnyx
                     await ws.send_text(json.dumps({
                         "event": "media",
-                        "stream_id": stream_id,
-                        "media": {"payload": payload}
+                        "media": {
+                            "track": "outbound",
+                            "payload": chunk_b64
+                        }
                     }))
-                    await asyncio.sleep((chunk_ms) / 1000.0)
+                    
+                    # Broadcast outbound audio to monitors
+                    await self.broadcast(session.call_control_id, "outbound", chunk_b64)
+                    
+                    # Precise timing - account for total chunks sent across loops
+                    total_chunks_sent += 1
+                    next_time = start_time + (total_chunks_sent * 0.02)  # 20ms per chunk
+                    sleep_time = next_time - asyncio.get_event_loop().time()
+                    if sleep_time > 0:
+                        await asyncio.sleep(sleep_time)
+                        
         except Exception as e:
-            console_logger.error(f"Error streaming audio over WS: {e}")
+            console_logger.error(f"Stream error: {e}")
 
 # Module-level singleton
 telnyx_service = TelnyxService()
