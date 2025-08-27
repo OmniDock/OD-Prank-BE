@@ -3,6 +3,7 @@ import asyncio
 from pydantic import BaseModel
 from typing import Optional
 import json
+import base64
 
 from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
@@ -76,13 +77,32 @@ async def telnyx_media_ws(ws: WebSocket, call_control_id: str):
                 d = json.loads(msg)
                 if d.get("event") == "media":
                     media = d.get("media", {}) or {}
-                    payload = media.get("payload")
-                    if not payload:
+                    payload_b64 = media.get("payload")
+                    if not payload_b64:
                         continue
                     track = media.get("track") or "inbound"
-                    # Telnyx liefert "inbound"/"outbound" oder "inbound_track"/"outbound_track"
                     direction = "inbound" if track in ("inbound", "inbound_track") else "outbound"
-                    await telnyx_service.broadcast(call_control_id, direction, payload)
+
+                    # Strip RTP header if present (stream_bidirectional_mode=rtp)
+                    try:
+                        raw = base64.b64decode(payload_b64)
+                        if len(raw) >= 12:
+                            b0 = raw[0]
+                            cc = b0 & 0x0F
+                            xbit = (b0 & 0x10) >> 4
+                            header_len = 12 + (cc * 4)
+                            # Handle RTP extension header
+                            if xbit and len(raw) >= header_len + 4:
+                                ext_len_words = int.from_bytes(raw[header_len+2:header_len+4], 'big')
+                                header_len += 4 + (ext_len_words * 4)
+                            if header_len < len(raw):
+                                ulaw_payload = raw[header_len:]
+                                payload_b64 = base64.b64encode(ulaw_payload).decode('ascii')
+                    except Exception:
+                        # Fallback: forward as-is
+                        pass
+
+                    await telnyx_service.broadcast(call_control_id, direction, payload_b64)
 
                     
         await asyncio.gather(
