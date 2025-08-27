@@ -6,6 +6,10 @@ from datetime import datetime, timedelta
 import weakref
 import gc
 from dataclasses import dataclass
+import base64
+import io
+from pydub import AudioSegment
+import audioop
 
 from app.core.database import AsyncSession
 from app.core.logging import console_logger
@@ -30,6 +34,10 @@ class PreloadedAudio:
     size_bytes: int
     loaded_at: datetime
     storage_path: str
+    # Precomputed for Telnyx streaming (optional)
+    ulaw_chunks_b64: Optional[List[str]] = None
+    ulaw_sample_rate_hz: Optional[int] = None
+    ulaw_chunk_ms: Optional[int] = None
 
 
 class AudioPreloadService:
@@ -96,6 +104,26 @@ class AudioPreloadService:
         except Exception as e:
             console_logger.error(f"Error downloading audio for voice line {voice_line_id}: {str(e)}")
             return None
+
+    def _precompute_ulaw_chunks(self, mp3_bytes: bytes, *, chunk_ms: int = 200, sample_rate: int = 8000) -> Tuple[List[str], int, int]:
+        """
+        Prepare μ-law (PCMU) base64 chunks for smoother Telnyx streaming.
+        - Downsample to 8kHz mono 16-bit PCM
+        - Slice into chunk_ms windows (default 200ms)
+        - Convert each window to μ-law and base64-encode
+        Returns: (chunks_b64, sample_rate, chunk_ms)
+        """
+        segment = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
+        segment = segment.set_frame_rate(sample_rate).set_channels(1).set_sample_width(2)
+
+        chunks_b64: List[str] = []
+        total_ms = len(segment)
+        for start_ms in range(0, total_ms, chunk_ms):
+            chunk = segment[start_ms:start_ms + chunk_ms]
+            pcm16 = chunk.raw_data  # 16-bit LE PCM
+            ulaw_bytes = audioop.lin2ulaw(pcm16, 2)
+            chunks_b64.append(base64.b64encode(ulaw_bytes).decode("ascii"))
+        return chunks_b64, sample_rate, chunk_ms
     
     async def preload_scenario_audio(self, user_id: str, scenario_id: int, preferred_voice_id: Optional[str] = None) -> Tuple[bool, str, Dict[str, Any]]:
         """
@@ -195,6 +223,15 @@ class AudioPreloadService:
                             loaded_at=datetime.utcnow(),
                             storage_path=audio.storage_path
                         )
+                        # Precompute μ-law chunks for smoother streaming
+                        try:
+                            chunks_b64, sr, cms = self._precompute_ulaw_chunks(audio_data, chunk_ms=200, sample_rate=8000)
+                            preloaded.ulaw_chunks_b64 = chunks_b64
+                            preloaded.ulaw_sample_rate_hz = sr
+                            preloaded.ulaw_chunk_ms = cms
+                        except Exception as _:
+                            # Fallback to runtime conversion if precompute fails
+                            pass
                         preloaded_audio[voice_line.id] = preloaded
                         console_logger.debug(f"Preloaded voice line {voice_line.id} ({len(audio_data):,} bytes)")
             

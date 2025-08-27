@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set
 
 import httpx
 import base64
@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.logging import console_logger
 from app.core.database import AsyncSession
 from app.services.audio_preload_service import AudioPreloadService, PreloadedAudio
+from fastapi import WebSocket
 
 
 @dataclass
@@ -35,6 +36,30 @@ class TelnyxService:
 
     # In-memory sessions keyed by call_control_id
     _sessions: Dict[str, CallSession] = {}
+    _monitors: Dict[str, Set[WebSocket]] = {}
+
+    def register_monitor(self, call_control_id: str, ws: WebSocket) -> None:
+        self._monitors.setdefault(call_control_id, set()).add(ws)
+
+    def unregister_monitor(self, call_control_id: str, ws: WebSocket) -> None:
+        if call_control_id in self._monitors:
+            self._monitors[call_control_id].discard(ws)
+            if not self._monitors[call_control_id]:
+                del self._monitors[call_control_id]
+
+    async def broadcast(self, call_control_id: str, direction: str, payload_b64: str) -> None:
+        """Broadcast base64 media payload to any monitor websockets for this call."""
+        for ws in list(self._monitors.get(call_control_id, [])):
+            try:
+                await ws.send_json({
+                    "event": "media",
+                    "direction": direction,
+                    "codec": "PCMU",
+                    "rate": 8000,
+                    "payload": payload_b64,
+                })
+            except Exception:
+                self.unregister_monitor(call_control_id, ws)
 
     def get_session(self, call_control_id: str) -> Optional[CallSession]:
         return self._sessions.get(call_control_id)
@@ -181,28 +206,36 @@ class TelnyxService:
             if not session.playlist:
                 return
 
-            # Decode the first MP3 once → mono 8kHz 16-bit PCM
+            # Use precomputed μ-law chunks if available, else compute on the fly with 200ms windows
             item = session.playlist[0]
-            segment = AudioSegment.from_file(io.BytesIO(item.audio_data), format="mp3")
-            segment = segment.set_frame_rate(8000).set_channels(1).set_sample_width(2)
 
-            frame_ms = 20
-            # Loop until session removed (hangup) or WS closed
-            while self.get_session(session.call_control_id) is not None:
+            if getattr(item, "ulaw_chunks_b64", None):
+                chunks_b64 = item.ulaw_chunks_b64 or []
+                chunk_ms = item.ulaw_chunk_ms or 200
+            else:
+                # Fallback: precompute quickly from in-memory MP3
+                segment = AudioSegment.from_file(io.BytesIO(item.audio_data), format="mp3")
+                segment = segment.set_frame_rate(8000).set_channels(1).set_sample_width(2)
+                chunk_ms = 200
+                chunks_b64: List[str] = []
                 total_ms = len(segment)
-                for start_ms in range(0, total_ms, frame_ms):
-                    if self.get_session(session.call_control_id) is None:
-                        return
-                    chunk = segment[start_ms:start_ms + frame_ms]
+                for start_ms in range(0, total_ms, chunk_ms):
+                    chunk = segment[start_ms:start_ms + chunk_ms]
                     pcm16 = chunk.raw_data
                     ulaw = audioop.lin2ulaw(pcm16, 2)
-                    payload = base64.b64encode(ulaw).decode("ascii")
+                    chunks_b64.append(base64.b64encode(ulaw).decode("ascii"))
+
+            # Loop until session removed (hangup) or WS closed
+            while self.get_session(session.call_control_id) is not None:
+                for payload in chunks_b64:
+                    if self.get_session(session.call_control_id) is None:
+                        return
                     await ws.send_text(json.dumps({
                         "event": "media",
                         "stream_id": stream_id,
                         "media": {"payload": payload}
                     }))
-                    await asyncio.sleep(frame_ms / 1000.0)
+                    await asyncio.sleep((chunk_ms) / 1000.0)
         except Exception as e:
             console_logger.error(f"Error streaming audio over WS: {e}")
 
