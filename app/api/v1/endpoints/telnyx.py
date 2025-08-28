@@ -51,30 +51,21 @@ async def telnyx_webhook(req: Request):
     event = await req.json()
     event_type = event.get("data", {}).get("event_type") or event.get("event_type")
     console_logger.info(f"Telnyx webhook event: {event_type}")
-
-    # if event_type == "call.initiated":
-    #     console_logger.info(f"Call initiated: {event}")
-
-    # if event_type == "conference.created":
-    #     console_logger.info(f"Conference created: {event}")
-        
-    
-    # if event_type == "conference.ended":
-    #     console_logger.warning(f"Conference ended: {event}")
     
     if event_type == "conference.participant.joined":
         console_logger.warning(f"Participant joined: {event}")
-    
-    # if event_type == "conference.participant.left":
-    #     console_logger.warning(f"Participant left: {event}")
-
-    
+        
     try:
         await telnyx_service.handle_webhook_event(event)
         return {"ok": True}
     except Exception as e:
         console_logger.error(f"Webhook error: {e}")
         return {"ok": False}
+    
+
+@router.post("/webhooks/telnyx")
+async def telnyx_webhook(req: Request):
+    return await telnyx_webhook(req)
 
 
 class WebRTCTokenRequest(BaseModel):
@@ -122,10 +113,13 @@ async def mint_webrtc_token(body: WebRTCTokenRequest, user: AuthUser = Depends(g
             token = r.text
             if not token:
                 raise HTTPException(status_code=500, detail="Token missing in Telnyx response")
-            
+
     except Exception as e:
         console_logger.error(f"Failed to mint Telnyx token: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to mint Telnyx token: {str(e)}")
+
+    # Correlate SIP/WebRTC legs to this live session's conference
+    telnyx_service.register_webrtc_mapping(user.id, sip_username, sess.conference_name)
 
     return WebRTCTokenResponse(token=token, conference_name=sess.conference_name, sip_username=sip_username)
 

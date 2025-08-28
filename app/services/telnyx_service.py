@@ -35,13 +35,17 @@ class TelnyxService:
     BASE_URL = "https://api.telnyx.com/v2"
     AUTH_HEADER = {"Authorization": f"Bearer {settings.TELNYX_API_KEY}"}
 
-    # In-memory sessions keyed by call_control_id
     _sessions: Dict[str, CallSession] = {}
     _token_cache: str = None
     _pending_joins: Dict[str, str] = {}
+    _sip_to_conf: Dict[str, str] = {}  # sip_username -> conference_name
 
     def get_session(self, call_control_id: str) -> Optional[CallSession]:
         return self._sessions.get(call_control_id)
+
+    def register_webrtc_mapping(self, user_id: str, sip_username: str, conference_name: str) -> None:
+        if sip_username and conference_name:
+            self._sip_to_conf[sip_username] = conference_name
 
     async def get_or_create_on_demand_credential(self, user_id: str) -> str:
         """
@@ -86,14 +90,13 @@ class TelnyxService:
             r2.raise_for_status()
             cid = ((r2.json() or {}).get("data") or {}).get("id")
             sip_username = ((r2.json() or {}).get("data") or {}).get("sip_username")
+
+            console_logger.info(f"created telephony_credential: {r2.json()}")
+
             if not cid:
                 raise RuntimeError("Created telephony credential but response missing id")
             return cid, sip_username
         
-
-
-
-
     async def _ensure_playlist(
         self,
         db_session: AsyncSession,
@@ -209,32 +212,34 @@ class TelnyxService:
                 conf_from_state = None
 
         if event_type == "call.initiated":
-            # Prefer client_state when present; defer actual join until answered
-            direction = p.get("direction") or ""
-            if direction.lower() in ("incoming", "inbound"):
-                if conf_from_state:
-                    console_logger.info(f"Pending join: {call_control_id} → conference {conf_from_state}")
-                    self._pending_joins[call_control_id] = conf_from_state
-                    return
+            # Determine target conference from SIP mapping or client_state
+            target_conf: Optional[str] = None
+            from_uri = (p.get("from") or "").lower()
+            if "@" in from_uri:
+                sip_user = from_uri.split("@", 1)[0]
+                target_conf = self._sip_to_conf.get(sip_user) or target_conf
+            if not target_conf and conf_from_state:
+                target_conf = conf_from_state
 
-                # Fallback: infer from SIP-URI userpart
-                to_uri = p.get("to") or ""
-                conf_name = None
-                if to_uri.startswith("sip:"):
-                    try:
-                        conf_name = to_uri.split("sip:",1)[1].split("@",1)[0]
-                    except Exception:
-                        conf_name = None
+            if target_conf:
+                console_logger.info(f"Auto-answering and joining {call_control_id} to conference {target_conf}")
+                try:
+                    await self.answer_call(call_control_id)
+                except Exception as e:
+                    console_logger.error(f"answer error for {call_control_id}: {e}")
+                try:
+                    await self.join_conference(call_control_id, target_conf)
+                except Exception as e:
+                    console_logger.error(f"conference_join error for {call_control_id}: {e}")
+                return
 
-                if conf_name:
-                    console_logger.info(f"Pending join (SIP URI): {call_control_id} → {conf_name}")
-                    self._pending_joins[call_control_id] = conf_name
-                return        
-
-
+            console_logger.info(event)
 
         if event_type == "call.answered":
-            console_logger.info(f"Call answered: {call_control_id}")
+            dir_str = (p.get("direction") or "").lower()
+            frm = p.get("from") or ""
+            to = p.get("to") or ""
+            console_logger.info(f"Call answered: {call_control_id} (dir={dir_str}, from={frm}, to={to})")
 
                 
         elif event_type in ("call.hangup", "call.ended"):
@@ -249,16 +254,29 @@ class TelnyxService:
             pending = self._pending_joins.pop(call_control_id, None)
             if pending:
                 console_logger.info(f"Joining leg {call_control_id} to conference {pending}")
-                await self.join_conference(call_control_id, pending)
+                try:
+                    await self.join_conference(call_control_id, pending)
+                except Exception as e:
+                    console_logger.error(f"conference_join error for {call_control_id}: {e}")
                 return
             # Fallback: if client_state was present but we didn't set pending (e.g., non-inbound direction)
             if conf_from_state:
                 console_logger.info(f"Joining leg {call_control_id} to conference {conf_from_state} (fallback)")
-                await self.join_conference(call_control_id, conf_from_state)
+                try:
+                    await self.join_conference(call_control_id, conf_from_state)
+                except Exception as e:
+                    console_logger.error(f"conference_join error for {call_control_id}: {e}")
                 return
             
-            if session:
-                await self.fork_start(call_control_id)
+            if session and session.conference_name:
+                # Outbound PSTN leg we created; start Media Stream only. Conference_config handles joining.
+                try:
+                    await self.fork_start(call_control_id)
+                except Exception as e:
+                    console_logger.error(f"fork_start error for {call_control_id}: {e}")
+                return
+
+
 
     async def fork_start(self, call_control_id: str):
         base = settings.TUNNEL_URL.replace("https://", "wss://").replace("http://", "ws://")
@@ -282,6 +300,18 @@ class TelnyxService:
             resp.raise_for_status()
         console_logger.info(f"Fork started for {call_control_id} -> {ws_url}")
 
+
+    async def answer_call(self, call_control_id: str):
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(
+                f"{self.BASE_URL}/calls/{call_control_id}/actions/answer",
+                headers={**self.AUTH_HEADER, "Content-Type": "application/json"},
+            )
+            if r.status_code >= 400:
+                console_logger.error(f"answer action error {r.status_code}: {r.text}")
+            r.raise_for_status()
+
+
     async def join_conference(self, call_control_id: str, conference_name: str):
         async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.post(
@@ -292,6 +322,8 @@ class TelnyxService:
             if r.status_code >= 400:
                 console_logger.error(f"conference action error {r.status_code}: {r.text}")
             r.raise_for_status()
+
+    # No retry helper; rely on single join attempt when leg is answered
 
     async def stream_playlist_over_ws(self, ws, session: CallSession):
         """
