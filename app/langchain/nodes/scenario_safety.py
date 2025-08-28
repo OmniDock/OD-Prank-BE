@@ -147,3 +147,94 @@ class ScenarioSafetyChecker:
         console_logger.info(f"Overall safety check result: {result}")
 
         return result
+    
+    async def check_overall_safety_v2(self, title: str, description: str, target_name: str, language: str, voice_lines: List[VoiceLineState], scenario_analysis: ScenarioAnalysisResult) -> SafetyCheckResult:
+            """Check scenario safety with structured output"""
+            console_logger.info(f"Checking safety for scenario: {title}")
+
+            overall_safety_prompt = ChatPromptTemplate.from_messages(
+                [
+                
+                    ("system", self.base_safety_prompt),
+                    ("user", """
+
+                        Scenario Details:
+                        Title: {title}
+                        Description: {description}
+                        Target Name: {target_name}
+                        Language: {language}
+                    
+                        Scenario Analysis:
+                        {scenario_analysis}
+                    
+                        Voice Lines:
+                        {voice_lines}
+
+                        Evaluate for safety issues and provide your assessment.
+                    
+                    """
+                    )
+                ]
+            )
+
+            chain = overall_safety_prompt | self.llm
+        
+            result = await chain.ainvoke({
+                "title": title,
+                "description": description,
+                "target_name": target_name,
+                "language": language,
+                "voice_lines": voice_lines,
+                "scenario_analysis": scenario_analysis
+            })
+
+            console_logger.info(f"Overall safety check result: {result}")
+
+            return result
+            
+    
+
+    async def check_answer_safety(self, scenario_description: str, questions: List[str],  answers: List[str]) -> SafetyCheckResult:
+        """Check safety of questions and answers for scenario enhancement"""
+        console_logger.info(f"Checking safety for questions and answers in scenario: {scenario_description[:50]}...")
+
+        answer_safety_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", """
+                    You are a safety moderator for a prank call application.
+                    
+                    Evaluate the safety of the provided questions and answers for scenario enhancement.
+                    
+                    Output MUST follow the structured schema.
+                    Provide concise reasoning.
+                """),
+                ("user", """
+                    Scenario Description:
+                    {scenario_description}
+
+                    Questions:
+                    {questions}
+                    Answers:
+                    {answers}
+
+                    Evaluate the safety of these questions and answers for the scenario enhancement.
+                    Consider both individual items and their combined effect on the overall scenario safety.
+                """)
+            ]
+        )
+
+        questions_answers_formatted = []
+        for i, (question, answer) in enumerate(zip(questions, answers), 1):
+            questions_answers_formatted.append(f"Q{i}: {question}\nA{i}: {answer}")
+
+        chain = answer_safety_prompt | self.llm
+
+        result = await chain.ainvoke({
+            "scenario_description": scenario_description,
+            "questions": questions,
+            "answers": answers
+        })
+
+        console_logger.info(f"Answer safety check result: {result}")
+
+        return result

@@ -45,7 +45,7 @@ class VoiceLineGenerator:
     
 
     
-    def _build_complete_system_prompt(self, scenario_data: ScenarioCreateRequest, 
+    def _build_complete_system_prompt(self,language: str,
                                     voice_line_type: VoiceLineTypeEnum,
                                     scenario_analysis: ScenarioAnalysisResult) -> str:
         """Build the complete system prompt with all components"""
@@ -54,7 +54,7 @@ class VoiceLineGenerator:
         complete_prompt = BASE_SYSTEM_PROMPT
         
         # Add language-specific context
-        complete_prompt += "\n\n" + get_language_specific_context(scenario_data.language)
+        complete_prompt += "\n\n" + get_language_specific_context(language)
         
         # Add emotional state context
         complete_prompt += "\n\n" + get_emotional_state_context(voice_line_type.value)
@@ -77,10 +77,13 @@ class VoiceLineGenerator:
     
     async def generate_voice_lines(
             self, 
-            scenario_data: ScenarioCreateRequest, 
+            title: str,
+            description: str,
+            target_name: str,
+            language: str,
             voice_line_type: VoiceLineTypeEnum, 
             count: int,
-            scenario_analysis: ScenarioAnalysisResult,
+            scenario_analysis: ScenarioAnalysisResult
         ) -> VoiceLineGenerationResult:
 
         """Generate voice lines with shared scenario analysis"""    
@@ -88,7 +91,7 @@ class VoiceLineGenerator:
         console_logger.info(f"Voice line type: {voice_line_type.value}, Persona: {scenario_analysis.persona_name if scenario_analysis else 'None'}")
         
         # Build complete system prompt
-        system_prompt = self._build_complete_system_prompt(scenario_data, voice_line_type, scenario_analysis)
+        system_prompt = self._build_complete_system_prompt(language, voice_line_type, scenario_analysis)
         
         # Create LLM with structured output - higher temperature for more natural speech variation
         llm = ChatOpenAI(model=self.model_name, temperature=0.7).with_structured_output(VoiceLineGenerationResult)
@@ -135,8 +138,7 @@ class VoiceLineGenerator:
                 Description: {description}
                 Target Name: {target_name}
                 Language: {language}
-                
-                Remember: You are {persona_name} from {company_service} - stay in character but make it FUNNY!
+             
                 Generate {voice_line_type} lines that fit naturally in ongoing conversations!
                 Return only spoken text (no quotation marks), audio tags in [square brackets] are allowed.
             """)
@@ -146,10 +148,10 @@ class VoiceLineGenerator:
         chain = generation_prompt | llm
         
         result = await chain.ainvoke({
-            "title": scenario_data.title,
-            "description": scenario_data.description,
-            "target_name": scenario_data.target_name,
-            "language": scenario_data.language.value if hasattr(scenario_data.language, 'value') else str(scenario_data.language),
+            "title": title,
+            "description": description,
+            "target_name": target_name,
+            "language": language,
             "voice_line_type": voice_line_type.value,
             "count": count,
             "persona_name": scenario_analysis.persona_name,
@@ -171,14 +173,14 @@ class VoiceLineGenerator:
         )
     
     # Convenience methods for each voice line type
-    async def generate_opening_voice_lines(self, scenario_data: ScenarioCreateRequest, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
-        return await self.generate_voice_lines(scenario_data, VoiceLineTypeEnum.OPENING, count, scenario_analysis)
+    async def generate_opening_voice_lines(self, title: str, description: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
+        return await self.generate_voice_lines(title, description, target_name, language, VoiceLineTypeEnum.OPENING, count, scenario_analysis)
     
-    async def generate_response_voice_lines(self, scenario_data: ScenarioCreateRequest, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
-        return await self.generate_voice_lines(scenario_data, VoiceLineTypeEnum.RESPONSE, count, scenario_analysis)
+    async def generate_response_voice_lines(self, title: str, description: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
+        return await self.generate_voice_lines(title, description, target_name, language, VoiceLineTypeEnum.RESPONSE, count, scenario_analysis)
     
-    async def generate_question_voice_lines(self, scenario_data: ScenarioCreateRequest, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
-        return await self.generate_voice_lines(scenario_data, VoiceLineTypeEnum.QUESTION, count, scenario_analysis)
+    async def generate_question_voice_lines(self, title: str, description: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
+        return await self.generate_voice_lines(title, description, target_name, language, VoiceLineTypeEnum.QUESTION, count, scenario_analysis)
     
-    async def generate_closing_voice_lines(self, scenario_data: ScenarioCreateRequest, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
-        return await self.generate_voice_lines(scenario_data, VoiceLineTypeEnum.CLOSING, count, scenario_analysis)
+    async def generate_closing_voice_lines(self, title: str, description: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
+        return await self.generate_voice_lines(title, description, target_name, language, VoiceLineTypeEnum.CLOSING, count, scenario_analysis)

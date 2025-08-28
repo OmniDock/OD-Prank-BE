@@ -49,6 +49,16 @@ class Settings(BaseSettings):
     ELEVENLABS_API_KEY: str = Field(default="")
     ELEVENLABS_AGENT_ID: str = Field(default="agent_6101k2hvvyege6k91757ph92vc64")
     
+    # Telnyx
+    TELNYX_PHONE_NUMBER: str = Field(default="")
+    TELNYX_API_KEY: str = Field(default="")
+    TELNYX_APPLICATION_ID: str = Field(default="")
+    TUNNEL_URL: str = Field(default="")
+    TELNYX_WEBHOOK_BASE_URL: str = Field(default="")
+    TELNYX_SIP_USERNAME: str = Field(default="")
+    TELNYX_SIP_PASSWORD: str = Field(default="")
+    TELNYX_CONNECTION_ID: str = Field(default="")
+    
     # CORS
     BACKEND_CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8080")
     

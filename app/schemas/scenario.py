@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from app.core.utils.enums import LanguageEnum, VoiceLineTypeEnum
@@ -24,6 +24,77 @@ class ScenarioCreateRequest(BaseModel):
             v = v.strip()
             return v if v else None
         return v
+
+    class Config:
+        use_enum_values = True
+        json_schema_extra = {
+            "example": {
+                "title": "Pizza Delivery Prank",
+                "description": "A funny prank call pretending to be a pizza delivery service",
+                "language": "en",
+                "target_name": "John Doe"
+            }
+        }
+
+
+class ScenarioCreateRequestV2(BaseModel):
+    """Schema for creating a new scenario"""
+    title: str = Field(..., min_length=1, max_length=255, description="Scenario title")
+    target_name: str = Field(..., min_length=1, max_length=255, description="Target name")
+    description: str = Field(..., max_length=5096, description="Scenario description")
+    language: LanguageEnum = Field(default=LanguageEnum.GERMAN, description="Scenario language")
+    questions: List[str] = Field(default_factory=list, description="Follow-up questions")
+    answers: List[str] = Field(default_factory=list, description="Answers to follow-up questions")
+    
+    @field_validator('title')
+    @classmethod
+    def title_must_not_be_empty(cls, v):
+        if not v.strip():
+            raise ValueError('Title cannot be empty or just whitespace')
+        return v.strip()
+    
+    @field_validator('description')
+    @classmethod
+    def description_optional_cleanup(cls, v):
+        if v is not None:
+            v = v.strip()
+            return v if v else None
+        return v
+
+    @field_validator('questions')
+    @classmethod
+    def validate_questions(cls, v):
+        if v is None:
+            return []
+        # Clean and filter out empty questions
+        cleaned_questions = []
+        for question in v:
+            if question is not None and question.strip():
+                cleaned_questions.append(question.strip())
+        return cleaned_questions
+
+    @field_validator('answers')
+    @classmethod
+    def validate_answers(cls, v):
+        if v is None:
+            return []
+        # Clean and filter out empty answers
+        cleaned_answers = []
+        for answer in v:
+            if answer is not None and answer.strip():
+                cleaned_answers.append(answer.strip())
+        return cleaned_answers
+
+    # @field_validator('questions', 'answers')
+    # @classmethod
+    # def validate_questions_answers_length(cls, v, info):
+    #     # Ensure questions and answers have the same length
+    #     if info.field_name == 'questions':
+    #         return v
+    #     elif info.field_name == 'answers':
+    #         # This will be called after questions validation
+    #         return v
+    #     return v
 
     class Config:
         use_enum_values = True

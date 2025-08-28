@@ -10,7 +10,7 @@ from typing import List, Optional
 from pprint import pprint 
 from app.langchain.scenarios.scenario_enhancement_processor import ScenarioEnhancementProcessor
 from app.langchain.nodes.scenario_follow_up import ScenarioFollowUp
-from app.schemas.scenario import ScenarioEnhancementRequest, ScenarioEnhancementResponse
+from app.schemas.scenario import ScenarioEnhancementRequest, ScenarioEnhancementResponse, ScenarioCreateRequestV2
 
 class ScenarioService: 
 
@@ -117,6 +117,14 @@ class ScenarioService:
             await self.repository.rollback()
             raise
     
+
+    async def create_scenario_v2(self, user: AuthUser, scenario_data: ScenarioCreateRequestV2) -> ScenarioCreateResponse:
+        #TODO: Implement create scenario v2 
+        pass
+    
+
+
+
     def _extract_voice_lines_from_results(self, results: ScenarioProcessorState) -> List[dict]:
         """Extract voice lines from processing results and convert to database format"""
         voice_lines_data = []

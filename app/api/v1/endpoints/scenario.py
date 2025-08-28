@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.auth import get_current_user, AuthUser
-from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, ScenarioFollowUpResponse, ScenarioEnhancementRequest, ScenarioEnhancementResponse, VoiceLineEnhancementRequest, VoiceLineEnhancementResponse
+from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, ScenarioFollowUpResponse, ScenarioEnhancementRequest, ScenarioEnhancementResponse, VoiceLineEnhancementRequest, VoiceLineEnhancementResponse, ScenarioCreateRequestV2
 from fastapi import Body
 from app.services.scenario_service import ScenarioService
 from app.core.database import AsyncSession, get_db_session
@@ -20,6 +20,20 @@ async def create_scenario(
     try:
         scenario_service = ScenarioService(db_session)
         result = await scenario_service.create_scenario(user, scenario_create_request)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create scenario: {str(e)}")
+    
+@router.post("/v2/", response_model=ScenarioCreateResponse)
+async def create_scenario_v2(
+    scenario_create_request_v2: ScenarioCreateRequestV2 = Body(...),
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> ScenarioCreateResponse:
+    """Create a new scenario with LangChain processing and save to database"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        result = await scenario_service.create_scenario_v2(user, scenario_create_request_v2)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create scenario: {str(e)}")

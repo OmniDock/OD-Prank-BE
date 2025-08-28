@@ -28,7 +28,7 @@ class ScenarioAnalyzer:
             1. A believable, engaging character persona 
             2. Realistic but funny company/service or personal agenda context 
             3. Natural speech patterns with ACCENTS
-            4. Believability anchors and ABSURD escalation strategy
+            4. Believability anchors and strategy to escalete the humor of the scenario while not being too far fetched
             5. Cultural adaptation.
             6. Audio-tag guidance for optimal ElevenLabs v3 performance
 
@@ -36,9 +36,9 @@ class ScenarioAnalyzer:
 
             CHARACTER DEVELOPMENT FOR YOUTH APPEAL:
             - Create character names that are funny/memorable (Giuseppe, Kevin, Ahmed, Tyler, etc.)
-            - Develop backgrounds that include modern references (social media, gaming, streaming)
-            - Design speech patterns with ACCENTS and casual language ("dude", "honestly", occasional "weird")
-            - Create personalities that are relatable to young people (slightly chaotic, authentic, funny)
+            - Develop backgrounds that include believable references fitting the scenario (social media, organisations, etc.)
+            - Design speech patterns and accents that fit the character 
+            - Create personalities that complement the given scenario
 
             BELIEVABILITY ENGINEERING:
             - Use modern, relatable services
@@ -58,7 +58,7 @@ class ScenarioAnalyzer:
             - Consider regional variations in communication style
 
             ESCALATION STRATEGY FOR MAXIMUM YOUTH HUMOR:
-            - Start with believable modern scenario (social media issue, delivery problem)
+            - Start with  believable scenario (social media issue, delivery problem)
             - Gradually introduce ABSURD elements (Giuseppe's obsession with pizza preferences)
             - Include memorable and quotable lines
             - Create scenarios that would be funny to share with friends
@@ -79,7 +79,7 @@ class ScenarioAnalyzer:
         """Analyze scenario and generate dynamic persona and context"""
         console_logger.info(f"Analyzing scenario: {scenario_data.title}")
         
-        llm = ChatOpenAI(model=self.model_name, temperature=0.7).with_structured_output(ScenarioAnalysisResult)
+        llm = ChatOpenAI(model=self.model_name, temperature=0.6).with_structured_output(ScenarioAnalysisResult)
         
         analysis_prompt = ChatPromptTemplate.from_messages([
             ("system", self.analysis_system_prompt),

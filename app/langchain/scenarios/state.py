@@ -86,7 +86,18 @@ class ScenarioProcessorState(BaseModel):
         arbitrary_types_allowed = True  
         use_enum_values = True  
 
-
+class ScenarioProccessorStateV2(BaseModel):
+    start_scenario_data: ScenarioCreateRequest
+    questions: List[str]
+    answers: List[str]
+    answers_safety_check: Optional[SafetyCheckResult]
+    enhanced_scenario_description: str 
+    target_counts: Dict[VoiceLineTypeEnum, int]
+    opening_voice_lines: Annotated[List[VoiceLineState], extend_list] = Field(default_factory=list)
+    question_voice_lines: Annotated[List[VoiceLineState], extend_list] = Field(default_factory=list)
+    response_voice_lines: Annotated[List[VoiceLineState], extend_list] = Field(default_factory=list)
+    closing_voice_lines: Annotated[List[VoiceLineState], extend_list] = Field(default_factory=list)
+    
 
 class ScenarioEnhancementProcessorState(BaseModel):
     scenario_data: ScenarioCreateRequest
