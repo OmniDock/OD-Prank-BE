@@ -2,13 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSo
 import asyncio
 from pydantic import BaseModel
 from typing import Optional
+import time
+import base64 as b64
 import json
 import base64
+import httpx
 
 from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
 from app.core.logging import console_logger
 from app.services.telnyx_service import telnyx_service
+from app.core.config import settings
 
 
 router = APIRouter(tags=["telnyx"])
@@ -46,13 +50,71 @@ async def start_call(
 async def telnyx_webhook(req: Request):
     # TODO: Add signature verification using TELNYX_WEBHOOK_SECRET
     event = await req.json()
-    console_logger.info(f"Telnyx webhook event: {event}")
+    event_type = event.get("data", {}).get("event_type") or event.get("event_type")
+    console_logger.info(f"Telnyx webhook event: {event_type}")
+
+    if "conference" in event_type:
+        console_logger.info(f"Conference event: {event}")
+        return {"ok": True}
+
     try:
         await telnyx_service.handle_webhook_event(event)
         return {"ok": True}
     except Exception as e:
         console_logger.error(f"Webhook error: {e}")
         return {"ok": False}
+
+
+class WebRTCTokenRequest(BaseModel):
+    call_control_id: str
+    ttl_seconds: int = 300
+
+
+class WebRTCTokenResponse(BaseModel):
+    token: str
+    conference_name: str
+
+
+@router.post("/webrtc/token", response_model=WebRTCTokenResponse)
+async def mint_webrtc_token(body: WebRTCTokenRequest, user: AuthUser = Depends(get_current_user)):
+    """
+    Return a short-lived Telnyx WebRTC JWT for listen-only monitoring.
+    Mints via Telnyx telephony_credentials token API using TELNYX_API_KEY.
+    """
+    # Resolve secret conference name from live session, fallback to call_control_id
+    sess = telnyx_service.get_session(body.call_control_id)
+
+    # Enforce owner-only token minting
+    if not sess or sess.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: not owner of this call")
+
+    # Find or create per-user On-Demand Credential, then mint JWT
+    try:
+        cred_id = await telnyx_service.get_or_create_on_demand_credential(user.id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Credential provisioning failed: {str(e)}")
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(
+                f"https://api.telnyx.com/v2/telephony_credentials/{cred_id}/token",
+                headers={"Authorization": f"Bearer {settings.TELNYX_API_KEY}"},
+            )
+
+            if r.status_code >= 400:
+                console_logger.error(f"Telnyx token error: {r.text}")
+                raise HTTPException(status_code=r.status_code, detail=f"Telnyx token error: {r.text}")
+            
+            token = r.text
+            console_logger.info(f"Telnyx token response: {token}")
+            if not token:
+                raise HTTPException(status_code=500, detail="Token missing in Telnyx response")
+            
+    except Exception as e:
+        console_logger.error(f"Failed to mint Telnyx token: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to mint Telnyx token: {str(e)}")
+
+    return WebRTCTokenResponse(token=token, conference_name=sess.conference_name)
 
 
 @router.websocket("/media/{call_control_id}")
@@ -69,47 +131,33 @@ async def telnyx_media_ws(ws: WebSocket, call_control_id: str):
         data = json.loads(msg)
         console_logger.info(f"Media WS connected: {data}")
         
-        async def handle_inbound():
-            """Receive audio from Telnyx and broadcast to monitors"""
-            while True:
-                msg = await ws.receive_text()
-                data = json.loads(msg)
-                                
-                if data.get("event") == "media":
-                    media = data.get("media", {})
-                    track = media.get("track", "inbound")
-                    payload = media.get("payload", "")
-                    
-                    # Broadcast inbound audio to monitors
-                    if track == "inbound" or track == "inbound_track":
-                        await telnyx_service.broadcast(
-                            call_control_id, 
-                            "inbound", 
-                            payload
-                        )
-                elif data.get("event") == "stop":
-                    break
+        # Start outbound streaming of the first audio in a loop for testing
+        send_task = asyncio.create_task(
+            telnyx_service.stream_playlist_over_ws(ws, session)
+        )
         
-        # Debug: inbound-only to verify callee audio without our playback
-        await handle_inbound()
+        # Consume inbound frames to keep the socket healthy; do not forward
+        while True:
+            try:
+                inbound_msg = await ws.receive_text()
+                inbound = json.loads(inbound_msg)
+                if inbound.get("event") in ("stop", "streaming_stopped"):
+                    break
+            except WebSocketDisconnect:
+                break
+            except Exception:
+                # Ignore malformed frames
+                continue
         
     except WebSocketDisconnect:
         pass
     except Exception as e:
         console_logger.error(f"Media WS error: {e}")
     finally:
+        try:
+            if 'send_task' in locals() and not send_task.done():
+                send_task.cancel()
+        except Exception:
+            pass
         await ws.close()
-
-@router.websocket("/monitor/{call_control_id}")
-async def telnyx_monitor_ws(ws: WebSocket, call_control_id: str):
-    await ws.accept()
-    telnyx_service.register_monitor(call_control_id, ws)
-    try:
-        while True:
-            # Keep alive; ignore any client messages
-            await ws.receive_text()
-    except WebSocketDisconnect:
-        return
-    finally:
-        telnyx_service.unregister_monitor(call_control_id, ws)
 

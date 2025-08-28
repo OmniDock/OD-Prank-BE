@@ -1,3 +1,4 @@
+import base64
 from pydantic import Field, ConfigDict
 from pydantic_settings import BaseSettings
 from typing import List
@@ -61,7 +62,8 @@ class Settings(BaseSettings):
     TELNYX_CONNECTION_ID: str = Field(default="")  # OD-Backend Credential Connection
     TELNYX_SIP_USERNAME: str = Field(default="")  # SIP username for WebRTC (optional)
     TELNYX_SIP_PASSWORD: str = Field(default="")  # SIP password for WebRTC (optional)
-    
+
+
     # CORS
     BACKEND_CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8080")
     
@@ -72,6 +74,7 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         """Parse CORS origins from comma-separated string."""
         return [origin.strip() for origin in self.BACKEND_CORS_ORIGINS.split(",")]
+
 
     model_config = ConfigDict(
         env_file=".env.local",

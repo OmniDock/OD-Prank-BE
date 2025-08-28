@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Set
+import secrets
+from typing import Dict, List, Optional, Tuple
 
 import httpx
 import base64
@@ -13,7 +14,7 @@ from app.core.config import settings
 from app.core.logging import console_logger
 from app.core.database import AsyncSession
 from app.services.audio_preload_service import AudioPreloadService, PreloadedAudio
-from fastapi import WebSocket
+ 
 
 
 @dataclass
@@ -27,6 +28,7 @@ class CallSession:
     call_session_id: Optional[str] = None
     playlist: List[PreloadedAudio] = field(default_factory=list)
     current_index: int = 0
+    conference_name: Optional[str] = None
 
 
 class TelnyxService:
@@ -35,33 +37,55 @@ class TelnyxService:
 
     # In-memory sessions keyed by call_control_id
     _sessions: Dict[str, CallSession] = {}
-    _monitors: Dict[str, Set[WebSocket]] = {}
-
-    def register_monitor(self, call_control_id: str, ws: WebSocket) -> None:
-        self._monitors.setdefault(call_control_id, set()).add(ws)
-
-    def unregister_monitor(self, call_control_id: str, ws: WebSocket) -> None:
-        if call_control_id in self._monitors:
-            self._monitors[call_control_id].discard(ws)
-            if not self._monitors[call_control_id]:
-                del self._monitors[call_control_id]
-
-    async def broadcast(self, call_control_id: str, direction: str, payload_b64: str) -> None:
-        """Broadcast base64 media payload to any monitor websockets for this call."""
-        for ws in list(self._monitors.get(call_control_id, [])):
-            try:
-                await ws.send_json({
-                    "event": "media",
-                    "direction": direction,
-                    "codec": "PCMU",
-                    "rate": 8000,
-                    "payload": payload_b64,
-                })
-            except Exception:
-                self.unregister_monitor(call_control_id, ws)
+    _token_cache: str = None
+    _pending_joins: Dict[str, str] = {}
 
     def get_session(self, call_control_id: str) -> Optional[CallSession]:
         return self._sessions.get(call_control_id)
+
+    async def get_or_create_on_demand_credential(self, user_id: str) -> str:
+        """
+        Find (by name) or create an On-Demand Telephony Credential under the configured SIP Connection.
+        Returns the credential id to be used for JWT minting.
+        """
+        if not settings.TELNYX_CONNECTION_ID:
+            raise RuntimeError("TELNYX_CONNECTION_ID not configured")
+
+        name = f"odprank-{user_id}"
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # Try to find existing credential by name
+            r = await client.get(
+                f"{self.BASE_URL}/telephony_credentials",
+                headers=self.AUTH_HEADER,
+            )
+            if r.status_code >= 400:
+                console_logger.error(f"list telephony_credentials error {r.status_code}: {r.text}")
+            r.raise_for_status()
+            items = (r.json() or {}).get("data") or []
+            for item in items:
+                if item.get("name") == name:
+                    cid = item.get("id")
+                    if cid:
+                        return cid
+
+            # Create a new credential
+            payload = {
+                "connection_id": settings.TELNYX_CONNECTION_ID,
+                "name": name,
+            }
+            r2 = await client.post(
+                f"{self.BASE_URL}/telephony_credentials",
+                headers={**self.AUTH_HEADER, "Content-Type": "application/json"},
+                json=payload,
+            )
+            if r2.status_code >= 400:
+                console_logger.error(f"create telephony_credential error {r2.status_code}: {r2.text}")
+            r2.raise_for_status()
+            cid = ((r2.json() or {}).get("data") or {}).get("id")
+            if not cid:
+                raise RuntimeError("Created telephony credential but response missing id")
+            return cid
 
     async def _ensure_playlist(
         self,
@@ -102,11 +126,18 @@ class TelnyxService:
         if not playlist:
             raise RuntimeError("No READY audio found to play.")
 
+        # per-call secret conference name (unguessable)
+        secret_conf = f"{secrets.token_urlsafe(64)}"
+
         payload = {
             "to": to_number,
             "from": from_number,
-            "connection_id": settings.TELNYX_APPLICATION_ID, 
-            "webhook_url": f"{settings.TELNYX_WEBHOOK_BASE_URL}{settings.API_V1_STR}/telnyx/webhook"
+            "connection_id": settings.TELNYX_APPLICATION_ID,
+            "webhook_url": f"{settings.TELNYX_WEBHOOK_BASE_URL}{settings.API_V1_STR}/telnyx/webhook",
+            "conference_config": {
+                "conference_name": secret_conf,
+                "start_conference_on_enter": True
+            }
         }
 
         async with httpx.AsyncClient(timeout=20.0) as client:
@@ -123,6 +154,8 @@ class TelnyxService:
         call_control_id = data.get("call_control_id")
         call_session_id = data.get("call_session_id")
 
+        console_logger.info(f"Call Initiated: {data}")
+
         if not call_control_id:
             raise RuntimeError("Missing call_control_id from Telnyx response.")
 
@@ -136,6 +169,7 @@ class TelnyxService:
             call_session_id=call_session_id,
             playlist=playlist,
             current_index=0,
+            conference_name=secret_conf,
         )
         self._sessions[call_control_id] = session
 
@@ -150,18 +184,74 @@ class TelnyxService:
         payload = event.get("data", {})
         call_control_id = payload.get("payload", {}).get("call_control_id") or payload.get("call_control_id")
 
+        p = payload.get("payload", {}) or {}
+
         if not call_control_id:
             console_logger.warning("Webhook without call_control_id; ignoring.")
             return
 
         session = self._sessions.get(call_control_id)
+
+        # Try to extract conference name from client_state (base64)
+        conf_from_state: Optional[str] = None
+        cs_b64 = p.get("client_state") or payload.get("client_state")
+        if cs_b64:
+            try:
+                conf_from_state = base64.b64decode(cs_b64).decode("utf-8")
+            except Exception:
+                conf_from_state = None
+
+        if event_type == "call.initiated":
+            # Prefer client_state when present; defer actual join until answered
+            direction = p.get("direction") or ""
+            if direction.lower() in ("incoming", "inbound"):
+                if conf_from_state:
+                    console_logger.info(f"Pending join: {call_control_id} → conference {conf_from_state}")
+                    self._pending_joins[call_control_id] = conf_from_state
+                    return
+
+                # Fallback: infer from SIP-URI userpart
+                to_uri = p.get("to") or ""
+                conf_name = None
+                if to_uri.startswith("sip:"):
+                    try:
+                        conf_name = to_uri.split("sip:",1)[1].split("@",1)[0]
+                    except Exception:
+                        conf_name = None
+
+                if conf_name:
+                    console_logger.info(f"Pending join (SIP URI): {call_control_id} → {conf_name}")
+                    self._pending_joins[call_control_id] = conf_name
+                return        
+
+
+
         if event_type == "call.answered":
             console_logger.info(f"Call answered: {call_control_id}")
-            if session:
-                await self.fork_start(call_control_id)
+
+                
         elif event_type in ("call.hangup", "call.ended"):
             console_logger.info(f"Call ended: {call_control_id}")
+            # Cleanup
+            self._pending_joins.pop(call_control_id, None)
             self._sessions.pop(call_control_id, None)
+
+        # Join any pending leg when it gets answered (works for inbound/outbound WebRTC)
+        if event_type == "call.answered":
+            # If we have a pending target conference for this leg, join now
+            pending = self._pending_joins.pop(call_control_id, None)
+            if pending:
+                console_logger.info(f"Joining leg {call_control_id} to conference {pending}")
+                await self.join_conference(call_control_id, pending)
+                return
+            # Fallback: if client_state was present but we didn't set pending (e.g., non-inbound direction)
+            if conf_from_state:
+                console_logger.info(f"Joining leg {call_control_id} to conference {conf_from_state} (fallback)")
+                await self.join_conference(call_control_id, conf_from_state)
+                return
+            
+            if session:
+                await self.fork_start(call_control_id)
 
     async def fork_start(self, call_control_id: str):
         base = settings.TUNNEL_URL.replace("https://", "wss://").replace("http://", "ws://")
@@ -169,9 +259,9 @@ class TelnyxService:
 
         body = {
             "stream_url": ws_url,
-            "stream_track": "inbound_track",
+            "stream_track": "both_tracks",
             "stream_codec": "PCMU",
-            "stream_bidirectional_mode": "mp3",
+            "stream_bidirectional_mode": "rtp",
         }
 
         async with httpx.AsyncClient(timeout=20.0) as client:
@@ -184,6 +274,17 @@ class TelnyxService:
                 console_logger.error(f"Telnyx streaming_start error {resp.status_code}: {resp.text}")
             resp.raise_for_status()
         console_logger.info(f"Fork started for {call_control_id} -> {ws_url}")
+
+    async def join_conference(self, call_control_id: str, conference_name: str):
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(
+                f"{self.BASE_URL}/calls/{call_control_id}/actions/conference",
+                headers={**self.AUTH_HEADER, "Content-Type": "application/json"},
+                json={"name": conference_name},  # Telnyx expects "name" as the conference name
+            )
+            if r.status_code >= 400:
+                console_logger.error(f"conference action error {r.status_code}: {r.text}")
+            r.raise_for_status()
 
     async def stream_playlist_over_ws(self, ws, session: CallSession):
         """
@@ -230,11 +331,7 @@ class TelnyxService:
                             "track": "outbound",
                             "payload": chunk_b64
                         }
-                    }))
-                    
-                    # Broadcast outbound audio to monitors
-                    await self.broadcast(session.call_control_id, "outbound", chunk_b64)
-                    
+                    }))                                        
                     # Precise timing - account for total chunks sent across loops
                     total_chunks_sent += 1
                     next_time = start_time + (total_chunks_sent * 0.02)  # 20ms per chunk
