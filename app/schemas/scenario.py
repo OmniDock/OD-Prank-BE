@@ -107,6 +107,15 @@ class ScenarioFollowUpResponse(BaseModel):
         from_attributes = True
 
 
+class ScenarioEnhancementResponse(BaseModel):
+    """Schema for scenario enhancement response"""
+    original_request: ScenarioCreateRequest
+    enhanced_scenario: ScenarioCreateRequest
+    
+    class Config:
+        from_attributes = True
+
+
 class ScenarioEnhancementRequest(BaseModel):
     """Schema for scenario enhancement request with questions and answers"""
     original_request: ScenarioCreateRequest

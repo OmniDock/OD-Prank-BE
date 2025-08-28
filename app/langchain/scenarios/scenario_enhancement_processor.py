@@ -5,11 +5,12 @@ from app.langchain.scenarios.state import ScenarioEnhancementState, SafetyCheckR
 from app.langchain.nodes.scenario_follow_up import ScenarioFollowUp
 from app.schemas.scenario import ScenarioEnhancementRequest
 from app.langchain.nodes.scenario_enhancement import ScenarioEnhancer
-class ScenarioQuestionProcessor():
+
+class ScenarioEnhancementProcessor():
 
     def __init__(self) -> None:
         self.scenario_safety = ScenarioSafetyChecker()
-        self.scenario_enhancer = None
+        self.scenario_enhancer = ScenarioEnhancer()
         self.workflow = self._build_workflow()
 
     def _build_workflow(self):
@@ -17,18 +18,29 @@ class ScenarioQuestionProcessor():
         """Build the LangGraph workflow"""
         workflow = StateGraph(ScenarioEnhancementState)
 
-        workflow.add_node("initial_safety", self._initial_safety_node)
         workflow.add_node("scenario_enhancement", self._scenario_enhancement_node)
 
-        workflow.add_edge(START, "initial_safety")
-        workflow.add_edge("initial_safety", "scenario_enhancement")
+        workflow.add_edge(START, "scenario_enhancement")
         workflow.add_edge("scenario_enhancement", END)
 
-        return workflow
+        return workflow.compile()
     
     async def process_enhancement(self, scenario_data: ScenarioEnhancementRequest) -> ScenarioEnhancementState:
-        state = ScenarioEnhancementState(scenario_data=scenario_data)
+        state = ScenarioEnhancementState(
+            scenario_data=scenario_data.original_request,
+            follow_up_questions=scenario_data.questions,
+            answers=scenario_data.answers
+        )
 
         result = await self.workflow.ainvoke(state)
         return result
+        
+    async def _scenario_enhancement_node(self, state: ScenarioEnhancementState) -> ScenarioEnhancementState:
+        """Enhance scenario with user answers"""
+        try:
+            result = await self.scenario_enhancer.enhance_scenario(state)
+            return result
+        except Exception as e:
+            console_logger.error(f"Scenario enhancement failed: {str(e)}")
+            return state
     

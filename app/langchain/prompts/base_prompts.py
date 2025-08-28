@@ -129,7 +129,48 @@ FOLLOWUP_SYSTEM_PROMPT = '''
 '''
 
 ENHANCEMENT_SYSTEM_PROMPT = '''
+        You are an expert audio-based comedy writer and teacher with 15+ years of experience in crafting funny and entertaining dialogue for prank call scenarios.
 
+        Your expertise includes:
+        - Deep understanding of audio-based humor, speech patterns, and timing.
+        - Creating authentic, memorable characters with distinct personalities, quirks, and accents.
+        - Writing dialogue that feels believable at first but escalates into absurd, genuinely funny territory.
+        - Balancing credibility with comedy for maximum prank impact.
+        - Adapting humor to different cultural contexts and audience expectations.
+
+        TASK:
+        You will be provided with:
+        1.The original prank scenario description.
+        2.A set of clarifying questions about the scenario.
+        3.The user’s answers to those questions.
+
+        Your job is to merge all of this information into a single, enhanced scenario description
+        - The scenario needs to stay true to the users original idea and enhace / expand on what is funny about the users sceanrio without being too far fetched.       
+        - Analyze the 
+        - Make the scneario richer in detail (characters, tone, relationships, setting, escalation).
+        - Make the scenario the funniest possible version of the original that maximizes the humor and possibility for memorable moments while staying true to the users original intent.
+        - Make the scenario structured for execution as a prank call (clear setup, progression, escalation, closing ideas).
+        - The scenario description needs to HILARIOUS but BELIEVABLE.
+        - Escalation needs to be FUNNY but BELIEVABLE throughout 
+        
+        Mistakes to avoid:
+        - Assuming specfific reactions of the target.
+        - Giving direct quoted examples of dialogue.
+        - Writing too much or too little. Stay within 200-400 words
+
+        When rewriting the scenario, focus on:
+        - Making the characters vivid and distinct.
+        - Clarifying the prankster’s role and how they hook the target.
+        - Building a logical but funny path of escalation.
+        - Adding quirky or funny elements that heighten the comedy.
+        - Not giving restrictive examples for direct dialogue.
+        - Keeping the flow natural and realistic but escalate the humor.
+        - The description itself and not giving examples
+        - Not commenting on the description or its enhaced version, itslef 
+
+        Output:
+        Produce a single, polished scenario description (not a dialogue) without changing the title or traget name that is funnier and has a more focused vision than the original but stays true to the users original idea.
+        The scenario should be ready to be turned into an hilariously funny phone call prank script. 
 '''
 
 
@@ -207,3 +248,62 @@ def get_emotional_state_context(voice_line_type: str) -> str:
     }
     
     return contexts.get(voice_line_type, contexts["OPENING"])
+
+
+
+
+
+"""
+{
+    "original_request": {
+        "title": "Müll",
+        "target_name": "Sebastian",
+        "description": "Herr Tropikovski ruft sie an um ihnen zu sage dass ihr Müll nicht richtig nach deutscher Norm getrennt wurde",
+        "language": "GERMAN"
+    },
+    "questions": [
+        "Wie würdest du Herr Tropikovski beschreiben? Ist er ein überkorrekter, leicht nervöser Hausmeister, ein pedantischer Beamter vom Ordnungsamt oder vielleicht ein Nachbar mit sehr eigenen Ansichten zur Mülltrennung?",
+        "Was für absurde oder übertriebene Regeln könnte Herr Tropikovski erfinden, um Sebastian zu verwirren? Zum Beispiel: Muss der Biomüll nach Wochentagen sortiert werden, oder gibt es eine spezielle Farbe für Joghurtbecher-Deckel?",
+        "Wie reagiert Sebastian normalerweise auf Autorität oder Kritik? Ist er eher schüchtern und eingeschüchtert, oder kontert er mit eigenen absurden Ausreden?",
+        "Soll das Gespräch anfangs ganz sachlich und bürokratisch klingen und dann langsam ins Lächerliche abdriften? Oder möchtest du, dass Herr Tropikovski schon von Anfang an einen leicht verrückten Eindruck macht?",
+        "Gibt es bestimmte Running Gags oder wiederkehrende Begriffe, die Herr Tropikovski immer wieder benutzt, um die Absurdität zu steigern? Zum Beispiel: \"Mülltrennungs-Ehrenurkunde\", \"Papierklopfer-Test\" oder \"Restmüll-Polizei\"?"
+    ]
+    "answers":[
+    "Er ist ein überkorrekter, pedantisceh Nachbar, mit sehr eigenen ansichten zu korrekter Mülltrennung",
+    "Er bleibt vage ohne genaue aussagen und weicht bei spezifischen fragen mit allgemeinen aussagen zur Mülltrennung aus",
+    "Sebastian reaktion wird wahrscheinlich leich empört und verwirrt sein.",
+    "Leicht verrückter eindruck von Beginn an",
+    "Er stützt sich auf deutsche Mülltrennungsnorm und Nachbarschaftsverordnung"
+    ]
+}
+"""
+
+"""
+{
+    "original_request": {
+        "title": "Müll",
+        "target_name": "Sebastian",
+        "description": "Du hast den Müll nicht ordentlich getrennt und wir müssen nun die grossen Muelleimer gegen kleiner austauschen fuer die naechsten 12 Wochen. Wenn das ganze nicht abnimmt gibt es Strafgelder von bis zu 10 Euro pro Monat.",
+        "language": "GERMAN"
+    },
+    "questions": [
+        "Welche Art von Person soll der Anrufer darstellen? Ist es jemand vom Ordnungsamt, ein übermotivierter Hausmeister oder vielleicht ein extrem engagierter Nachbar mit absurden Mülltrennungsregeln?",
+        "Wie reagiert Sebastian normalerweise auf bürokratische Anrufe? Ist er eher gelassen, leicht genervt oder nimmt er alles sehr ernst? Das hilft, die Eskalation des Gesprächs lustiger zu gestalten.",
+        "Möchtest du, dass der Anrufer mit besonders absurden Mülltrennungsregeln kommt (z.B. Bananenschalen müssen einzeln in Butterbrotpapier gewickelt werden), oder soll es eher trocken und übertrieben bürokratisch bleiben?",
+        "Gibt es bestimmte Running Gags oder wiederkehrende Begriffe, die im Gespräch auftauchen sollen? Zum Beispiel ein Fantasie-Mülltrennungsgerät, das Sebastian angeblich benutzen muss.",
+        "Wie soll das Gespräch eskalieren? Soll der Anrufer immer verrücktere Konsequenzen androhen (z.B. Mülltrennungs-Fortbildung am Sonntagmorgen, Müllpolizei, etc.), oder bleibt es bei den kleineren Mülleimern und Strafgeldern?"
+    ],
+    "answers" : [
+    "extrem engagierter Nachbar",
+    "verunsichert und leicht genervt",
+    "übertrieben bürokratisch",
+    "Anrufer verweist oft auf deutsche norm und Nachbarschaftsverordnung"
+    "kleinere Mülleimer, Strafgeld und melden bei der Nachbarschaftswache"
+    ]
+}
+
+
+
+
+
+"""

@@ -1,6 +1,6 @@
 from app.langchain.scenarios.initial_processor import InitialScenarioProcessor
 from app.langchain.scenarios.state import ScenarioProcessorState, VoiceLineState
-from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, ScenarioFollowUpResponse, VoiceLineResponse, VoiceLineAudioResponse
+from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, ScenarioFollowUpResponse, ScenarioEnhancementRequest, ScenarioEnhancementResponse
 from app.core.auth import AuthUser
 from app.repositories.scenario_repository import ScenarioRepository
 from app.core.database import AsyncSession
@@ -8,32 +8,21 @@ from app.core.logging import console_logger
 from app.services.tts_service import TTSService
 from typing import List, Optional
 from pprint import pprint 
-from app.langchain.scenarios.scenario_questions_procesor import ScenarioQuestionProcessor
+from app.langchain.scenarios.scenario_enhancement_processor import ScenarioEnhancementProcessor
+from app.langchain.nodes.scenario_follow_up import ScenarioFollowUp
+from app.schemas.scenario import ScenarioEnhancementRequest, ScenarioEnhancementResponse
 
 class ScenarioService: 
 
     def __init__(self, db_session: AsyncSession):
         self.repository = ScenarioRepository(db_session)
 
-    async def create_scenario_questions(self, user: AuthUser, scenario_data: ScenarioCreateRequest) -> ScenarioFollowUpResponse:
-        """Create and process a scenario, then save to database"""
-        console_logger.info(f"Creating enhanced scenario '{scenario_data.title}' for user {user.id}")
-        try:
-            processor = ScenarioQuestionProcessor()
-            results = await processor.process_enhancement(scenario_data)
 
-            is_safe = results['enhancement_safety_check'].is_safe
-            return results # Needs to be followup response 
-        except Exception as e:
-            console_logger.error(f"Failed to create enhanced scenario: {str(e)}")
-            raise
 
     async def generate_follow_up_questions(self, scenario_data: ScenarioCreateRequest) -> ScenarioFollowUpResponse:
         """Generate follow-up questions for scenario enhancement"""
         console_logger.info(f"Generating follow-up questions for scenario '{scenario_data.title}'")
         try:
-            from app.langchain.nodes.scenario_follow_up import ScenarioFollowUp
-            
             follow_up_node = ScenarioFollowUp()
             result = await follow_up_node.generate_follow_up_questions(scenario_data)
             
@@ -43,6 +32,24 @@ class ScenarioService:
             )
         except Exception as e:
             console_logger.error(f"Failed to generate follow-up questions: {str(e)}")
+            raise
+        
+
+    async def enhance_scenario_with_answers(self, user: AuthUser, enhancement_request: ScenarioEnhancementRequest) -> ScenarioEnhancementResponse:
+        """Enhance a scenario with user answers to follow-up questions"""
+        console_logger.info(f"Enhancing scenario '{enhancement_request.original_request.title}' with answers to follow-up questions")
+        try:
+            processor = ScenarioEnhancementProcessor()
+            results = await processor.process_enhancement(enhancement_request)
+            # Convert dict result to ScenarioEnhancementState to access enhanced_scenario_data
+            from app.langchain.scenarios.state import ScenarioEnhancementState
+            state = ScenarioEnhancementState.model_validate(results)
+            return ScenarioEnhancementResponse(
+                original_request=enhancement_request.original_request,
+                enhanced_scenario=state.enhanced_scenario_data
+            )
+        except Exception as e:
+            console_logger.error(f"Failed to enhance scenario: {str(e)}")
             raise
 
     async def create_scenario(self, user: AuthUser, scenario_data: ScenarioCreateRequest) -> ScenarioCreateResponse:

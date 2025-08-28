@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.auth import get_current_user, AuthUser
-from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, ScenarioFollowUpResponse, ScenarioEnhancementRequest, VoiceLineEnhancementRequest, VoiceLineEnhancementResponse
+from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, ScenarioFollowUpResponse, ScenarioEnhancementRequest, ScenarioEnhancementResponse, VoiceLineEnhancementRequest, VoiceLineEnhancementResponse
 from fastapi import Body
 from app.services.scenario_service import ScenarioService
 from app.core.database import AsyncSession, get_db_session
@@ -57,12 +57,12 @@ async def follow_up_questions(
         raise HTTPException(status_code=500, detail=f"Failed to generate follow up questions: {str(e)}")
 
 
-@router.post('/enhance', response_model=ScenarioCreateResponse)
+@router.post('/enhance', response_model=ScenarioEnhancementResponse)
 async def enhance_scenario(
     enhancement_request: ScenarioEnhancementRequest = Body(...),
     user: AuthUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
-) -> ScenarioCreateResponse:
+) -> ScenarioEnhancementResponse:
     """Enhance a scenario with user answers to follow-up questions"""
     try:
         scenario_service = ScenarioService(db_session)
@@ -130,3 +130,33 @@ async def update_scenario_preferred_voice(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update preferred voice: {str(e)}")
+    
+
+
+
+
+'''
+{
+    "original_request": {
+        "title": "GARBAGE",
+        "target_name": "Sebastian",
+        "description": "Das flüchtlingsheim is überfüllt und fragt nach ob ein paar Flüchis bei Sebi unterkommen können.",
+        "language": "GERMAN"
+    },
+    "questions": [
+        "Welche Art von Person soll der Anrufer darstellen? Ist es ein überkorrekter Behördenmitarbeiter, ein überforderter Praktikant oder vielleicht jemand mit einem besonders skurrilen Akzent?",
+        "Wie würdest du Sebastians Persönlichkeit beschreiben? Ist er eher hilfsbereit, leicht gestresst, sehr korrekt oder vielleicht ein bisschen paranoid? Das beeinflusst, wie er auf absurde Forderungen reagiert.",
+        "Soll das Gespräch am Anfang ganz sachlich und glaubwürdig klingen, oder willst du schon früh kleine absurde Details einbauen (z.B. seltsame Namen der \"Flüchis\" oder merkwürdige Anforderungen)?",
+        "Wie könnte sich das Gespräch steigern? Sollen die Wünsche immer absurder werden (z.B. ein Flüchi braucht ein eigenes Trampolin, einer bringt ein Lama mit, etc.), oder bleibt es bei der Grundidee und wird durch absurde Bürokratie komisch?",
+        "Gibt es bestimmte Running Gags, wiederkehrende Begriffe oder Insider, die du gerne einbauen würdest, damit das Gespräch einen roten Faden bekommt?"
+    ],
+    "answers": [
+        "Ich würde einen überkorrekten Behördenmitarbeiter darstellen. Er ist sehr korrekt und beherrscht die Sprache perfekt.",
+        "Sebastian ist eher hilfsbereit und leicht gestresst. Er ist sehr korrekt und beherrscht die Sprache perfekt.",
+        "Das Gespräch sollte am Anfang ganz sachlich und glaubwürdig klingen. Wir wollen nicht zu früh absurde Details einbauen.",
+        "Das Gespräch sollte steigern, indem die Wünsche immer absurder werden. Wir wollen nicht, dass es bei der Grundidee bleibt.",
+        "Es gibt bestimmte Running Gags, wiederkehrende Begriffe oder Insider, die ich gerne einbauen würde, damit das Gespräch einen roten Faden bekommt."
+    ]
+}
+
+'''

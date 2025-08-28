@@ -94,7 +94,7 @@ class ScenarioAnalyzer:
 
                 Please provide:
                 1. A specific character persona with name and background (optimized for youth humor)
-                2. Modern, relatable company/service context (social media, delivery, tech support, etc.)
+                2. Only if applicable to the scenario, meaning the charakter is associated with a company or service given the scenarion! A Modern, relatable company/service context (social media, delivery, tech support, etc.)
                 3. Character-specific speech patterns with ACCENT and youth slang
                 4. Believability anchors and ABSURD escalation strategy (Marcophono-inspired)
                 5. Cultural adaptation for 14-30 year old humor

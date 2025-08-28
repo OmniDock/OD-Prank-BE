@@ -30,6 +30,8 @@ class ScenarioQuestionProcessor():
             }
         )
         workflow.add_edge("follow_up_questions", "end")
+        
+        return workflow.compile()
 
     async def process_enhancement(self,scenario_create_request: ScenarioCreateRequest) -> ScenarioEnhancementState:
         state = ScenarioEnhancementState(

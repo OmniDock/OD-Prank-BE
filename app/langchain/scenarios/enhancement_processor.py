@@ -163,3 +163,34 @@ class IndividualVoiceLineEnhancementProcessor:
             return "safety_check"
         else:
             return "complete"
+        
+
+
+
+
+
+
+'''
+"original_request": {
+    "title": "AUtoschaden",
+    "target_name": "Sebastian",
+    "description": "Der Sohn vom Anrufer Giovanni hat mit seinem Dreirrad ihren weissen BMW angefahren. Aber der stand auch im Halteverbot, deshalb findet er dasss das okay ist",
+    "language": "GERMAN"
+},
+"questions": [
+    "Wie stellst du dir den Charakter von Giovanni vor? Soll er einen bestimmten Akzent oder eine besonders lockere, vielleicht sogar leicht freche Art haben? Oder ist er eher übertrieben höflich und entschuldigend, aber mit absurden Ausreden?",
+    "Wie reagiert Sebastian normalerweise auf solche Situationen? Ist er eher gelassen, leicht reizbar oder vielleicht sehr korrekt und regelorientiert? Das beeinflusst, wie weit die Absurdität getrieben werden kann.",
+    "Möchtest du, dass Giovanni versucht, die Schuld komplett auf Sebastian zu schieben, weil der BMW im Halteverbot stand? Welche absurden Argumente könnte er dafür bringen (z.B. \"Mein Sohn übt schon mal für die Formel 1\" oder \"Ihr Auto hat mein Kind verwirrt\")?",
+    "Soll der Anruf einen bestimmten Verlauf nehmen – zum Beispiel erst sehr ernst und dann immer absurder werden? Gibt es eine Eskalationsstufe, bei der Giovanni plötzlich noch mehr Dreiräder ins Spiel bringt oder andere Nachbarskinder beschuldigt?",
+    "Welche Running Gags oder wiederkehrenden Sprüche könnte Giovanni benutzen, um die Situation immer lächerlicher zu machen (z.B. \"Das ist doch nur ein Kratzer, das macht das Auto schneller!\" oder \"In Italien zählt das nicht mal als Unfall\")?"
+]
+}
+"anserws":[
+"lockere, freche, selbstverständliche art",
+"nicht wütend aber schnell genervt",
+"Der wird erst vage als relativ klein Beschrieben, bis er irgendwann locker, nebenbei spezifischer wird und enthüllt dass der Schaden doch grösser ist.",
+"Nur vage Beschreibungen, vom schaden, runterspielung, bis zum reveal"
+]
+
+
+'''

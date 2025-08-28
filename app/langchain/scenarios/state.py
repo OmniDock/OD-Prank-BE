@@ -56,9 +56,8 @@ class VoiceLineState(BaseModel):
 
 class ScenarioEnhancementState(BaseModel):
     scenario_data: ScenarioCreateRequest
-    follow_up_questions: Optional[str] = None
-    answers: Optional[str] = None
-    inital_safety_check: Optional[SafetyCheckResult] = None
+    follow_up_questions: Optional[List[str]] = None
+    answers: Optional[List[str]] = None
     answer_safety_check: Optional[SafetyCheckResult] = None
     enhanced_scenario_data: Optional[ScenarioCreateRequest] = None
 
