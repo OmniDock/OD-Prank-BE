@@ -93,15 +93,15 @@ class ScenarioAnalyzer:
                 Language: {language}
 
                 Please provide:
-                1. A specific character persona with name and background (optimized for youth humor)
+                1. A specific character persona with name and background (funny to people aged 14-30)
                 2. Only if applicable to the scenario, meaning the charakter is associated with a company or service given the scenarion! A Modern, relatable company/service context (social media, delivery, tech support, etc.)
-                3. Character-specific speech patterns with ACCENT and youth slang
-                4. Believability anchors and ABSURD escalation strategy (Marcophono-inspired)
-                5. Cultural adaptation for 14-30 year old humor
+                3. Character-specific speech patterns with accent if applicable 
+                4. Believability anchors and funny escalation strategy  (Marcophono-inspired)
+                5. Cultural adaptation to the scenario context
                 6. Audio tag recommendations for ElevenLabs v3 performance
                 
-                Focus on creating a character that young people find HILARIOUS and memorable.
-                The persona should start believable but quickly become absurdly funny in ways that resonate with youth culture.
+                Focus on creating a character fits the user scenarios intent and is HILARIOUS and memorable.
+                The scenario should start believable and quickly become funny.
                 Include specific accent and audio tag guidance for optimal TTS performance.
             """)
         ])

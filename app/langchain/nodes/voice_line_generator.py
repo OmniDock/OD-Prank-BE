@@ -99,7 +99,7 @@ class VoiceLineGenerator:
             ("user", """
                 Generate {count} {voice_line_type} voice lines for this prank scenario.
                 
-                CRITICAL: These are {voice_line_type} voice lines - NOT opening lines! (Marcophono-style)
+                CRITICAL: These are {voice_line_type} voice lines - NOT opening lines! 
                 - OPENING: First contact, introduce yourself and purpose (USE target name)
                 - QUESTION: Ask follow-up questions during ongoing conversation (AVOID overusing name)
                 - RESPONSE: React to target's questions/objections in mid-conversation (AVOID overusing name)
@@ -112,7 +112,7 @@ class VoiceLineGenerator:
                 
                 IMPORTANT: Generate ONLY the spoken text without quotation marks. Square-bracket audio tags (e.g., [sighs], [curious]) are allowed.
                 
-                YOUTH-OPTIMIZED: Make dialogue natural AND funny (Marcophono-inspired):
+                REALISTIC: Make dialogue natural AND funny (Marcophono-inspired):
                 - Natural hesitations: "Uh...", "Like...", "Hmm...", "Wait what..."
                 - Casual corrections: "I mean... uh, hold on..."
                 - Thinking aloud: "Where did I put... oh here!", "Wait... that's weird"

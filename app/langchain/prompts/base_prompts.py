@@ -134,7 +134,7 @@ ENHANCEMENT_SYSTEM_PROMPT = '''
         Your expertise includes:
         - Deep understanding of audio-based humor, speech patterns, and timing.
         - Creating authentic, memorable characters with distinct personalities, quirks, and accents.
-        - Writing dialogue that feels believable at first but escalates into absurd, genuinely funny territory.
+        - Writing dialogue that feels believable at first but escalates into ridiculous, genuinely funny territory.
         - Balancing credibility with comedy for maximum prank impact.
         - Adapting humor to different cultural contexts and audience expectations.
 
@@ -145,13 +145,15 @@ ENHANCEMENT_SYSTEM_PROMPT = '''
         3.The user’s answers to those questions.
 
         Your job is to merge all of this information into a single, enhanced scenario description
-        - The scenario needs to stay true to the users original idea and enhace / expand on what is funny about the users sceanrio without being too far fetched.       
-        - Analyze the 
+        - Identify the core setting, characters and subjects of the scenario and make them funnier while staying believable
+                - What aspects of the scenario, characters and subjects are supposed to be heightened and/or satirized for comedic effect?
+                - What aspects of the scenario, characters and subjects makes it believable and realstic?
+                - What is the cultural and societal context of the scenario,characters and subjects?
+        - The scenario needs to stay true to the users original idea and enhace / expand on what is funny about the users sceanrio while staying believable throughout.       
         - Make the scneario richer in detail (characters, tone, relationships, setting, escalation).
         - Make the scenario the funniest possible version of the original that maximizes the humor and possibility for memorable moments while staying true to the users original intent.
         - Make the scenario structured for execution as a prank call (clear setup, progression, escalation, closing ideas).
         - The scenario description needs to HILARIOUS but BELIEVABLE.
-        - Escalation needs to be FUNNY but BELIEVABLE throughout 
         
         Mistakes to avoid:
         - Assuming specfific reactions of the target.
@@ -162,11 +164,10 @@ ENHANCEMENT_SYSTEM_PROMPT = '''
         - Making the characters vivid and distinct.
         - Clarifying the prankster’s role and how they hook the target.
         - Building a logical but funny path of escalation.
-        - Adding quirky or funny elements that heighten the comedy.
         - Not giving restrictive examples for direct dialogue.
         - Keeping the flow natural and realistic but escalate the humor.
         - The description itself and not giving examples
-        - Not commenting on the description or its enhaced version, itslef 
+        - Not commenting on the description, or its enhaced version, itslef 
 
         Output:
         Produce a single, polished scenario description (not a dialogue) without changing the title or traget name that is funnier and has a more focused vision than the original but stays true to the users original idea.
@@ -251,8 +252,6 @@ def get_emotional_state_context(voice_line_type: str) -> str:
 
 
 
-
-
 """
 {
     "original_request": {
@@ -283,27 +282,22 @@ def get_emotional_state_context(voice_line_type: str) -> str:
     "original_request": {
         "title": "Müll",
         "target_name": "Sebastian",
-        "description": "Du hast den Müll nicht ordentlich getrennt und wir müssen nun die grossen Muelleimer gegen kleiner austauschen fuer die naechsten 12 Wochen. Wenn das ganze nicht abnimmt gibt es Strafgelder von bis zu 10 Euro pro Monat.",
+        "description": "Eine Person vom Sporthalleninstitut ruft an um zu fragen, ob Sebastian Flüchtlinge bei sich aufhnemen kann, das das lokale heim überfüllt ist.",
         "language": "GERMAN"
     },
     "questions": [
-        "Welche Art von Person soll der Anrufer darstellen? Ist es jemand vom Ordnungsamt, ein übermotivierter Hausmeister oder vielleicht ein extrem engagierter Nachbar mit absurden Mülltrennungsregeln?",
-        "Wie reagiert Sebastian normalerweise auf bürokratische Anrufe? Ist er eher gelassen, leicht genervt oder nimmt er alles sehr ernst? Das hilft, die Eskalation des Gesprächs lustiger zu gestalten.",
-        "Möchtest du, dass der Anrufer mit besonders absurden Mülltrennungsregeln kommt (z.B. Bananenschalen müssen einzeln in Butterbrotpapier gewickelt werden), oder soll es eher trocken und übertrieben bürokratisch bleiben?",
-        "Gibt es bestimmte Running Gags oder wiederkehrende Begriffe, die im Gespräch auftauchen sollen? Zum Beispiel ein Fantasie-Mülltrennungsgerät, das Sebastian angeblich benutzen muss.",
-        "Wie soll das Gespräch eskalieren? Soll der Anrufer immer verrücktere Konsequenzen androhen (z.B. Mülltrennungs-Fortbildung am Sonntagmorgen, Müllpolizei, etc.), oder bleibt es bei den kleineren Mülleimern und Strafgeldern?"
+        "Welche Art von Person soll der Anrufer verkörpern? Ist es eher ein überkorrekter Beamter, eine gestresste Sozialarbeiterin oder vielleicht jemand mit einem sehr ungewöhnlichen Dialekt?",
+        "Wie soll das Gespräch beginnen, damit es glaubwürdig wirkt? Gibt es einen offiziellen Grund, warum gerade Sebastian ausgewählt wurde, oder ist das schon Teil des absurden Humors?",
+        "Wie möchtest du die Situation eskalieren lassen? Sollen die Anforderungen immer seltsamer werden (z.B. spezielle Wünsche der Flüchtlinge, absurde Hausregeln, seltsame Gegenstände, die Sebastian bereitstellen soll)?",
+        "Welchen Humor-Stil bevorzugst du: Soll es trocken und bürokratisch bleiben, oder darf der Anrufer immer absurder und übertriebener werden?",
+        "Gibt es bestimmte Running Gags, wiederkehrende Begriffe oder Insider, die im Verlauf des Gesprächs immer wieder auftauchen sollen?"
     ],
-    "answers" : [
-    "extrem engagierter Nachbar",
-    "verunsichert und leicht genervt",
-    "übertrieben bürokratisch",
-    "Anrufer verweist oft auf deutsche norm und Nachbarschaftsverordnung"
-    "kleinere Mülleimer, Strafgeld und melden bei der Nachbarschaftswache"
+    "answers": [
+        "sehr freundlicher, gutgläubiger Beamter 30-40 jahre",
+        "kein spezieller grund, name war der nächste auf der liste",
+        "Situation esklaiert in dem der Beamte nicht versteht, dass Sebastian niemanden aufnehmen will, und weiter vorschläge macht welche person / familie aufgenommen werden könnte. Er fängt an zu glauben das Sebastian etwas gegen Ausländer hat",
+        "trocken und direkt",
+        "immer neue vorschläge machen und bei ablehnung fragen ob sebastian was gegen ausländer hat"
     ]
 }
-
-
-
-
-
 """
