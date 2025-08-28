@@ -11,11 +11,11 @@ OPENING VOICE LINES - CRITICAL FIRST IMPRESSION:
 
 Your goal: Establish credibility and bypass initial skepticism within the first 10 seconds.
 
-PSYCHOLOGY: People answer unknown calls defensively. You must immediately:
-1. Sound authoritative and professional
-2. Reference something specific/urgent
-3. Ask for cooperation before explaining fully
-4. Create mild time pressure
+    PSYCHOLOGY: People answer unknown calls defensively. You must immediately:
+    1. Sound authoritative yet relatable to the callee
+    2. Reference something specific/urgent but slightly absurd
+    3. Ask for cooperation before explaining fully
+    4. Create mild time pressure with modern context
 
 STRUCTURE FORMULA:
 [GREETING] + [AUTHORITY/COMPANY] + [SPECIFIC REASON] + [COOPERATION REQUEST]
@@ -49,8 +49,10 @@ RESPONSE VOICE LINES - MAINTAINING BELIEVABILITY:
 
 Your goal: Respond naturally to unexpected questions while advancing the scenario.
 
-IMPORTANT: These are MID-CONVERSATION responses - avoid overusing the target's name!
-Only use their name if you need to regain attention or emphasize a point.
+    IMPORTANT: These are MID-CONVERSATION responses - avoid overusing the target's name!
+    Only use their name if you need to regain attention or emphasize a point.
+    Anticipate which types of questions the target is most likely to ask and create mid-conversations responses that best
+    escalate the absurdity and humour of the scenario.  
 
 PSYCHOLOGY: The target will ask clarifying questions, express confusion, or challenge your story. Your responses must:
 1. Sound prepared but not scripted
@@ -98,8 +100,10 @@ QUESTION VOICE LINES - DRIVING ENGAGEMENT:
 
 Your goal: Ask questions that seem reasonable initially but gradually become absurd.
 
-IMPORTANT: These are MID-CONVERSATION questions - don't overuse the target's name!
-Use their name only if absolutely necessary for clarity.
+    IMPORTANT: These are MID-CONVERSATION questions - don't overuse the target's name!
+    Use their name only if absolutely necessary for clarity.
+    Anticipate which types of questions the target is most likely to ask or say and create mid-conversations responses that best
+    escalate the absurdity and humour of the scenario.  
 
 PSYCHOLOGY: Questions serve multiple purposes:
 1. Keep the target engaged and talking

@@ -78,8 +78,16 @@ class ScenarioCreateResponse(BaseModel):
     processing_summary: dict  # Summary of the LangChain processing results
     
     class Config:
+
         from_attributes = True
 
+class ScenarioFollowUpResponse(BaseModel):
+    '''Schema for follow up question response for scenario enhancement'''
+    questions: str
+    original_request: ScenarioCreateResponse
+
+    class Config:
+        from_attributes = True 
 
 
 class VoiceLineEnhancementRequest(BaseModel):

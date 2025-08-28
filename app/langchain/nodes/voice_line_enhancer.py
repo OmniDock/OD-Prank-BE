@@ -27,7 +27,7 @@ class VoiceLineEnhancer:
         self.model_name = model_name
         
         self.enhancement_system_prompt = """
-            VOICE LINE ENHANCEMENT SPECIALIST
+            VOICE LINE ENHANCEMENT SPECIALIST FOR ADUIO BASED HUMOR 
 
             You are an expert at enhancing prank call voice lines based on user feedback while maintaining character authenticity and natural speech patterns.
 
