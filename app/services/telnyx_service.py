@@ -59,6 +59,7 @@ class TelnyxService:
                 f"{self.BASE_URL}/telephony_credentials",
                 headers=self.AUTH_HEADER,
             )
+            
             if r.status_code >= 400:
                 console_logger.error(f"list telephony_credentials error {r.status_code}: {r.text}")
             r.raise_for_status()
@@ -66,8 +67,9 @@ class TelnyxService:
             for item in items:
                 if item.get("name") == name:
                     cid = item.get("id")
+                    sip_username = item.get("sip_username")
                     if cid:
-                        return cid
+                        return cid, sip_username
 
             # Create a new credential
             payload = {
@@ -83,9 +85,14 @@ class TelnyxService:
                 console_logger.error(f"create telephony_credential error {r2.status_code}: {r2.text}")
             r2.raise_for_status()
             cid = ((r2.json() or {}).get("data") or {}).get("id")
+            sip_username = ((r2.json() or {}).get("data") or {}).get("sip_username")
             if not cid:
                 raise RuntimeError("Created telephony credential but response missing id")
-            return cid
+            return cid, sip_username
+        
+
+
+
 
     async def _ensure_playlist(
         self,
@@ -148,7 +155,7 @@ class TelnyxService:
             )
             resp.raise_for_status()
             data = resp.json()['data']
-            console_logger.info(f"Telnyx response: {data}")
+            #console_logger.info(f"Telnyx response: {data}")
 
         call_leg_id = data["call_leg_id"]
         call_control_id = data.get("call_control_id")

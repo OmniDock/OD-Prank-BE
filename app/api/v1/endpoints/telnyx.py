@@ -48,15 +48,27 @@ async def start_call(
 
 @router.post("/webhook")
 async def telnyx_webhook(req: Request):
-    # TODO: Add signature verification using TELNYX_WEBHOOK_SECRET
     event = await req.json()
     event_type = event.get("data", {}).get("event_type") or event.get("event_type")
     console_logger.info(f"Telnyx webhook event: {event_type}")
 
-    if "conference" in event_type:
-        console_logger.info(f"Conference event: {event}")
-        return {"ok": True}
+    # if event_type == "call.initiated":
+    #     console_logger.info(f"Call initiated: {event}")
 
+    # if event_type == "conference.created":
+    #     console_logger.info(f"Conference created: {event}")
+        
+    
+    # if event_type == "conference.ended":
+    #     console_logger.warning(f"Conference ended: {event}")
+    
+    if event_type == "conference.participant.joined":
+        console_logger.warning(f"Participant joined: {event}")
+    
+    # if event_type == "conference.participant.left":
+    #     console_logger.warning(f"Participant left: {event}")
+
+    
     try:
         await telnyx_service.handle_webhook_event(event)
         return {"ok": True}
@@ -73,6 +85,7 @@ class WebRTCTokenRequest(BaseModel):
 class WebRTCTokenResponse(BaseModel):
     token: str
     conference_name: str
+    sip_username: str
 
 
 @router.post("/webrtc/token", response_model=WebRTCTokenResponse)
@@ -90,7 +103,8 @@ async def mint_webrtc_token(body: WebRTCTokenRequest, user: AuthUser = Depends(g
 
     # Find or create per-user On-Demand Credential, then mint JWT
     try:
-        cred_id = await telnyx_service.get_or_create_on_demand_credential(user.id)
+        cred_id, sip_username = await telnyx_service.get_or_create_on_demand_credential(user.id)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Credential provisioning failed: {str(e)}")
 
@@ -106,7 +120,6 @@ async def mint_webrtc_token(body: WebRTCTokenRequest, user: AuthUser = Depends(g
                 raise HTTPException(status_code=r.status_code, detail=f"Telnyx token error: {r.text}")
             
             token = r.text
-            console_logger.info(f"Telnyx token response: {token}")
             if not token:
                 raise HTTPException(status_code=500, detail="Token missing in Telnyx response")
             
@@ -114,7 +127,7 @@ async def mint_webrtc_token(body: WebRTCTokenRequest, user: AuthUser = Depends(g
         console_logger.error(f"Failed to mint Telnyx token: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to mint Telnyx token: {str(e)}")
 
-    return WebRTCTokenResponse(token=token, conference_name=sess.conference_name)
+    return WebRTCTokenResponse(token=token, conference_name=sess.conference_name, sip_username=sip_username)
 
 
 @router.websocket("/media/{call_control_id}")
