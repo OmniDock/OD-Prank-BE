@@ -51,10 +51,7 @@ async def telnyx_webhook(req: Request):
     event = await req.json()
     event_type = event.get("data", {}).get("event_type") or event.get("event_type")
     console_logger.info(f"Telnyx webhook event: {event_type}")
-    
-    if event_type == "conference.participant.joined":
-        console_logger.warning(f"Participant joined: {event}")
-        
+
     try:
         await telnyx_service.handle_webhook_event(event)
         return {"ok": True}
@@ -137,10 +134,11 @@ async def telnyx_media_ws(ws: WebSocket, call_control_id: str):
         msg = await ws.receive_text()
         data = json.loads(msg)
         console_logger.info(f"Media WS connected: {data}")
-        
+        stream_id = data.get("stream_id") or data.get("streamId") or ((data.get("media") or {}).get("stream_id"))
+
         # Start outbound streaming of the first audio in a loop for testing
         send_task = asyncio.create_task(
-            telnyx_service.stream_playlist_over_ws(ws, session)
+            telnyx_service.stream_playlist_over_ws(ws, session, stream_id)
         )
         
         # Consume inbound frames to keep the socket healthy; do not forward

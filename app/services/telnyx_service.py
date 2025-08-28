@@ -8,6 +8,7 @@ import base64
 import io
 import json
 import audioop
+
 from pydub import AudioSegment
 
 from app.core.config import settings
@@ -15,7 +16,8 @@ from app.core.logging import console_logger
 from app.core.database import AsyncSession
 from app.services.audio_preload_service import AudioPreloadService, PreloadedAudio
  
-
+from urllib.parse import quote
+import asyncio, httpx
 
 @dataclass
 class CallSession:
@@ -39,9 +41,16 @@ class TelnyxService:
     _token_cache: str = None
     _pending_joins: Dict[str, str] = {}
     _sip_to_conf: Dict[str, str] = {}  # sip_username -> conference_name
+    _aliases: Dict[str, str] = {}  # inbound leg ccid -> primary session ccid
 
     def get_session(self, call_control_id: str) -> Optional[CallSession]:
-        return self._sessions.get(call_control_id)
+        sess = self._sessions.get(call_control_id)
+        if sess:
+            return sess
+        primary = self._aliases.get(call_control_id)
+        if primary:
+            return self._sessions.get(primary)
+        return None
 
     def register_webrtc_mapping(self, user_id: str, sip_username: str, conference_name: str) -> None:
         if sip_username and conference_name:
@@ -211,36 +220,74 @@ class TelnyxService:
             except Exception:
                 conf_from_state = None
 
+        # if event_type == "call.initiated":
+        #     p = payload.get("payload", {}) or {}
+        #     direction = (p.get("direction") or "").lower()
+        #     ccid = p.get("call_control_id")
+
+        #     # Nur INBOUND/INCOMING-Legs behandeln
+        #     if direction not in ("incoming", "inbound"):
+        #         console_logger.info(f"Skip non-inbound leg {ccid} dir={direction}")
+        #         return
+
+        #     # 1) Konferenzname aus Header holen (empfohlen)
+        #     headers_list = p.get("custom_headers") or []
+        #     headers = { (h.get("name") or "").lower(): (h.get("value") or "") for h in headers_list }
+        #     conf = headers.get("x-conference-name")
+
+        #     # 2) Optional: Wenn du per SIP-URI dialst, userpart als Fallback:
+        #     # to_uri = p.get("to") or ""
+        #     # if not conf and isinstance(to_uri, str) and to_uri.startswith("sip:"):
+        #     #     conf = to_uri.split("sip:", 1)[1].split("@", 1)[0]
+
+        #     # 3) Optionaler weiterer Fallback: serverseitiges Mapping (z. B. pro User/Session)
+        #     # if not conf:
+        #     #     conf = self.resolve_conf_for_user(...)
+
+        #     if not conf:
+        #         console_logger.warning(f"Inbound {ccid} ohne Conference-Name; headers={headers}")
+        #         return
+
+        #     console_logger.info(f"Inbound {ccid} -> join conference {conf}")
+        #     try:
+        #         await self.join_conference(ccid, conf)  # impliziert Answer
+        #     except Exception as e:
+        #         console_logger.error(f"conference_join error for {ccid}: {e}")
+        #     return
         if event_type == "call.initiated":
-            # Determine target conference from SIP mapping or client_state
-            target_conf: Optional[str] = None
-            from_uri = (p.get("from") or "").lower()
-            if "@" in from_uri:
-                sip_user = from_uri.split("@", 1)[0]
-                target_conf = self._sip_to_conf.get(sip_user) or target_conf
-            if not target_conf and conf_from_state:
-                target_conf = conf_from_state
+            p = (payload.get("payload") or {})
+            if (p.get("direction","").lower() in ("incoming","inbound")):
+                ccid = p["call_control_id"]
+                hdrs = { (h.get("name") or "").lower(): (h.get("value") or "") for h in (p.get("custom_headers") or []) }
+                conf = hdrs.get("x-conference-name")
+                if not conf:
+                    console_logger.warning(f"Inbound {ccid} without X-Conference-Name"); return
 
-            if target_conf:
-                console_logger.info(f"Auto-answering and joining {call_control_id} to conference {target_conf}")
+                # Map inbound WebRTC leg to the existing session by conference
                 try:
-                    await self.answer_call(call_control_id)
-                except Exception as e:
-                    console_logger.error(f"answer error for {call_control_id}: {e}")
-                try:
-                    await self.join_conference(call_control_id, target_conf)
-                except Exception as e:
-                    console_logger.error(f"conference_join error for {call_control_id}: {e}")
-                return
+                    primary = next((s for s in self._sessions.values() if s.conference_name == conf), None)
+                    if primary:
+                        self._aliases[ccid] = primary.call_control_id
+                except Exception:
+                    pass
 
-            console_logger.info(event)
+                console_logger.info(f"Inbound {ccid} -> answer then join {conf}")
+                # 1) answer
+                await self.answer_with_retry(ccid)
+                # 2) join
+                await self.join_conference_by_name(ccid, conf, mute=True)
+                # 3) start Media Stream on the inbound WebRTC leg too
+                try:
+                    await self.fork_start(ccid)
+                except Exception as e:
+                    console_logger.error(f"fork_start error for inbound {ccid}: {e}")
+            return
 
         if event_type == "call.answered":
             dir_str = (p.get("direction") or "").lower()
             frm = p.get("from") or ""
             to = p.get("to") or ""
             console_logger.info(f"Call answered: {call_control_id} (dir={dir_str}, from={frm}, to={to})")
-
                 
         elif event_type in ("call.hangup", "call.ended"):
             console_logger.info(f"Call ended: {call_control_id}")
@@ -259,6 +306,7 @@ class TelnyxService:
                 except Exception as e:
                     console_logger.error(f"conference_join error for {call_control_id}: {e}")
                 return
+            
             # Fallback: if client_state was present but we didn't set pending (e.g., non-inbound direction)
             if conf_from_state:
                 console_logger.info(f"Joining leg {call_control_id} to conference {conf_from_state} (fallback)")
@@ -298,7 +346,6 @@ class TelnyxService:
             if resp.status_code >= 400:
                 console_logger.error(f"Telnyx streaming_start error {resp.status_code}: {resp.text}")
             resp.raise_for_status()
-        console_logger.info(f"Fork started for {call_control_id} -> {ws_url}")
 
 
     async def answer_call(self, call_control_id: str):
@@ -312,20 +359,38 @@ class TelnyxService:
             r.raise_for_status()
 
 
-    async def join_conference(self, call_control_id: str, conference_name: str):
+
+
+
+    async def answer_with_retry(self, ccid: str, retries: int = 4):
+        ccid_path = quote(ccid, safe="")
+        url = f"{self.BASE_URL}/calls/{ccid_path}/actions/answer"
         async with httpx.AsyncClient(timeout=10.0) as client:
-            r = await client.post(
-                f"{self.BASE_URL}/calls/{call_control_id}/actions/conference",
-                headers={**self.AUTH_HEADER, "Content-Type": "application/json"},
-                json={"name": conference_name},  # Telnyx expects "name" as the conference name
-            )
-            if r.status_code >= 400:
-                console_logger.error(f"conference action error {r.status_code}: {r.text}")
-            r.raise_for_status()
+            for attempt in range(1, retries+1):
+                r = await client.post(url, headers={**self.AUTH_HEADER, "Content-Type": "application/json"})
+                if r.status_code == 404 and attempt < retries:
+                    await asyncio.sleep(0.15 * attempt)  # 150ms, 300ms, ...
+                    continue
+                r.raise_for_status()
+                return
+
+    async def join_conference_by_name(self, inbound_ccid: str, conf: str, retries: int = 5, mute: bool = False):
+        conf_path = quote(conf, safe="")
+        url = f"{self.BASE_URL}/conferences/{conf_path}/actions/join"
+        body = {"call_control_id": inbound_ccid, "start_conference_on_enter": True, "mute": mute}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for attempt in range(1, retries+1):
+                r = await client.post(url, headers={**self.AUTH_HEADER, "Content-Type": "application/json"}, json=body)
+                if r.status_code in (404, 422) and attempt < retries:
+                    # 404: leg/conference not ready; 422: not answered yet -> give core a moment
+                    await asyncio.sleep(0.15 * attempt)
+                    continue
+                r.raise_for_status()
+                return
 
     # No retry helper; rely on single join attempt when leg is answered
 
-    async def stream_playlist_over_ws(self, ws, session: CallSession):
+    async def stream_playlist_over_ws(self, ws, session: CallSession, stream_id: Optional[str] = None):
         """
         Stream audio to Telnyx and broadcast BOTH directions to monitors.
         """
@@ -364,13 +429,16 @@ class TelnyxService:
                         return
                     
                     # Send to Telnyx
-                    await ws.send_text(json.dumps({
+                    frame = {
                         "event": "media",
                         "media": {
-                            "track": "outbound",
                             "payload": chunk_b64
                         }
-                    }))                                        
+                    }
+                    if stream_id:
+                        frame["stream_id"] = stream_id
+
+                    await ws.send_text(json.dumps(frame))                                        
                     # Precise timing - account for total chunks sent across loops
                     total_chunks_sent += 1
                     next_time = start_time + (total_chunks_sent * 0.02)  # 20ms per chunk
