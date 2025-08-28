@@ -399,7 +399,7 @@ class TelnyxService:
                 return
 
             # Use first audio file
-            item = session.playlist[0]
+            item = session.playlist[1]
             
             # Convert to 8kHz μ-law
             segment = AudioSegment.from_file(io.BytesIO(item.audio_data), format="mp3")
