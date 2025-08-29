@@ -20,6 +20,7 @@ class StartCallResponse(BaseModel):
     call_control_id: str
     call_session_id: str
     conference_name: str
+    webrtc_token: str
 
 class WebRTCTokenRequest(BaseModel):
     call_control_id: str
@@ -35,18 +36,25 @@ async def start_call(
     db: AsyncSession = Depends(get_db_session),
 ):
     try:
+
+        # Also mint WebRTC token immediately so frontend can join
+        token = await telnyx_handler.get_webrtc_token(user.id)
+
         call_leg_id, call_control_id, call_session_id, conference_name = await telnyx_handler.initiate_call(
             db_session=db,
             user_id=user.id,
             scenario_id=body.scenario_id,
             to_number=body.to_number,
         )
+
         return StartCallResponse(
             call_leg_id=call_leg_id,
             call_control_id=call_control_id,
             call_session_id=call_session_id,
             conference_name=conference_name,
+            webrtc_token=token,
         )
+    
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

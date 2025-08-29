@@ -40,7 +40,8 @@ class TelnyxHTTPClient:
             "webhook_url": self.WEBHOOK_URL,
             "conference_config": {
                 "conference_name": secret_conf,
-                "start_conference_on_enter": True
+                "start_conference_on_enter": True,
+                "end_conference_on_exit": True,
             }
         }
 
