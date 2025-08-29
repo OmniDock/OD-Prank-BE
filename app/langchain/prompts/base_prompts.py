@@ -280,7 +280,7 @@ def get_emotional_state_context(voice_line_type: str) -> str:
 """
 {
     "original_request": {
-        "title": "Müll",
+        "title": "Flüchis",
         "target_name": "Sebastian",
         "description": "Eine Person vom Sporthalleninstitut ruft an um zu fragen, ob Sebastian Flüchtlinge bei sich aufhnemen kann, das das lokale heim überfüllt ist.",
         "language": "GERMAN"

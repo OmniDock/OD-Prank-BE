@@ -45,7 +45,7 @@ class ScenarioAnalysisResult(BaseModel):
     absurdity_escalation: List[str] = Field(description="Progression of how absurdity should be introduced")
     cultural_context: str = Field(description="Cultural and linguistic context for the target language")
     quality_score: float = Field(ge=0.0, le=1.0, description="Quality assessment of the analysis (0-1)")
-    optimized_scenario: str = Field(description="Optimized scenario with the character persona and context for guidance")
+    enhanced_scenario: str = Field(description="Enhanced scenario with the character persona and context for guidance")
 
 
 class VoiceLineState(BaseModel):
@@ -71,7 +71,6 @@ class ScenarioProcessorState(BaseModel):
     # Initial safety check (with defaults)
     initial_safety_check: Optional[SafetyCheckResult] = None
     overall_safety_check: Optional[SafetyCheckResult] = None
-    
     # Scenario analysis (shared across all nodes)
     scenario_analysis: Optional[ScenarioAnalysisResult] = None
     

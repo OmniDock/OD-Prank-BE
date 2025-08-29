@@ -42,12 +42,10 @@ class ScenarioAnalyzer:
 
             BELIEVABILITY ENGINEERING:
             - Use modern, relatable services
-            - Start believable but quickly escalate to ABSURD 
+            - Start believable but quickly escalate the humor of the situation
 
             SPEECH PATTERN ANALYSIS WITH ACCENTS:
-            - Design casual vocabulary ("honestly", "weird", "dude", "bro" - moderate use)
             - Create natural hesitations with audio tag support ([confused], [nervous], [excited])
-            - Develop emotional responses that young people find funny
             - Include ACCENT indicators (Italian: "Mamma mia!", Turkish-German: "Vallah", Bavarian: "Servus")
             - Plan audio tag usage: [whispers], [sighs], [slight accent], [confused], [realizes]
 
@@ -84,19 +82,23 @@ class ScenarioAnalyzer:
         analysis_prompt = ChatPromptTemplate.from_messages([
             ("system", self.analysis_system_prompt),
             ("user", """
-                Analyze this prank call scenario and create a comprehensive character and context profile:
-
+                Analyze this prank call scenario and create a comprehensive character and context profile.
+                Follow up questions with answers are also given that clarift and refine the scenario.
+                Use these as a strong guide for the analysis.
+                
                 SCENARIO DETAILS:
                 Title: {title}
                 Description: {description}
+                Follow up questions about the description: {questions}
+                Answers to follow up questions: {answers}
                 Target Name: {target_name}
                 Language: {language}
 
                 Please provide:
-                1. A specific character persona with name and background (funny to people aged 14-30)
-                2. Only if applicable to the scenario, meaning the charakter is associated with a company or service given the scenarion! A Modern, relatable company/service context (social media, delivery, tech support, etc.)
+                1. A specific character persona with name and background 
+                2. Only if applicable to the scenario, meaning the charakter is associated with a company or service given the scenarion! A Modern, relatable company/service context (authority, delivery, tech support, etc.)
                 3. Character-specific speech patterns with accent if applicable 
-                4. Believability anchors and funny escalation strategy  (Marcophono-inspired)
+                4. Believability anchors and funny escalation strategy  
                 5. Cultural adaptation to the scenario context
                 6. Audio tag recommendations for ElevenLabs v3 performance
                 
@@ -111,6 +113,8 @@ class ScenarioAnalyzer:
         result = await chain.ainvoke({
             "title": scenario_data.title,
             "description": scenario_data.description,
+            "questions": scenario_data.questions,
+            "answers": scenario_data.answers,
             "target_name": scenario_data.target_name,
             "language": scenario_data.language.value if hasattr(scenario_data.language, 'value') else str(scenario_data.language)
         })

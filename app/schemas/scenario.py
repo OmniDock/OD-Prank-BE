@@ -8,6 +8,8 @@ class ScenarioCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="Scenario title")
     target_name: str = Field(..., min_length=1, max_length=255, description="Target name")
     description: str = Field(..., max_length=5096, description="Scenario description")
+    questions: List[str] = Field(default_factory=list, description="Follow-up questions")
+    answers: List[str] = Field(default_factory=list, description="Answers to follow-up questions")
     language: LanguageEnum = Field(default=LanguageEnum.GERMAN, description="Scenario language")
     
     @field_validator('title')

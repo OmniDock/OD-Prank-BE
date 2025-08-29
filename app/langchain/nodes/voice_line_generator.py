@@ -78,7 +78,6 @@ class VoiceLineGenerator:
     async def generate_voice_lines(
             self, 
             title: str,
-            description: str,
             target_name: str,
             language: str,
             voice_line_type: VoiceLineTypeEnum, 
@@ -149,7 +148,7 @@ class VoiceLineGenerator:
         
         result = await chain.ainvoke({
             "title": title,
-            "description": description,
+            "description": scenario_analysis.enhanced_scenario,
             "target_name": target_name,
             "language": language,
             "voice_line_type": voice_line_type.value,
@@ -173,14 +172,14 @@ class VoiceLineGenerator:
         )
     
     # Convenience methods for each voice line type
-    async def generate_opening_voice_lines(self, title: str, description: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
-        return await self.generate_voice_lines(title, description, target_name, language, VoiceLineTypeEnum.OPENING, count, scenario_analysis)
+    async def generate_opening_voice_lines(self, title: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
+        return await self.generate_voice_lines(title=title, target_name=target_name, language=language, voice_line_type=VoiceLineTypeEnum.OPENING, count=count, scenario_analysis=scenario_analysis)
     
-    async def generate_response_voice_lines(self, title: str, description: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
-        return await self.generate_voice_lines(title, description, target_name, language, VoiceLineTypeEnum.RESPONSE, count, scenario_analysis)
+    async def generate_response_voice_lines(self, title: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
+        return await self.generate_voice_lines(title=title, target_name=target_name, language=language, voice_line_type=VoiceLineTypeEnum.RESPONSE, count=count, scenario_analysis=scenario_analysis)
     
-    async def generate_question_voice_lines(self, title: str, description: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
-        return await self.generate_voice_lines(title, description, target_name, language, VoiceLineTypeEnum.QUESTION, count, scenario_analysis)
+    async def generate_question_voice_lines(self, title: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
+        return await self.generate_voice_lines(title=title, target_name=target_name, language=language, voice_line_type=VoiceLineTypeEnum.QUESTION, count=count, scenario_analysis=scenario_analysis)
     
-    async def generate_closing_voice_lines(self, title: str, description: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
-        return await self.generate_voice_lines(title, description, target_name, language, VoiceLineTypeEnum.CLOSING, count, scenario_analysis)
+    async def generate_closing_voice_lines(self, title: str, target_name: str, language: str, count: int, scenario_analysis: ScenarioAnalysisResult) -> VoiceLineGenerationResult:
+        return await self.generate_voice_lines(title=title, target_name=target_name, language=language, voice_line_type=VoiceLineTypeEnum.CLOSING, count=count, scenario_analysis=scenario_analysis)

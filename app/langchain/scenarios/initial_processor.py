@@ -158,9 +158,11 @@ class InitialScenarioProcessor:
         try:
             count = state.target_counts.get(VoiceLineTypeEnum.OPENING.value)
             result = await self.voice_line_generator.generate_opening_voice_lines(
-                state.scenario_data, 
-                count,
-                state.scenario_analysis
+                title=state.scenario_data.title,
+                target_name=state.scenario_data.target_name,
+                language=state.scenario_data.language,
+                count=count,
+                scenario_analysis=state.scenario_analysis
             )
             
             # Convert to VoiceLineState objects - return them, don't append
@@ -189,9 +191,11 @@ class InitialScenarioProcessor:
         try:
             count = state.target_counts.get(VoiceLineTypeEnum.QUESTION.value)
             result = await self.voice_line_generator.generate_question_voice_lines(
-                state.scenario_data, 
-                count,
-                state.scenario_analysis
+                title=state.scenario_data.title,
+                target_name=state.scenario_data.target_name,
+                language=state.scenario_data.language,
+                count=count,
+                scenario_analysis=state.scenario_analysis
             )
             
             # Convert to VoiceLineState objects - return them, don't append
@@ -219,9 +223,11 @@ class InitialScenarioProcessor:
         try:
             count = state.target_counts.get(VoiceLineTypeEnum.RESPONSE.value)
             result = await self.voice_line_generator.generate_response_voice_lines(
-                state.scenario_data, 
-                count,
-                state.scenario_analysis
+                title=state.scenario_data.title,
+                target_name=state.scenario_data.target_name,
+                language=state.scenario_data.language,
+                count=count,
+                scenario_analysis=state.scenario_analysis
             )
             
             # Convert to VoiceLineState objects - return them, don't append
@@ -249,9 +255,11 @@ class InitialScenarioProcessor:
         try:
             count = state.target_counts.get(VoiceLineTypeEnum.CLOSING.value)
             result = await self.voice_line_generator.generate_closing_voice_lines(
-                state.scenario_data, 
-                count,
-                state.scenario_analysis
+                title=state.scenario_data.title,
+                target_name=state.scenario_data.target_name,
+                language=state.scenario_data.language,
+                count=count,
+                scenario_analysis=state.scenario_analysis
             )
             
             # Convert to VoiceLineState objects - return them, don't append

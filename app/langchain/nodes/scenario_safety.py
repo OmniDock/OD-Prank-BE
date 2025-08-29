@@ -84,6 +84,8 @@ class ScenarioSafetyChecker:
                     SCENARIO DETAILS:
                     Title: {title}
                     Description: {description}
+                    Follow up questions about the description: {questions}
+                    Answers to follow up questions: {answers}
                     Target Name: {target_name}
                     Language: {language}
                  
@@ -98,6 +100,8 @@ class ScenarioSafetyChecker:
         result = await chain.ainvoke({
             "title": scenario_data.title,
             "description": scenario_data.description,
+            "questions": scenario_data.questions,
+            "answers": scenario_data.answers,
             "target_name": scenario_data.target_name,
             "language": scenario_data.language
         })

@@ -72,6 +72,8 @@ class ScenarioService:
                 "user_id": user.id,
                 "title": scenario_data.title,
                 "description": scenario_data.description,
+                "questions": scenario_data.questions,
+                "answers": scenario_data.answers,
                 "language": scenario_data.language,
                 "target_name": scenario_data.target_name,
                 "scenario_analysis": results['scenario_analysis'].model_dump() if results['scenario_analysis'] else None,
@@ -116,13 +118,6 @@ class ScenarioService:
             console_logger.error(f"Failed to create scenario: {str(e)}")
             await self.repository.rollback()
             raise
-    
-
-    async def create_scenario_v2(self, user: AuthUser, scenario_data: ScenarioCreateRequestV2) -> ScenarioCreateResponse:
-        #TODO: Implement create scenario v2 
-        pass
-    
-
 
 
     def _extract_voice_lines_from_results(self, results: ScenarioProcessorState) -> List[dict]:

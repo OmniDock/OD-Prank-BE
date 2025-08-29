@@ -15,6 +15,8 @@ class Scenario(Base, TimestampMixin):
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
+    questions: Mapped[List[str]] = mapped_column(JSON, nullable=True)
+    answers: Mapped[List[str]] = mapped_column(JSON, nullable=True)
     language: Mapped[LanguageEnum] = mapped_column(Enum(LanguageEnum), nullable=False)
     preferred_voice_id: Mapped[str] = mapped_column(String(100), nullable=True)
     target_name: Mapped[str] = mapped_column(String(255), nullable=False)
