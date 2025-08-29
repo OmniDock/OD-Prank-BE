@@ -5,16 +5,18 @@ from app.core.logging import console_logger
 from app.core.utils.enums import ElevenLabsModelEnum
 from app.services.tts_service import TTSService
 from app.core.utils.voices_catalog import PREVIEW_VERSION
+import io
+import wave
 
 
 class PreviewTTSService:
     """Service to ensure short public preview clips exist for each voice_id.
 
     Previews are stored in the same bucket as private assets but under a public path:
-      voice-lines/public/voice-previews/{voice_id}.mp3
+      voice-lines/public/voice-previews/{voice_id}.wav
 
     The resulting public URL is:
-      {SUPABASE_URL}/storage/v1/object/public/voice-lines/public/voice-previews/{voice_id}.mp3
+      {SUPABASE_URL}/storage/v1/object/public/voice-lines/public/voice-previews/{voice_id}.wav
     """
 
     def __init__(self) -> None:
@@ -43,6 +45,15 @@ class PreviewTTSService:
         )
         self.tts_service = TTSService()
 
+    def _pcm16_to_wav(self, pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1) -> bytes:
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wf:
+            wf.setnchannels(channels)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            wf.writeframes(pcm_bytes)
+        return buf.getvalue()
+
     def _public_url(self, path: str) -> str:
         # Note: path should not start with leading slash
         return f"{settings.SUPABASE_URL}/storage/v1/object/public/{self.bucket_name}/{path}"
@@ -50,7 +61,7 @@ class PreviewTTSService:
     def _object_exists(self, path: str) -> bool:
         try:
             # List the directory and check for the file name
-            # Example: path = "public/voice-previews/VOICEID.mp3"
+            # Example: path = "public/voice-previews/VOICEID.wav"
             directory, file_name = path.rsplit("/", 1)
             items = self.storage_client.storage.from_(self.bucket_name).list(directory)
             for item in items or []:
@@ -93,7 +104,7 @@ class PreviewTTSService:
                 path=path,
                 file=data,
                 file_options={
-                    "content-type": "audio/mpeg",
+                    "content-type": "audio/wav",
                     "cache-control": "2592000",  # 30 days
                     "upsert": "false",
                 },
@@ -111,19 +122,20 @@ class PreviewTTSService:
         """
         for vid in voice_ids:
             try:
-                path = f"{self.public_prefix}/{vid}.mp3"
+                path = f"{self.public_prefix}/{vid}.wav"
                 if self._object_exists(path):
                     continue
                 console_logger.info(f"Generating preview for voice {vid}")
                 audio_bytes = await self._generate_preview_bytes(vid, preview_text)
-                ok = self._upload_public(path, audio_bytes)
+                wav_bytes = self._pcm16_to_wav(audio_bytes)
+                ok = self._upload_public(path, wav_bytes)
                 if not ok:
                     console_logger.warning(f"Upload failed for preview {vid}")
             except Exception as e:
                 console_logger.error(f"Error ensuring preview for {vid}: {e}")
 
     def build_preview_url(self, voice_id: str) -> str:
-        path = f"{self.public_prefix}/{voice_id}.mp3"
+        path = f"{self.public_prefix}/{voice_id}.wav"
         return self._public_url(path)
 
     def _preview_text_for_language(self, primary_language) -> str:
@@ -147,12 +159,13 @@ class PreviewTTSService:
             primary_lang = langs[0] if langs else None
             text = self._preview_text_for_language(primary_lang)
             try:
-                path = f"{self.public_prefix}/{vid}.mp3"
+                path = f"{self.public_prefix}/{vid}.wav"
                 if self._object_exists(path):
                     continue
                 console_logger.info(f"Generating preview for voice {vid} (lang: {primary_lang})")
                 audio_bytes = await self._generate_preview_bytes(vid, text)
-                ok = self._upload_public(path, audio_bytes)
+                wav_bytes = self._pcm16_to_wav(audio_bytes)
+                ok = self._upload_public(path, wav_bytes)
                 if not ok:
                     console_logger.warning(f"Upload failed for preview {vid}")
             except Exception as e:

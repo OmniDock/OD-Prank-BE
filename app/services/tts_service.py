@@ -12,6 +12,9 @@ import hashlib
 import json
 import re
 import asyncio
+import wave 
+import io 
+
 
 class TTSService: 
     """Unified TTS generation and storage service with user-dependent private storage"""
@@ -49,6 +52,7 @@ class TTSService:
         t = re.sub(r"\s+", " ", t)
         return t
 
+
     def _sha256(self, s: str) -> str:
         return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
@@ -66,32 +70,20 @@ class TTSService:
 
     def compute_content_hash(self, text: str, voice_id: str, model_id: ElevenLabsModelEnum, voice_settings: Optional[Dict]) -> str:
         # Use processed text for consistent hashing
-        processed_text = self._preprocess_text_for_v3(text)
-        th = self.compute_text_hash(processed_text)
+        th = self.compute_text_hash(text)
         sh = self.compute_settings_hash(voice_id, model_id, voice_settings)
         return self._sha256(f"{th}|{sh}")
     
-    def _preprocess_text_for_v3(self, text: str) -> str:
-        """Optimizes text for ElevenLabs v3 audio tags and accents (Marcophono-style)"""
-        # Normalize text
-        processed = self._normalize_text(text)
-        
-        # Optimize audio tag spacing for better performance
-        processed = re.sub(r'\[(\w+)\]\s*', r'[\1] ', processed)
-        
-        # Optimize punctuation for better timing
-        processed = re.sub(r'\.\.\.(\w)', r'... \1', processed)
-        processed = re.sub(r'—(\w)', r'— \1', processed)
-        
-        # Ensure audio tags are correctly formatted
-        processed = re.sub(r'\[\s*(\w+)\s*\]', r'[\1]', processed)
-        
-        # Enhance accent markers for better v3 performance
-        processed = re.sub(r'\bmamma mia\b', 'mamma mia', processed, flags=re.IGNORECASE)
-        processed = re.sub(r'\bvallah\b', 'vallah', processed, flags=re.IGNORECASE)
-        
-        return processed.strip()
 
+    def _pcm16_to_wav(self, pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1) -> bytes:
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wf:
+            wf.setnchannels(channels)
+            wf.setsampwidth(2)  
+            wf.setframerate(sample_rate)
+            wf.writeframes(pcm_bytes)
+        return buf.getvalue()
+    
     async def generate_audio(self, text: str, voice_id: str = None, 
                            model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,
                            voice_settings: Optional[Dict] = None) -> bytes:
@@ -108,23 +100,17 @@ class TTSService:
         try:
             # Determine voice ID
             selected_voice_id = self.select_voice_id(voice_id)
-            
-            # Pre-process text for better v3 performance
-            processed_text = self._preprocess_text_for_v3(text)
-            
-            console_logger.info(f"Generating audio with voice {selected_voice_id}, model {model.value}")
-            console_logger.info(f"Original text: {text[:50]}...")
-            console_logger.info(f"Processed text: {processed_text[:50]}...")
-            
+ 
             vs_dict = voice_settings or self.default_voice_settings()
 
             def _convert_sync() -> bytes:
                 # ElevenLabs SDK is synchronous; run in a thread to avoid blocking the event loop
                 generator = self.client.text_to_speech.convert(
-                    text=processed_text,
+                    text=text,
                     voice_id=selected_voice_id,
                     voice_settings=VoiceSettings(**vs_dict),
-                    model_id=model.value
+                    model_id=model.value,
+                    output_format="pcm_16000"
                 )
                 return b"".join(generator)
 
@@ -143,10 +129,10 @@ class TTSService:
     def _get_storage_path(self, user_id: str, voice_line_id: int) -> str:
         """
         Generate private storage path for user
-        Structure: /private/{user_id}/voice_lines/{voice_line_id}_{timestamp}_{uuid}.mp3
+        Structure: /private/{user_id}/voice_lines/{voice_line_id}_{timestamp}_{uuid}.wav
         """
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        filename = f"{voice_line_id}_{timestamp}_{uuid.uuid4().hex[:8]}.mp3"
+        filename = f"{voice_line_id}_{timestamp}_{uuid.uuid4().hex[:8]}.wav"
         return f"private/{user_id}/voice_lines/{filename}"
 
     async def store_audio_file(self, audio_data: bytes, voice_line_id: int, user_id: str) -> Tuple[Optional[str], Optional[str]]:
@@ -169,7 +155,7 @@ class TTSService:
                     path=file_path,
                     file=audio_data,
                     file_options={
-                        "content-type": "audio/mpeg",
+                        "content-type": "audio/wav",
                         "cache-control": "3600",
                         "upsert": "false"
                     }
@@ -255,9 +241,10 @@ class TTSService:
             
             # Step 1: Generate audio with voice selection
             audio_data = await self.generate_audio(text, voice_id, model, voice_settings)
+            wav_bytes = self._pcm16_to_wav(audio_data)
             
             # Step 2: Store audio with user-dependent path
-            signed_url, storage_path = await self.store_audio_file(audio_data, voice_line_id, user_id)
+            signed_url, storage_path = await self.store_audio_file(wav_bytes, voice_line_id, user_id)
             
             if signed_url and storage_path:
                 console_logger.info(f"Voice line {voice_line_id} successfully generated and stored")

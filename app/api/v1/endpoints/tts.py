@@ -97,7 +97,7 @@ async def get_available_voices():
             "description": v.get("description"),
             "languages": v.get("languages", []),
             "gender": v.get("gender"),
-            "preview_url": f"{base_public}/{v['id']}.mp3",
+            "preview_url": f"{base_public}/{v['id']}.wav",
         })
 
     return VoiceListResponse(voices=voices)
