@@ -1,3 +1,4 @@
+from http.client import HTTPResponse
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
@@ -28,6 +29,14 @@ class WebRTCTokenRequest(BaseModel):
 class WebRTCTokenResponse(BaseModel):
     token: str
     conference_name: str
+
+class PlayVoiceLineRequest(BaseModel):
+    voice_line_id: int
+    conference_name: str
+
+class PlayVoiceLineResponse(BaseModel):
+    success: bool
+    message: str
 
 @router.post("/call", response_model=StartCallResponse)
 async def start_call(
@@ -90,4 +99,15 @@ async def mint_webrtc_token(body: WebRTCTokenRequest, user: AuthUser = Depends(g
     return WebRTCTokenResponse(token=token, conference_name=sess.conference_name)
 
 
+@router.post("/call/play-voiceline")
+async def play_voice_line(
+    body: PlayVoiceLineRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    try:
+        console_logger.info(f"Playing voice line {body.voice_line_id} for user {user.id} in conference {body.conference_name}")
+        await telnyx_handler.play_voice_line(user_id=user.id, conference_name=body.conference_name, voice_line_id=body.voice_line_id)
+        return PlayVoiceLineResponse(success=True, message="Voice line streaming started")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 

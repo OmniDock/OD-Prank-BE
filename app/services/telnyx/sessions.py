@@ -41,6 +41,13 @@ class TelnyxSessionService:
                             return session
         return None
     
+    def get_session_by_conference(self, conference_name: str) -> Optional[CallSession]:
+        for ccid in self._conf_to_ccids.get(conference_name, set()):
+            session = self._sessions.get(ccid)
+            if session:
+                return session
+        return None
+    
     def remove_session(self, call_control_id: str):
         sess = self._sessions.pop(call_control_id, None) 
         self._websocket_sessions.pop(call_control_id, None)
@@ -65,6 +72,7 @@ class TelnyxSessionService:
 
     def get_websockets(self, call_control_id: str) -> List[WebSocket]:
         return list(self._websocket_sessions.get(call_control_id, {}).values())
+
 
     def get_ccids_by_conference(self, conference_name: str) -> List[str]:
         return list(self._conf_to_ccids.get(conference_name, set()))

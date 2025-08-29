@@ -84,7 +84,7 @@ class TelnyxHandler:
         payload = data.get("payload", {})
         call_control_id = payload.get("call_control_id")
 
-        self.logger.info(f"Telnyx webhook event: {event_type} (call_control_id={call_control_id})")
+        self.logger.debug(f"Telnyx webhook event: {event_type} (call_control_id={call_control_id})")
 
         if not call_control_id:
             self.logger.warning("Webhook without call_control_id; ignoring.")
@@ -126,7 +126,7 @@ class TelnyxHandler:
     async def handle_media_ws(self, ws: WebSocket, call_control_id: str):
         await ws.accept()
 
-        console_logger.info(f"Media WS connected: {call_control_id}")
+        console_logger.debug(f"Media WS connected: {call_control_id}")
 
         session = self._session_service.get_session(call_control_id)
         if not session:
@@ -144,11 +144,6 @@ class TelnyxHandler:
                 if data.get("event") == "start":
                     stream_id = data.get("stream_id") or data.get("streamId")
                     break
-
-            send_task = asyncio.create_task(
-                self.stream_playlist_over_ws(ws, session, stream_id)
-            )
-
             # Keep consuming inbound to keep socket healthy
             while True:
                 inbound_msg = await ws.receive_text()
@@ -162,65 +157,53 @@ class TelnyxHandler:
             console_logger.error(f"Media WS error: {e}")
         finally:
             self._session_service.remove_websocket(call_control_id, ws)
-            try:
-                if send_task and not send_task.done():
-                    send_task.cancel()
-            except Exception:
-                pass
             await ws.close()
 
 
-
-    async def stream_playlist_over_ws(self, ws, session: CallSession, stream_id: Optional[str] = None):
+    async def play_voice_line(self, user_id: str, conference_name: str, voice_line_id: int):
         """
-        Stream audio to Telnyx and broadcast BOTH directions to monitors.
+        Play a voice line over the media stream.
         """
-        try:
-            if not session.voice_line_audios:
-                return
 
-            # Use only one audio file
-            item = session.voice_line_audios[4]
-            
-            # Convert to 8kHz μ-law
-            segment = AudioSegment.from_file(io.BytesIO(item.audio_data), format="mp3")
-            segment = segment.set_frame_rate(8000).set_channels(1).set_sample_width(2).normalize()
-            chunk_ms = 20
-            
-            # Convert entire audio to μ-law chunks
-            chunks = []
-            for i in range(0, len(segment), chunk_ms):
-                chunk = segment[i:i+chunk_ms]
-                if len(chunk) < chunk_ms:
-                    # Pad last chunk with silence
-                    chunk = chunk + AudioSegment.silent(duration=chunk_ms - len(chunk))
-                pcm = chunk.raw_data
-                ulaw = audioop.lin2ulaw(pcm, 2)
-                chunks.append(base64.b64encode(ulaw).decode('ascii'))
+        # CHECK IF SESSION EXISTS 
+        session = self._session_service.get_session_by_conference(conference_name)
+        if not session:
+            raise RuntimeError(f"No session found for conference {conference_name}")
+        
+        # CHECK IF USER HAS ACCESS TO THE CONFERENCE 
+        if session.user_id != user_id:
+            raise RuntimeError(f"User {user_id} does not have access to conference {conference_name}")
+        
+        # GET THE VOICE LINE AUDIO 
+        audio = session.voice_line_audios[voice_line_id]
 
-            # Stream with precise timing
-            start_time = asyncio.get_event_loop().time()
-            total_chunks_sent = 0
-            
-            while self._session_service.get_session(session.call_control_id):
-                for chunk_b64 in chunks:                    
-                    # Send to Telnyx
-                    frame = {
-                        "event": "media",
-                        "media": {
-                            "payload": chunk_b64
-                        }
-                    }
+        # CONVERT TO 8KHZ MU-LAW 
+        segment = AudioSegment.from_file(io.BytesIO(audio.audio_data), format="mp3")
+        segment = segment.set_frame_rate(8000).set_channels(1).set_sample_width(2).normalize()
+        chunk_ms = 20
 
-                    await ws.send_text(json.dumps(frame))                                        
-                    total_chunks_sent += 1
-                    next_time = start_time + (total_chunks_sent * 0.02)
-                    sleep_time = next_time - asyncio.get_event_loop().time()
-                    if sleep_time > 0:
-                        await asyncio.sleep(sleep_time)
-                        
-        except Exception as e:
-            console_logger.error(f"Stream error: {e}")
+        # Convert entire audio to μ-law chunks
+        chunks = []
+        for i in range(0, len(segment), chunk_ms):
+            chunk = segment[i:i+chunk_ms]
+            if len(chunk) < chunk_ms:
+                # Pad last chunk with silence
+                chunk = chunk + AudioSegment.silent(duration=chunk_ms - len(chunk))
+            pcm = chunk.raw_data
+            ulaw = audioop.lin2ulaw(pcm, 2)
+            chunks.append(base64.b64encode(ulaw).decode('ascii'))
+
+        websockets = self._session_service.get_conference_websockets(conference_name)
+        if not websockets:
+            raise RuntimeError(f"No websockets found for conference {conference_name}")
+        
+        console_logger.info(f"Playing voice line {voice_line_id} for user {user_id} in conference {conference_name} to {len(websockets)} websockets")
+
+        # Stream all chunks with proper timing (20ms per chunk)
+        for chunk in chunks:
+            for ws in websockets:
+                await ws.send_text(json.dumps({"event": "media", "media": {"payload": chunk}}))
+            await asyncio.sleep(0.02)
 
 
 telnyx_handler = TelnyxHandler()
