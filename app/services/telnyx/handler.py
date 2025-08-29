@@ -85,7 +85,7 @@ class TelnyxHandler:
         payload = data.get("payload", {})
         call_control_id = payload.get("call_control_id")
 
-        self.logger.debug(f"Telnyx webhook event: {event_type} (call_control_id={call_control_id})")
+        self.logger.info(f"Telnyx webhook event: {event_type} (call_control_id={call_control_id})")
 
         if not call_control_id:
             self.logger.warning("Webhook without call_control_id; ignoring.")
