@@ -12,7 +12,6 @@ from pydub import AudioSegment
 import audioop
 
 from app.core.database import AsyncSession
-from app.core.logging import console_logger
 from app.repositories.scenario_repository import ScenarioRepository
 from app.services.tts_service import TTSService
 from app.models.voice_line import VoiceLine
@@ -73,7 +72,6 @@ class AudioPreloadService:
             if key in cls._preload_cache:
                 audio_count = len(cls._preload_cache[key])
                 total_size = sum(audio.size_bytes for audio in cls._preload_cache[key].values())
-                console_logger.info(f"Cleaning up expired preload cache: {key} ({audio_count} files, {total_size:,} bytes)")
                 del cls._preload_cache[key]
                 del cls._cache_timestamps[key]
         
@@ -87,7 +85,6 @@ class AudioPreloadService:
             # Get signed URL for the audio file
             signed_url = await self.tts_service.get_audio_url(storage_path, expires_in=3600)
             if not signed_url:
-                console_logger.error(f"Failed to get signed URL for voice line {voice_line_id}")
                 return None
             
             # Download the file
@@ -95,14 +92,11 @@ class AudioPreloadService:
                 async with session.get(signed_url) as response:
                     if response.status == 200:
                         audio_data = await response.read()
-                        console_logger.debug(f"Downloaded {len(audio_data):,} bytes for voice line {voice_line_id}")
                         return audio_data
                     else:
-                        console_logger.error(f"Failed to download audio for voice line {voice_line_id}: HTTP {response.status}")
                         return None
                         
         except Exception as e:
-            console_logger.error(f"Error downloading audio for voice line {voice_line_id}: {str(e)}")
             return None
 
     def _precompute_ulaw_chunks(self, mp3_bytes: bytes, *, chunk_ms: int = 40, sample_rate: int = 8000) -> Tuple[List[str], int, int]:
@@ -158,7 +152,6 @@ class AudioPreloadService:
                         "loaded_at": cached_time.isoformat()
                     }
             
-            console_logger.info(f"Starting audio preload for user {user_id}, scenario {scenario_id}")
             
             # Get scenario with voice lines and audio
             query = select(VoiceLine).where(
@@ -205,7 +198,6 @@ class AudioPreloadService:
             if not audio_files_to_load:
                 return False, "No ready audio files found for preloading", {"audio_count": 0}
             
-            console_logger.info(f"Found {len(audio_files_to_load)} audio files to preload")
             
             # Download audio files with concurrency limit
             semaphore = asyncio.Semaphore(self._max_concurrent_downloads)
@@ -236,7 +228,6 @@ class AudioPreloadService:
                             # Fallback to runtime conversion if precompute fails
                             pass
                         preloaded_audio[voice_line.id] = preloaded
-                        console_logger.debug(f"Preloaded voice line {voice_line.id} ({len(audio_data):,} bytes)")
             
             # Execute downloads concurrently
             download_tasks = [
@@ -252,7 +243,6 @@ class AudioPreloadService:
                 self._cache_timestamps[cache_key] = datetime.utcnow()
                 
                 total_size = sum(audio.size_bytes for audio in preloaded_audio.values())
-                console_logger.info(f"Successfully preloaded {len(preloaded_audio)} audio files ({total_size:,} bytes) for scenario {scenario_id}")
                 
                 return True, f"Successfully preloaded {len(preloaded_audio)} audio files", {
                     "cached": False,
@@ -268,7 +258,6 @@ class AudioPreloadService:
                 return False, "Failed to preload any audio files", {"audio_count": 0}
                 
         except Exception as e:
-            console_logger.error(f"Error preloading audio for scenario {scenario_id}: {str(e)}")
             return False, f"Preload failed: {str(e)}", {"audio_count": 0}
     
     def get_preloaded_audio(self, user_id: str, scenario_id: int, voice_line_id: Optional[int] = None) -> Optional[Dict[int, PreloadedAudio]]:
@@ -291,7 +280,6 @@ class AudioPreloadService:
         # Check if cache is expired
         cached_time = self._cache_timestamps.get(cache_key, datetime.min)
         if datetime.utcnow() - cached_time > timedelta(minutes=self._max_cache_age_minutes):
-            console_logger.info(f"Preloaded cache expired for {cache_key}")
             self.drop_preloaded_audio(user_id, scenario_id)
             return None
         
@@ -354,7 +342,6 @@ class AudioPreloadService:
             # Force garbage collection to free memory
             gc.collect()
             
-            console_logger.info(f"Dropped preloaded audio for {cache_key} ({audio_count} files, {total_size:,} bytes)")
             return True
         
         return False
@@ -380,7 +367,6 @@ class AudioPreloadService:
             cls._cache_timestamps.clear()
             gc.collect()
             
-            console_logger.info(f"Dropped all preloaded audio ({dropped_count} scenarios, {total_files} files, {total_size:,} bytes)")
         
         return dropped_count
     
