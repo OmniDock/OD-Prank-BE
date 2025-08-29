@@ -1,12 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
-import asyncio
 from pydantic import BaseModel
-from typing import Optional
-import time
-import base64 as b64
-import json
-import base64
-import httpx
 
 from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
