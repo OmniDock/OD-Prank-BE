@@ -3,7 +3,7 @@ import base64
 import audioop 
 import asyncio 
 import json 
-from typing import Optional 
+from typing import Optional, Dict
 from fastapi import WebSocket, WebSocketDisconnect
 from pydub import AudioSegment 
 
@@ -23,6 +23,7 @@ class TelnyxHandler:
 
     _session_service = TelnyxSessionService()
     _client = TelnyxHTTPClient()
+    _active_playbacks_tasks: Dict[str, asyncio.Task] = {}
 
     def __init__(self):
         self.logger = console_logger 
@@ -126,7 +127,7 @@ class TelnyxHandler:
     async def handle_media_ws(self, ws: WebSocket, call_control_id: str):
         await ws.accept()
 
-        console_logger.debug(f"Media WS connected: {call_control_id}")
+        console_logger.info(f"Media WS connected: {call_control_id}")
 
         session = self._session_service.get_session(call_control_id)
         if not session:
@@ -161,49 +162,151 @@ class TelnyxHandler:
 
 
     async def play_voice_line(self, user_id: str, conference_name: str, voice_line_id: int):
-        """
-        Play a voice line over the media stream.
-        """
-
+        
         # CHECK IF SESSION EXISTS 
         session = self._session_service.get_session_by_conference(conference_name)
         if not session:
             raise RuntimeError(f"No session found for conference {conference_name}")
         
-        # CHECK IF USER HAS ACCESS TO THE CONFERENCE 
         if session.user_id != user_id:
             raise RuntimeError(f"User {user_id} does not have access to conference {conference_name}")
+        
+        # CHECK IF VOICE LINE IS AVAILABLE 
+        if voice_line_id not in session.voice_line_audios:
+            raise RuntimeError(f"Voice line {voice_line_id} not found in session")
         
         # GET THE VOICE LINE AUDIO 
         audio = session.voice_line_audios[voice_line_id]
 
-        # CONVERT TO 8KHZ MU-LAW 
-        segment = AudioSegment.from_file(io.BytesIO(audio.audio_data), format="mp3")
-        segment = segment.set_frame_rate(8000).set_channels(1).set_sample_width(2).normalize()
-        chunk_ms = 20
+        # Use precomputed chunks if available for better quality and performance
+        if audio.ulaw_chunks_b64 and audio.ulaw_chunk_ms:
+            chunks = audio.ulaw_chunks_b64
+            chunk_ms = audio.ulaw_chunk_ms
+            console_logger.info(f"Using precomputed ulaw chunks: {len(chunks)} chunks, {chunk_ms}ms each")
+        else:
+            # Fallback to on-the-fly conversion with enhanced processing
+            console_logger.info("Converting audio on-the-fly (precomputed chunks not available)")
+            segment = AudioSegment.from_file(io.BytesIO(audio.audio_data), format="mp3")
+            
+            # Enhanced audio processing for telephony
+            segment = segment.set_frame_rate(8000).set_channels(1).set_sample_width(2)
+            segment = segment.compress_dynamic_range(threshold=-20.0, ratio=4.0, attack=5.0, release=50.0)
+            segment = segment.high_pass_filter(300)
+            segment = segment.low_pass_filter(3400)
+            segment = segment.normalize()
+            segment = segment + 3  # +3dB gain
+            
+            chunk_ms = 20  # Use 20ms chunks for real-time streaming
 
-        # Convert entire audio to μ-law chunks
-        chunks = []
-        for i in range(0, len(segment), chunk_ms):
-            chunk = segment[i:i+chunk_ms]
-            if len(chunk) < chunk_ms:
-                # Pad last chunk with silence
-                chunk = chunk + AudioSegment.silent(duration=chunk_ms - len(chunk))
-            pcm = chunk.raw_data
-            ulaw = audioop.lin2ulaw(pcm, 2)
-            chunks.append(base64.b64encode(ulaw).decode('ascii'))
+            # Convert entire audio to μ-law chunks
+            chunks = []
+            for i in range(0, len(segment), chunk_ms):
+                chunk = segment[i:i+chunk_ms]
+                if len(chunk) < chunk_ms:
+                    # Pad last chunk with silence
+                    chunk = chunk + AudioSegment.silent(duration=chunk_ms - len(chunk), frame_rate=8000)
+                pcm = chunk.raw_data
+                ulaw = audioop.lin2ulaw(pcm, 2)
+                chunks.append(base64.b64encode(ulaw).decode('ascii'))
 
-        websockets = self._session_service.get_conference_websockets(conference_name)
-        if not websockets:
-            raise RuntimeError(f"No websockets found for conference {conference_name}")
+        # Create async task for streaming
+        async def stream_chunks():
+            websockets = self._session_service.get_conference_websockets(conference_name)
+            if not websockets:
+                raise RuntimeError(f"No websockets found for conference {conference_name}")
+            
+            try:
+                # Calculate precise timing for chunk streaming
+                chunk_duration = chunk_ms / 1000.0  # Convert to seconds
+                
+                # Stream all chunks with proper timing
+                for idx, chunk in enumerate(chunks):
+                    # Check if task was cancelled
+                    if asyncio.current_task().cancelled():
+                        break
+                    
+                    # Send to all websockets in the conference
+                    for ws in websockets:
+                        await ws.send_text(json.dumps({
+                            "event": "media",
+                            "media": {
+                                "payload": chunk
+                            }
+                        }))
+                    
+                    # Use precise sleep timing for smooth audio
+                    await asyncio.sleep(chunk_duration)
+                    
+                    # Log progress periodically
+                    if idx % 50 == 0:  # Every 50 chunks (1 second at 20ms)
+                        console_logger.debug(f"Streamed {idx}/{len(chunks)} chunks for conference {conference_name}")
+                        
+            except asyncio.CancelledError:
+                console_logger.info(f"Playback cancelled for conference {conference_name}")
+                raise
+            finally:
+                # Clean up the task reference
+                self._active_playbacks_tasks.pop(conference_name, None)
+
+        # Create and store the task
+        task = asyncio.create_task(stream_chunks())
+        self._active_playbacks_tasks[conference_name] = task
+        return
+
+    async def stop_voice_line(self, user_id: str, conference_name: str):
+        """
+        Stop any active voice line playback for a conference.
+        """
+        # CHECK IF SESSION EXISTS 
+        session = self._session_service.get_session_by_conference(conference_name)
+        if session and session.user_id != user_id:
+            raise RuntimeError(f"User {user_id} does not have access to conference {conference_name}")
         
-        console_logger.info(f"Playing voice line {voice_line_id} for user {user_id} in conference {conference_name} to {len(websockets)} websockets")
+        # Cancel the active playback task if it exists
+        task = self._active_playbacks_tasks.get(conference_name)
+        if task and not task.done():
+            console_logger.info(f"Stopping voice line playback for conference {conference_name}")
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            self._active_playbacks_tasks.pop(conference_name, None)
+            return True
+        return False
 
-        # Stream all chunks with proper timing (20ms per chunk)
-        for chunk in chunks:
-            for ws in websockets:
-                await ws.send_text(json.dumps({"event": "media", "media": {"payload": chunk}}))
-            await asyncio.sleep(0.02)
+    async def hangup_call(self, user_id: str, conference_name: str):
+        """
+        Hangup all calls in a conference.
+        """
+        # CHECK IF SESSION EXISTS 
+        session = self._session_service.get_session_by_conference(conference_name)
+        if not session:
+            raise RuntimeError(f"No session found for conference {conference_name}")
+        
+        if session.user_id != user_id:
+            raise RuntimeError(f"User {user_id} does not have access to conference {conference_name}")
+        
+        # Stop any active voice line playback first
+        await self.stop_voice_line(user_id, conference_name)
+        
+        # Get all call control IDs in this conference
+        ccids = self._session_service.get_ccids_by_conference(conference_name)
+        
+        # Hangup all calls in the conference
+        hangup_tasks = []
+        for ccid in ccids:
+            hangup_tasks.append(self._client.hangup_call(ccid))
+        
+        if hangup_tasks:
+            await asyncio.gather(*hangup_tasks, return_exceptions=True)
+        
+        # Clean up sessions
+        for ccid in ccids:
+            self._session_service.remove_session(ccid)
+        
+        console_logger.info(f"Hung up {len(ccids)} calls in conference {conference_name}")
+        return True
 
 
 telnyx_handler = TelnyxHandler()

@@ -38,6 +38,21 @@ class PlayVoiceLineResponse(BaseModel):
     success: bool
     message: str
 
+class StopVoiceLineRequest(BaseModel):
+    conference_name: str
+    voice_line_id: int
+
+class StopVoiceLineResponse(BaseModel):
+    success: bool
+    message: str
+
+class HangupCallRequest(BaseModel):
+    conference_name: str
+
+class HangupCallResponse(BaseModel):
+    success: bool
+    message: str
+
 @router.post("/call", response_model=StartCallResponse)
 async def start_call(
     body: StartCallRequest,
@@ -110,4 +125,28 @@ async def play_voice_line(
         return PlayVoiceLineResponse(success=True, message="Voice line streaming started")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
 
+@router.post("/call/stop-voiceline")
+async def stop_voice_line(
+    body: StopVoiceLineRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    try:
+        await telnyx_handler.stop_voice_line(user_id=user.id, conference_name=body.conference_name)
+        return StopVoiceLineResponse(success=True, message="Voice line streaming stopped")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/call/hangup")
+async def hangup_call(
+    body: HangupCallRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    try:
+        console_logger.info(f"Hanging up call for user {user.id} in conference {body.conference_name}")
+        await telnyx_handler.hangup_call(user_id=user.id, conference_name=body.conference_name)
+        return HangupCallResponse(success=True, message="Call terminated successfully")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

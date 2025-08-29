@@ -193,3 +193,27 @@ class TelnyxHTTPClient:
             if not token:
                 raise HTTPException(status_code=500, detail="Token missing in Telnyx response")
             return token 
+
+    async def hangup_call(self, call_control_id: str):
+        """
+        Hangup a call via Telnyx Call Control API.
+        """
+        ccid_path = quote(call_control_id, safe="")
+        url = f"{self.BASE_URL}/calls/{ccid_path}/actions/hangup"
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                url,
+                headers={**self.AUTH_HEADER, "Content-Type": "application/json"},
+                json={}
+            )
+            
+            if resp.status_code == 404:
+                # Call might already be hung up
+                self.logger.warning(f"Call {call_control_id} not found, may already be terminated")
+                return
+            
+            resp.raise_for_status()
+            
+            if self.logging_enabled:
+                self.logger.info(f"Call hung up: {call_control_id}") 

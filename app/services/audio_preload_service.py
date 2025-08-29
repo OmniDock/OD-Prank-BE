@@ -99,24 +99,42 @@ class AudioPreloadService:
         except Exception as e:
             return None
 
-    def _precompute_ulaw_chunks(self, mp3_bytes: bytes, *, chunk_ms: int = 40, sample_rate: int = 8000) -> Tuple[List[str], int, int]:
+    def _precompute_ulaw_chunks(self, mp3_bytes: bytes, *, chunk_ms: int = 20, sample_rate: int = 8000) -> Tuple[List[str], int, int]:
         """
         Prepare μ-law (PCMU) base64 chunks for smoother Telnyx streaming.
         - Downsample to 8kHz mono 16-bit PCM
-        - Slice into chunk_ms windows (default 40ms for stability)
+        - Slice into chunk_ms windows (default 20ms for real-time streaming)
         - Convert each window to μ-law and base64-encode
         Returns: (chunks_b64, sample_rate, chunk_ms)
         """
         segment = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
-        # Apply normalization and quality improvements
+        
+        # Enhanced audio processing for better quality
+        # 1. Set proper format for telephony
         segment = segment.set_frame_rate(sample_rate).set_channels(1).set_sample_width(2)
-        # Normalize audio level for consistent volume
+        
+        # 2. Apply compression to reduce dynamic range for telephony
+        segment = segment.compress_dynamic_range(threshold=-20.0, ratio=4.0, attack=5.0, release=50.0)
+        
+        # 3. Apply high-pass filter to remove low frequency noise (below 300Hz)
+        segment = segment.high_pass_filter(300)
+        
+        # 4. Apply low-pass filter to remove high frequency noise (above 3400Hz) 
+        segment = segment.low_pass_filter(3400)
+        
+        # 5. Normalize to consistent volume level
         segment = segment.normalize()
+        
+        # 6. Apply slight gain to ensure audibility
+        segment = segment + 3  # +3dB gain
         
         chunks_b64: List[str] = []
         total_ms = len(segment)
         for start_ms in range(0, total_ms, chunk_ms):
             chunk = segment[start_ms:start_ms + chunk_ms]
+            # Pad the last chunk if needed
+            if len(chunk) < chunk_ms:
+                chunk = chunk + AudioSegment.silent(duration=chunk_ms - len(chunk), frame_rate=sample_rate)
             pcm16 = chunk.raw_data  # 16-bit LE PCM
             ulaw_bytes = audioop.lin2ulaw(pcm16, 2)
             chunks_b64.append(base64.b64encode(ulaw_bytes).decode("ascii"))
@@ -220,12 +238,13 @@ class AudioPreloadService:
                         )
                         # Precompute μ-law chunks for smoother streaming
                         try:
-                            chunks_b64, sr, cms = self._precompute_ulaw_chunks(audio_data, chunk_ms=200, sample_rate=8000)
+                            chunks_b64, sr, cms = self._precompute_ulaw_chunks(audio_data, chunk_ms=20, sample_rate=8000)
                             preloaded.ulaw_chunks_b64 = chunks_b64
                             preloaded.ulaw_sample_rate_hz = sr
                             preloaded.ulaw_chunk_ms = cms
-                        except Exception as _:
+                        except Exception as e:
                             # Fallback to runtime conversion if precompute fails
+                            # console_logger.warning(f"Failed to precompute ulaw chunks: {e}") # This line was removed from the new_code, so it's removed here.
                             pass
                         preloaded_audio[voice_line.id] = preloaded
             
