@@ -177,7 +177,6 @@ class TelnyxHTTPClient:
             
             return cid
         
-
     async def mint_webrtc_token(self, cred_id: str) -> str:
         async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.post(
@@ -217,3 +216,61 @@ class TelnyxHTTPClient:
             
             if self.logging_enabled:
                 self.logger.info(f"Call hung up: {call_control_id}") 
+
+    async def playback_start(self, call_control_id: str, audio_url: str):
+        """
+        Start playback of an audio URL on a specific call leg.
+        """
+        ccid_path = quote(call_control_id, safe="")
+        url = f"{self.BASE_URL}/calls/{ccid_path}/actions/playback_start"
+        body = {"audio_url": audio_url}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(url, headers={**self.AUTH_HEADER, "Content-Type": "application/json"}, json=body)
+            if r.status_code >= 400:
+                self.logger.error(f"playback_start error {r.status_code}: {r.text}")
+            r.raise_for_status()
+
+    async def playback_stop(self, call_control_id: str):
+        """
+        Stop playback on a specific call leg.
+        """
+        ccid_path = quote(call_control_id, safe="")
+        url = f"{self.BASE_URL}/calls/{ccid_path}/actions/playback_stop"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(url, headers={**self.AUTH_HEADER, "Content-Type": "application/json"}, json={})
+            if r.status_code >= 400:
+                self.logger.error(f"playback_stop error {r.status_code}: {r.text}")
+            r.raise_for_status()
+
+    async def conference_play(self, conference_name: str, audio_url: str, *, call_control_ids: list[str] | None = None):
+        """
+        Play an audio URL to all participants in a conference (or targeted legs).
+        """
+        conf_path = quote(conference_name, safe="")
+        url = f"{self.BASE_URL}/conferences/{conf_path}/actions/play"
+        body = {"audio_url": audio_url}
+        if call_control_ids:
+            body["call_control_ids"] = call_control_ids
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(url, headers={**self.AUTH_HEADER, "Content-Type": "application/json"}, json=body)
+            if r.status_code >= 400:
+                self.logger.error(f"conference play error {r.status_code}: {r.text}")
+            r.raise_for_status()
+
+
+    async def conference_stop(self, conference_name: str, call_control_ids: list[str] | None = None):
+        """
+        Stop any audio being played on the conference (optionally target legs).
+        """
+        conf_path = quote(conference_name, safe="")
+        url = f"{self.BASE_URL}/conferences/{conf_path}/actions/stop"
+        body = {}
+        if call_control_ids:
+            body["call_control_ids"] = call_control_ids
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(url, headers={**self.AUTH_HEADER, "Content-Type": "application/json"}, json=body)
+            if r.status_code >= 400:
+                self.logger.error(f"conference stop error {r.status_code}: {r.text}")
+            r.raise_for_status()
+
+  
