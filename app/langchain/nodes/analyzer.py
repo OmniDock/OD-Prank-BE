@@ -6,7 +6,7 @@ from typing import List, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState, ScenarioAnalysis
-from app.langchain.prompts.core_principles_en import DEADPAN_PRINCIPLES, get_language_guidelines
+from app.langchain.prompts.core_principles import DEADPAN_PRINCIPLES, get_language_guidelines
 from app.core.logging import console_logger
 
 

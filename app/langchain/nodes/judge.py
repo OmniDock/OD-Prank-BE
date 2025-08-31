@@ -43,47 +43,47 @@ async def judge_node(state: ScenarioState) -> dict:
         }
     
     system_prompt = """
-You are an expert in prank call quality. Evaluate the generated lines.
+        You are an expert in prank call quality. Evaluate the generated lines.
 
-EVALUATION CRITERIA:
+        EVALUATION CRITERIA:
 
-SERIOUSNESS (0-1): How deadpan/serious are the lines?
-- 1.0 = Completely deadpan, no detectable jokes
-- 0.7 = Mostly serious with minimal humor elements
-- 0.5 = Too obviously funny
-- 0.0 = Open jokes, slang, breaking character
+        SERIOUSNESS (0-1): How deadpan/serious are the lines?
+        - 1.0 = Completely deadpan, no detectable jokes
+        - 0.7 = Mostly serious with minimal humor elements
+        - 0.5 = Too obviously funny
+        - 0.0 = Open jokes, slang, breaking character
 
-BELIEVABILITY (0-1): Could this be a real call?
-- 1.0 = Completely believable, like a real service call
-- 0.7 = Mostly believable with minor oddities
-- 0.5 = Too many unrealistic elements
-- 0.0 = Obviously fake
+        BELIEVABILITY (0-1): Could this be a real call?
+        - 1.0 = Completely believable, like a real service call
+        - 0.7 = Mostly believable with minor oddities
+        - 0.5 = Too many unrealistic elements
+        - 0.0 = Obviously fake
 
-SUBTLE_EMOTION (0-1): Does it create the desired confusion?
-- 1.0 = Perfect balance of normal and absurd
-- 0.7 = Good confusion, could be more subtle
-- 0.5 = Too direct or too normal
-- 0.0 = No emotional effect
+        SUBTLE_EMOTION (0-1): Does it create the desired confusion?
+        - 1.0 = Perfect balance of normal and absurd
+        - 0.7 = Good confusion, could be more subtle
+        - 0.5 = Too direct or too normal
+        - 0.0 = No emotional effect
 
-Give honest ratings. If something is bad, rate it low!
-"""
+        Give honest ratings. If something is bad, rate it low!
+    """ 
 
     user_prompt = """
-Evaluate these prank call lines:
+        Evaluate these prank call lines:
 
-{lines_text}
+        {lines_text}
 
-Context:
-- Persona: {persona}
-- Company: {company}
-- Escalation: {escalation}
+        Context:
+        - Persona: {persona}
+        - Company: {company}
+        - Escalation: {escalation}
 
-Provide scores from 0.0 to 1.0 for:
-- seriousness (deadpan delivery)
-- believability (credibility)
-- subtle_emotion (subtle confusion)
-- notes (what's good/bad?)
-"""
+        Provide scores from 0.0 to 1.0 for:
+        - seriousness (deadpan delivery)
+        - believability (credibility)
+        - subtle_emotion (subtle confusion)
+        - notes (what's good/bad?)
+    """
 
     lines_text = "\n".join(all_lines)
     

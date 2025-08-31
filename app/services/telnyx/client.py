@@ -3,14 +3,15 @@ from typing import Tuple
 
 from app.core.config import settings
 from app.core.logging import console_logger
-from app.core.database import AsyncSession
 
 import secrets 
 import httpx 
 import asyncio 
 from urllib.parse import quote 
 from fastapi import HTTPException
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone  # Add timezone import
+from deprecated import deprecated
+
 
 class TelnyxHTTPClient: 
 
@@ -64,35 +65,6 @@ class TelnyxHTTPClient:
 
         return call_leg_id, call_control_id, call_session_id, secret_conf
     
-
-    def _get_media_stream_url(self, call_control_id: str) -> str:
-        return f"{self.TUNNEL_BASE_URL}{settings.API_V1_STR}/telnyx/media/{call_control_id}"
-
-
-    async def start_media_stream(self, call_control_id: str):
-        """ 
-        Telling Telnyx to start a media stream over the WebSocket.
-        That way we can stream audio into different legs of the call. 
-        """
-        stream_url = self._get_media_stream_url(call_control_id)
-        body = {
-            "stream_url": stream_url,
-            "stream_track": "both_tracks",
-            "stream_codec": "PCMU",
-            "stream_bidirectional_mode": "rtp",
-        }
-
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.post(
-                f"{self.BASE_URL}/calls/{call_control_id}/actions/streaming_start",
-                headers={**self.AUTH_HEADER, "Content-Type": "application/json"},
-                json=body,
-            )
-            if resp.status_code >= 400:
-                self.logger.error(f"Telnyx streaming_start error {resp.status_code}: {resp.text}")
-            resp.raise_for_status()
-
-
 
     async def answer_with_retry(self, ccid: str, retries: int = 4):
         ccid_path = quote(ccid, safe="")
@@ -148,7 +120,8 @@ class TelnyxHTTPClient:
                 if expires_at:
                     console_logger.info(item)
                     tag_matches = item.get("tag") == unique_username
-                    expiry_matches = datetime.fromisoformat(item.get("expires_at")) > datetime.now() + timedelta(minutes=5)
+                    # Fix: Use timezone-aware datetime for comparison
+                    expiry_matches = datetime.fromisoformat(item.get("expires_at")) > datetime.now(timezone.utc) + timedelta(minutes=5)
                     if tag_matches and expiry_matches:
                         cid = item.get("id")
                         if cid:
@@ -159,7 +132,7 @@ class TelnyxHTTPClient:
                 "connection_id": settings.TELNYX_CONNECTION_ID,
                 "name": unique_username,
                 "tag": unique_username,
-                "expires_at": (datetime.now() + timedelta(minutes=30)).isoformat()
+                "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()  # Also fix here for consistency
             }
 
             r2 = await client.post(
@@ -274,3 +247,32 @@ class TelnyxHTTPClient:
             r.raise_for_status()
 
   
+
+
+    #@deprecated(reason="This method is deprecated we are not streaming media anymore. We do use Telnyx Playbacks.")
+    def _get_media_stream_url(self, call_control_id: str) -> str:
+        return f"{self.TUNNEL_BASE_URL}{settings.API_V1_STR}/telnyx/media/{call_control_id}"
+
+    #@deprecated(reason="This method is deprecated we are not streaming media anymore. We do use Telnyx Playbacks.")
+    async def start_media_stream(self, call_control_id: str):
+        """ 
+        Telling Telnyx to start a media stream over the WebSocket.
+        That way we can stream audio into different legs of the call. 
+        """
+        stream_url = self._get_media_stream_url(call_control_id)
+        body = {
+            "stream_url": stream_url,
+            "stream_track": "both_tracks",
+            "stream_codec": "PCMU",
+            "stream_bidirectional_mode": "rtp",
+        }
+
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.post(
+                f"{self.BASE_URL}/calls/{call_control_id}/actions/streaming_start",
+                headers={**self.AUTH_HEADER, "Content-Type": "application/json"},
+                json=body,
+            )
+            if resp.status_code >= 400:
+                self.logger.error(f"Telnyx streaming_start error {resp.status_code}: {resp.text}")
+            resp.raise_for_status()

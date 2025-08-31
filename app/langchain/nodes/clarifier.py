@@ -21,20 +21,36 @@ async def clarifier_node(state: ScenarioState) -> dict:
     system_prompt = """
         You are an expert in creating deadpan-serious prank call scenarios.
         
-        Your job is to check if the scenario description has enough detail to create a believable prank.
+        Your job is to ensure the scenario has the ESSENTIAL details for a memorable prank.
         
-        Ask maximum 3 clarifying questions ONLY if critical scenario details are missing:
-        - What specific problem/situation is the caller presenting? (e.g., wrong pizza order, package issue)
-        - What absurd twist or escalation should happen? (e.g., asking them to sing, confirm door color)
-        - What persona details would make it more believable? (e.g., company name, accent, attitude)
+        Only ask questions if CRITICAL information is missing. Ask 1-3 questions MAXIMUM.
+        Focus on what's absolutely necessary:
+        1. The CORE situation/problem (what's the main premise)
+        2. ONE key absurd element that makes it funny
+        3. The caller's basic personality (if not clear from context)
         
         DO NOT ask about:
+        - How the situation escalates (let creativity handle that)
+        - Multiple twists or complications
+        - Specific dialogue or phrases
         - When the actual call should happen
         - Real contact information
         - Payment or personal data
-        - Anything unrelated to the prank content itself
         
-        If the description already contains enough detail to work with, respond with: NO QUESTIONS
+        Examples of descriptions that DON'T need questions:
+        - "Pizza delivery insisting the customer ordered 50 pizzas with anchovies"
+        - "Bank calling about suspicious purchase of 1000 rubber ducks"
+        - "Package delivery for a life-size cardboard cutout of Nicolas Cage"
+        - "Dentist office confirming appointment for wisdom teeth removal for their pet hamster"
+        
+        Examples that MIGHT need 1-2 questions:
+        - "A funny prank call" → What's the situation? Who's calling?
+        - "Pizza delivery prank" → What's special about this delivery? What has gone wrong? 
+        
+        <important>Default to NO questions unless something is truly unclear.</important>
+        <important>If you can understand the basic premise, don't ask for more details.</important>
+        <important>Never ask more than 3 questions, even if more details could help.</important>
+        <important>Do NOT ask how things escalate or develop - that's for the scenario generation.</important>
     """
 
     user_prompt = """
@@ -43,9 +59,14 @@ async def clarifier_node(state: ScenarioState) -> dict:
         Target Name: {target_name}
         Language: {language}
 
-        Check if we have enough detail to create a believable prank scenario.
-        If key details about the prank situation, absurd elements, or character are missing, ask up to 3 questions.
+        Check if the CORE premise is clear. If yes, respond with "NO QUESTIONS".
+        
+        Only ask 1-3 questions if you truly cannot understand what the prank is about.
+        Focus only on the missing ESSENTIAL information.
+        
         Return questions in {language} language.
+        
+        Remember: If you understand the basic idea, that's enough. Don't ask for elaboration.
     """
 
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
@@ -81,7 +102,7 @@ async def clarifier_node(state: ScenarioState) -> dict:
                 if line:
                     questions.append(line)
         
-        # Limit to 3 questions
+        # Limit to 3 questions (changed from 5)
         questions = questions[:3]
         
         console_logger.info(f"Generated {len(questions)} clarifying questions")

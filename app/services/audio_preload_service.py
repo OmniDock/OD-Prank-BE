@@ -179,6 +179,5 @@ class AudioPreloadService:
             else:
                 return None
         
-        return preloaded_data.copy()  # Return copy to prevent external modification
-    
+        return preloaded_data.copy()
     

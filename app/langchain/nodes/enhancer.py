@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState
-from app.langchain.prompts.core_principles_en import DEADPAN_PRINCIPLES, get_language_guidelines, GOOD_EXAMPLES
+from app.langchain.prompts.core_principles import DEADPAN_PRINCIPLES, get_language_guidelines, GOOD_EXAMPLES
 from app.core.logging import console_logger
 
 
@@ -33,49 +33,49 @@ async def enhancer_node(state: ScenarioState) -> dict:
         return {}
     
     system_prompt = f"""
-{DEADPAN_PRINCIPLES}
+        {DEADPAN_PRINCIPLES}
 
-{get_language_guidelines(getattr(state.scenario_data.language, 'value', 'de'))}
+        {get_language_guidelines(getattr(state.scenario_data.language, 'value', 'de'))}
 
-You are enhancing existing prank call lines based on user feedback.
+        You are enhancing existing prank call lines based on user feedback.
 
-CURRENT CHARACTER:
-- Name: {state.analysis.persona_name if state.analysis else "Unknown"}
-- Company: {state.analysis.company_service if state.analysis else "Unknown"}
-- Voice: {state.analysis.voice_hints if state.analysis and state.analysis.voice_hints else "Standard"}
+        CURRENT CHARACTER:
+        - Name: {state.analysis.persona_name if state.analysis else "Unknown"}
+        - Company: {state.analysis.company_service if state.analysis else "Unknown"}
+        - Voice: {state.analysis.voice_hints if state.analysis and state.analysis.voice_hints else "Standard"}
 
-USER FEEDBACK: The user wants these specific improvements.
+        USER FEEDBACK: The user wants these specific improvements.
 
-ENHANCEMENT RULES:
-1. KEEP the same character and scenario
-2. MAINTAIN the deadpan-serious tone
-3. ADDRESS the user's specific feedback
-4. PRESERVE what's working well
-5. Only change what needs improvement
+        ENHANCEMENT RULES:
+        1. KEEP the same character and scenario
+        2. MAINTAIN the deadpan-serious tone
+        3. ADDRESS the user's specific feedback
+        4. PRESERVE what's working well
+        5. Only change what needs improvement
 
-QUALITY TARGETS:
-- More believable (if requested)
-- More serious/less obvious (if requested)  
-- Better flow/naturalness (if requested)
-- Stronger character voice (if requested)
+        QUALITY TARGETS:
+        - More believable (if requested)
+        - More serious/less obvious (if requested)  
+        - Better flow/naturalness (if requested)
+        - Stronger character voice (if requested)
 
-USE THESE EXAMPLES AS REFERENCE:
-{GOOD_EXAMPLES}
-"""
-    
+        USE THESE EXAMPLES AS REFERENCE:
+        {GOOD_EXAMPLES}
+    """
+        
     user_prompt = """
-CURRENT LINES:
-{current_lines}
+        CURRENT LINES:
+        {current_lines}
 
-USER FEEDBACK:
-{feedback}
+        USER FEEDBACK:
+        {feedback}
 
-Enhance these lines based on the feedback. Keep what works, improve what doesn't.
+        Enhance these lines based on the feedback. Keep what works, improve what doesn't.
 
-List the specific changes you made.
+        List the specific changes you made.
 
-Generate in {language} language.
-"""
+        Generate in {language} language.
+    """
     
     # Format current lines
     current_lines_text = ""
@@ -125,25 +125,25 @@ async def enhance_single_line(
     Enhance a single voice line (for targeted enhancement)
     """
     system_prompt = f"""
-{DEADPAN_PRINCIPLES}
+        {DEADPAN_PRINCIPLES}
 
-You are {persona_name} from {company_service}.
+        You are {persona_name} from {company_service}.
 
-Enhance this single {line_type} line based on user feedback.
-Keep the deadpan-serious tone.
-Make it sound natural but professional.
-"""
-    
+        Enhance this single {line_type} line based on user feedback.
+        Keep the deadpan-serious tone.
+        Make it sound natural but professional.
+        """
+            
     user_prompt = """
-CURRENT LINE:
-{line}
+        CURRENT LINE:
+        {line}
 
-USER FEEDBACK:
-{feedback}
+        USER FEEDBACK:
+        {feedback}
 
-Provide ONE enhanced version that addresses the feedback.
-Keep the same language ({language}).
-"""
+        Provide ONE enhanced version that addresses the feedback.
+        Keep the same language ({language}).
+    """
     
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
     prompt = ChatPromptTemplate.from_messages([

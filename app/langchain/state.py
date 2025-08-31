@@ -45,7 +45,8 @@ class ScenarioState(BaseModel):
         "OPENING": 2,
         "QUESTION": 6,
         "RESPONSE": 6,
-        "CLOSING": 2
+        "CLOSING": 2,
+        "FILLER": 4
     })
     
     # Clarification flow
@@ -60,14 +61,16 @@ class ScenarioState(BaseModel):
         "OPENING": [],
         "QUESTION": [],
         "RESPONSE": [],
-        "CLOSING": []
+        "CLOSING": [],
+        "FILLER": []
     })
     
     tts_lines: Dict[str, List[str]] = Field(default_factory=lambda: {
         "OPENING": [],
         "QUESTION": [],
         "RESPONSE": [],
-        "CLOSING": []
+        "CLOSING": [],
+        "FILLER": []
     })
     
     # Quality and safety

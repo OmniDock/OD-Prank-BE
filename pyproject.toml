@@ -8,6 +8,7 @@ dependencies = [
     "aiohttp>=3.12.15",
     "alembic>=1.16.4",
     "asyncpg>=0.30.0",
+    "deprecated>=1.2.18",
     "elevenlabs>=2.10.0",
     "fastapi>=0.116.1",
     "greenlet>=3.2.4",

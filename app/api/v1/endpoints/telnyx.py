@@ -1,16 +1,14 @@
-from http.client import HTTPResponse
-from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
+from deprecated import deprecated
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from pydantic import BaseModel
 
 from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
 from app.core.logging import console_logger
 from app.services.telnyx.handler import telnyx_handler
-from app.core.config import settings
 
 
 router = APIRouter(tags=["telnyx"])
-
 
 class StartCallRequest(BaseModel):
     to_number: str
@@ -22,36 +20,6 @@ class StartCallResponse(BaseModel):
     call_session_id: str
     conference_name: str
     webrtc_token: str
-
-class WebRTCTokenRequest(BaseModel):
-    call_control_id: str
-
-class WebRTCTokenResponse(BaseModel):
-    token: str
-    conference_name: str
-
-class PlayVoiceLineRequest(BaseModel):
-    voice_line_id: int
-    conference_name: str
-
-class PlayVoiceLineResponse(BaseModel):
-    success: bool
-    message: str
-
-class StopVoiceLineRequest(BaseModel):
-    conference_name: str
-    voice_line_id: int
-
-class StopVoiceLineResponse(BaseModel):
-    success: bool
-    message: str
-
-class HangupCallRequest(BaseModel):
-    conference_name: str
-
-class HangupCallResponse(BaseModel):
-    success: bool
-    message: str
 
 @router.post("/call", response_model=StartCallResponse)
 async def start_call(
@@ -94,25 +62,24 @@ async def telnyx_webhook(req: Request):
         return {"ok": False}
     
 
+@deprecated(reason="This endpoint is deprecated we are not streaming media anymore. We do use Telnyx Playbacks.")
 @router.websocket("/media/{call_control_id}")
 async def telnyx_media_ws(ws: WebSocket, call_control_id: str):
     await telnyx_handler.handle_media_ws(ws, call_control_id)
 
 
-@router.post("/webrtc/token", response_model=WebRTCTokenResponse)
-async def mint_webrtc_token(body: WebRTCTokenRequest, user: AuthUser = Depends(get_current_user)):
-    """
-    Return a short-lived Telnyx WebRTC JWT for listen-only monitoring.
-    Mints via Telnyx telephony_credentials token API using TELNYX_API_KEY.
-    """
+# ################################################################################
+# START CONTROL ENDPOINTS FOR ACTIVE CALLS
+# ################################################################################
 
-    sess = telnyx_handler._session_service.get_session(body.call_control_id)
-    if not sess or sess.user_id != user.id:
-        raise HTTPException(status_code=403, detail="Forbidden: not owner of this call")
 
-    token = await telnyx_handler.get_webrtc_token(user.id)
-    return WebRTCTokenResponse(token=token, conference_name=sess.conference_name)
+class PlayVoiceLineRequest(BaseModel):
+    voice_line_id: int
+    conference_name: str
 
+class PlayVoiceLineResponse(BaseModel):
+    success: bool
+    message: str
 
 @router.post("/call/play-voiceline")
 async def play_voice_line(
@@ -127,6 +94,14 @@ async def play_voice_line(
         raise HTTPException(status_code=400, detail=str(e))
     
 
+class StopVoiceLineRequest(BaseModel):
+    conference_name: str
+    voice_line_id: int
+
+class StopVoiceLineResponse(BaseModel):
+    success: bool
+    message: str
+
 @router.post("/call/stop-voiceline")
 async def stop_voice_line(
     body: StopVoiceLineRequest,
@@ -139,6 +114,14 @@ async def stop_voice_line(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+
+class HangupCallRequest(BaseModel):
+    conference_name: str
+
+class HangupCallResponse(BaseModel):
+    success: bool
+    message: str
+
 @router.post("/call/hangup")
 async def hangup_call(
     body: HangupCallRequest,
@@ -150,3 +133,7 @@ async def hangup_call(
         return HangupCallResponse(success=True, message="Call terminated successfully")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+# ################################################################################
+# END CONTROL ENDPOINTS FOR ACTIVE CALLS
+# ################################################################################

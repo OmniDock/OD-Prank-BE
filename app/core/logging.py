@@ -1,5 +1,4 @@
 import logging 
-import os 
 import sys 
 import structlog 
 import logging.handlers 
@@ -13,7 +12,6 @@ logging.basicConfig(
     level=settings.LOG_LEVEL,
 )
 
-
 shared_processors: list[structlog.typing.Processor] = [
     structlog.processors.TimeStamper(fmt="iso"),
     structlog.processors.add_log_level,
@@ -22,7 +20,6 @@ shared_processors: list[structlog.typing.Processor] = [
 ]
 
 console_renderer = structlog.dev.ConsoleRenderer(colors=True)
-
 
 structlog.configure(
     processors=shared_processors + [console_renderer],
@@ -35,8 +32,6 @@ structlog.configure(
 
 # Importable loggers
 console_logger: structlog.BoundLogger = structlog.get_logger("console")
-
-
 
 # Silencing other loggers
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)

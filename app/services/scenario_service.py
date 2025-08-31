@@ -11,10 +11,13 @@ from app.models.voice_line import VoiceLine
 from app.core.utils.enums import VoiceLineTypeEnum
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 
 class ScenarioService: 
     """Service for managing scenarios with LangChain processing"""
+
+    _clarification_sessions: Dict[str, Any] = {}
 
     def __init__(self, db_session: AsyncSession):
         self.repository = ScenarioRepository(db_session)
@@ -49,6 +52,88 @@ class ScenarioService:
             console_logger.error(f"Failed to create scenario: {str(e)}")
             await self.repository.rollback()
             raise
+
+    async def process_with_clarification_flow(
+        self,
+        user: AuthUser,
+        scenario_data: Optional[ScenarioCreateRequest],
+        session_id: Optional[str],
+        clarifications: Optional[List[str]]
+    ) -> Dict[str, Any]:
+        """
+        Orchestrate two-step process: new request → potential clarifications → scenario creation.
+
+        Returns a dict compatible with ScenarioProcessResponse.
+        """
+        if not scenario_data and not session_id:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Either 'scenario' or 'session_id' must be provided")
+
+        sessions: Dict[str, Any] = ScenarioService._clarification_sessions  # type: ignore[attr-defined]
+
+        # Import here to avoid circular dependency
+        processor = ScenarioProcessor()
+
+        # Continuation path
+        if session_id and session_id in sessions:
+            console_logger.info(f"Continuing session {session_id}")
+            stored = sessions[session_id]
+            if stored.get("user_id") != user.id:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=403, detail="Not authorized")
+
+            stored_state = stored["state"]
+            state = ScenarioState(**stored_state) if isinstance(stored_state, dict) else stored_state
+            if clarifications:
+                state.clarifications = clarifications
+                state.require_clarification = False
+        else:
+            # New session path
+            if not scenario_data:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail="Scenario is required for new sessions")
+            console_logger.info("Creating new session")
+            state = ScenarioState(scenario_data=scenario_data, require_clarification=True)
+
+        # Process scenario via LangChain graph
+        result = await processor.process(state)
+        state = ScenarioState(**result) if isinstance(result, dict) else result
+
+        # Needs clarification → store session and return questions
+        if getattr(state, "require_clarification", False) and getattr(state, "clarifying_questions", None):
+            import uuid
+            new_session_id = str(uuid.uuid4())
+            sessions[new_session_id] = {
+                "state": state.model_dump() if hasattr(state, "model_dump") else state,
+                "user_id": user.id
+            }
+            return {
+                "status": "needs_clarification",
+                "session_id": new_session_id,
+                "clarifying_questions": state.clarifying_questions
+            }
+
+        # Otherwise, create the scenario
+        created = await self.create_scenario_from_state(user, state)
+        # Clean up old session if present
+        if session_id and session_id in sessions:
+            del sessions[session_id]
+        return {
+            "status": "complete",
+            "scenario_id": created.scenario.id
+        }
+
+    def clear_clarification_session(self, session_id: str, user: AuthUser) -> None:
+        """Remove a stored clarification session, enforcing ownership."""
+        sessions: Dict[str, Any] = ScenarioService._clarification_sessions  # type: ignore[attr-defined]
+        if session_id in sessions:
+            if sessions[session_id].get("user_id") != user.id:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=403, detail="Not authorized")
+            del sessions[session_id]
+            return
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Session not found")
     
     def _build_scenario_analysis(self, state: ScenarioState) -> Dict[str, Any]:
         """Build scenario_analysis JSON from state"""
@@ -106,30 +191,43 @@ class ScenarioService:
         console_logger.info(f"Enhancing {len(voice_line_ids)} voice lines with feedback")
         
         try:
-            # Load voice lines via repository with RLS check
+            # Load voice lines with eager loading of relationships
             from app.repositories.voice_line_repository import VoiceLineRepository
-            voice_lines = await self.voice_line_repository.get_voice_lines_by_ids_with_user_check(
-                voice_line_ids, user.id_str
+            from app.models.voice_line_audio import VoiceLineAudio
+            from sqlalchemy.orm import selectinload
+            
+            # Query voice lines with all needed relationships
+            query = (
+                select(VoiceLine)
+                .join(Scenario)
+                .where(VoiceLine.id.in_(voice_line_ids))
+                .where(Scenario.user_id == user.id_str)
+                .options(
+                    selectinload(VoiceLine.audios),
+                    selectinload(VoiceLine.scenario)
+                )
+                .order_by(VoiceLine.order_index)
             )
+            result = await self.db_session.execute(query)
+            voice_lines = result.scalars().all()
             
             if not voice_lines:
                 raise ValueError("No voice lines found")
-            
-            # Check ownership
-            for vl in voice_lines:
-                if str(vl.scenario.user_id) != user.id_str:
-                    raise ValueError(f"Voice line {vl.id} does not belong to user")
             
             # Enhance each voice line
             successful_enhancements = []
             failed_enhancements = []
             
+            # Create TTSService instance once, outside the loop
+            tts_service = TTSService()
+            
             for voice_line in voice_lines:
+                original_text = voice_line.text
                 try:
                     # Use SingleLineEnhancer for individual lines
                     result = await SingleLineEnhancer.enhance(
                         voice_line_id=voice_line.id,
-                        original_text=voice_line.text,
+                        original_text=original_text,
                         voice_line_type=voice_line.type.value,
                         user_feedback=user_feedback,
                         scenario_analysis=voice_line.scenario.scenario_analysis
@@ -140,36 +238,59 @@ class ScenarioService:
                         voice_line.text = result["enhanced_text"]
                         
                         # Delete existing audio files
-                        for audio in voice_line.audios:
+                        # Query audios explicitly to avoid lazy loading
+                        audio_query = await self.db_session.execute(
+                            select(VoiceLineAudio).where(VoiceLineAudio.voice_line_id == voice_line.id)
+                        )
+                        audios = audio_query.scalars().all()
+                        
+                        for audio in audios:
                             if audio.storage_path:
-                                tts_service = TTSService()
                                 await tts_service.delete_audio_file(audio.storage_path)
                             await self.db_session.delete(audio)
                         
-                            successful_enhancements.append({
-                                "voice_line_id": voice_line.id,
-                            "new_text": result["enhanced_text"]
-                            })
+                        # Add to successful enhancements with proper schema
+                        successful_enhancements.append({
+                            "voice_line_id": voice_line.id,
+                            "original_text": original_text,
+                            "enhanced_text": result["enhanced_text"],
+                            "safety_passed": True,
+                            "safety_issues": []
+                        })
                     else:
+                        # Add to failed enhancements with proper schema
                         failed_enhancements.append({
                             "voice_line_id": voice_line.id,
-                            "reason": "Safety check failed"
+                            "original_text": original_text,
+                            "enhanced_text": None,
+                            "error": "Safety check failed",
+                            "safety_passed": False,
+                            "safety_issues": ["Content failed safety check"]
                         })
                         
                 except Exception as e:
                     console_logger.error(f"Failed to enhance voice line {voice_line.id}: {str(e)}")
                     failed_enhancements.append({
                         "voice_line_id": voice_line.id,
-                        "reason": str(e)
+                        "original_text": original_text,
+                        "enhanced_text": None,
+                        "error": str(e),
+                        "safety_passed": False,
+                        "safety_issues": []
                     })
             
             # Commit changes
             await self.db_session.commit()
             
+            # Return response matching VoiceLineEnhancementResponse schema
             return {
+                "success": len(successful_enhancements) > 0,
+                "total_processed": len(voice_lines),
+                "successful_count": len(successful_enhancements),
+                "failed_count": len(failed_enhancements),
                 "successful_enhancements": successful_enhancements,
                 "failed_enhancements": failed_enhancements,
-                "total_processed": len(voice_lines)
+                "user_feedback": user_feedback
             }
                 
         except Exception as e:
@@ -353,7 +474,7 @@ class ScenarioService:
         if voice_lines_payload:
             await self.voice_line_repository.add_voice_lines(scenario.id, voice_lines_payload)
         await self.db_session.commit()
-        await self.db_session.refresh(scenario)
+        scenario = await self.repository.get_scenario_by_id(scenario.id, user.id_str)
         return scenario
 
     async def _to_scenario_response(self, scenario: Scenario, include_audio: bool = False) -> ScenarioResponse:

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState
-from app.langchain.prompts.core_principles_en import (
+from app.langchain.prompts.core_principles import (
     DEADPAN_PRINCIPLES, 
     get_language_guidelines,
     GOOD_EXAMPLES
@@ -23,38 +23,44 @@ def get_type_instructions(voice_type: str) -> str:
     """Get specific instructions for each voice line type"""
     instructions = {
         "OPENING": """
-OPENING - First contact:
-- Introduce yourself (name/role/company)
-- State the reason for calling
-- Create mild time pressure
-- Use the target's name
-- Stay believable and professional
-""",
+            OPENING - First contact:
+            - Introduce yourself (name/role/company)
+            - State the reason for calling
+            - Create mild time pressure
+            - Use the target's name
+            - Stay believable and professional
+        """,
         "QUESTION": """
-QUESTION - Questions during conversation:
-- ONLY real QUESTIONS, no statements or explanations
-- Escalate from normal to absurd (last question should be absurd)
-- NO "Mr./Mrs. [Name]" in questions - it's unnatural
-- Ask absurd question deadpan: "What color is your front door?"
-- Blame weird questions on "the system"
-- Avoid repetition - each question different
-""",
+            QUESTION - Questions during conversation:
+            - ONLY real QUESTIONS, no statements or explanations
+            - Escalate from normal to absurd (last question should be absurd)
+            - Sparse "Mr./Mrs. [Name]" in questions - it's unnatural
+            - Ask absurd question deadpan: "What color is your front door?"
+            - Blame weird questions on "the system"
+            - Avoid repetition - each question different
+        """,
         "RESPONSE": """
-RESPONSE - Reactions to objections:
-- React to objections/questions
-- Stay in character
-- Blame problems on system/protocol
-- Get slightly annoyed at too many questions
-- Redirect back to main topic
-""",
+            RESPONSE - Reactions to objections:
+            - React to objections/questions
+            - Stay in character
+            - Blame problems on system/protocol
+            - Get slightly annoyed at too many questions
+            - Redirect back to main topic
+        """,
         "CLOSING": """
-CLOSING - End of conversation:
-- End politely but firmly
-- Mention the absurd thing casually again
-- Stay professional
-- Use the name for goodbye
-- Blame quick ending on other obligations
-"""
+            CLOSING - End of conversation:
+            - End politely but firmly
+            - Mention the absurd thing casually again
+            - Stay professional
+            - Use the name for goodbye
+            - Blame quick ending on other obligations
+        """,
+        "FILLER": """
+            FILLER - Natural pauses and fillers:
+            - Use natural pauses with "..." or fillers
+            - Stay in character, use 'yes' or 'no' or 'right' or 'okay'
+            - No repetition - each filler different
+        """
     }
     return instructions.get(voice_type, instructions["OPENING"])
 
@@ -72,26 +78,26 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         voice_context = f"\nCHARACTER VOICE: {state.analysis.voice_hints}"
     
     system_prompt = f"""
-{DEADPAN_PRINCIPLES}
+        {DEADPAN_PRINCIPLES}
 
-{get_language_guidelines(getattr(state.scenario_data.language, 'value', 'de'))}
+        {get_language_guidelines(getattr(state.scenario_data.language, 'value', 'de'))}
 
-You are {state.analysis.persona_name} from {state.analysis.company_service}.{voice_context}
-Your goals: {', '.join(state.analysis.conversation_goals)}
-Believable details: {', '.join(state.analysis.believability_anchors)}
-Escalation: {' → '.join(state.analysis.escalation_plan)}
+        You are {state.analysis.persona_name} from {state.analysis.company_service}.{voice_context}
+        Your goals: {', '.join(state.analysis.conversation_goals)}
+        Believable details: {', '.join(state.analysis.believability_anchors)}
+        Escalation: {' → '.join(state.analysis.escalation_plan)}
 
-{get_type_instructions(voice_type)}
+        {get_type_instructions(voice_type)}
 
-IMPORTANT RULES:
-- Short sentences (5-12 words)
-- No youth slang or obvious jokes
-- Maximum ONE absurd detail, delivered deadpan
-- Use natural pauses with "..." or fillers
-- ALWAYS stay in character
-- NO REPETITION - each line must be unique
-- Avoid excessive name usage (max 1x per type)
-"""
+        IMPORTANT RULES:
+        - Short sentences (5-12 words)
+        - No youth slang or obvious jokes
+        - Maximum ONE absurd detail, delivered deadpan
+        - Use natural pauses with "..." or fillers
+        - ALWAYS stay in character
+        - NO REPETITION - each line must be unique
+        - Avoid excessive name usage (max 1x per type)
+    """
 
     # Include relevant examples
     examples_text = ""
@@ -101,23 +107,23 @@ IMPORTANT RULES:
             examples_text += f"- {example}\n"
 
     user_prompt = """
-Generate {count} {voice_type} lines for a prank call.
+        Generate {count} {voice_type} lines for a prank call.
 
-Scenario: {title}
-Description: {description}
-Target Name: {target_name}
+        Scenario: {title}
+        Description: {description}
+        Target Name: {target_name}
 
-{examples_text}
+        {examples_text}
 
-Create {count} DIFFERENT variations.
-Return ONLY the spoken lines, no quotation marks.
-Each line should sound natural and believable.
-Generate in {language} language.
-"""
+        Create {count} DIFFERENT variations.
+        Return ONLY the spoken lines, no quotation marks.
+        Each line should sound natural and believable.
+        Generate in {language} language.
+    """
 
     llm = ChatOpenAI(
         model="gpt-4.1", 
-        temperature=0.4 if voice_type in ["OPENING", "CLOSING"] else 0.6
+        temperature=0.4 if voice_type in ["OPENING", "CLOSING", "FILLER"] else 0.6
     ).with_structured_output(GeneratorOutput)
     
     prompt = ChatPromptTemplate.from_messages([
@@ -161,7 +167,7 @@ async def generator_node(state: ScenarioState) -> dict:
     
     plain_lines = {}
     
-    for voice_type in ["OPENING", "QUESTION", "RESPONSE", "CLOSING"]:
+    for voice_type in ["OPENING", "QUESTION", "RESPONSE", "CLOSING", "FILLER"]:
         lines = await generate_for_type(state, voice_type)
         plain_lines[voice_type] = lines
     

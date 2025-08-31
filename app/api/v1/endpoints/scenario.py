@@ -16,9 +16,11 @@ import uuid
 
 router = APIRouter(tags=["scenario"])
 
-# Session store for clarification loops (should be Redis in production)
-sessions: Dict[str, Any] = {}
 
+
+# ################################################################################
+# PROCESS SCENARIO WITH CLARIFICATION SUPPORT
+# ################################################################################
 
 class ScenarioProcessRequest(BaseModel):
     """Request for processing a scenario with clarification support"""
@@ -59,125 +61,44 @@ async def process_scenario(
     2. Follow-up with session_id and clarifications → creates scenario
     """
     try:
-        # Import here to avoid circular dependency
-        from app.langchain import ScenarioProcessor, ScenarioState
-        
-        # Validate request
-        if not request.scenario and not request.session_id:
-            raise HTTPException(
-                status_code=400,
-                detail="Either 'scenario' or 'session_id' must be provided"
-            )
-        
-        processor = ScenarioProcessor()
-        
-        # Handle session continuation
-        if request.session_id and request.session_id in sessions:
-            console_logger.info(f"Continuing session {request.session_id}")
-            # Reconstruct state from stored dict
-            stored_state = sessions[request.session_id]["state"]
-            if isinstance(stored_state, dict):
-                state = ScenarioState(**stored_state)
-            else:
-                state = stored_state
-            
-            # Add clarifications if provided
-            if request.clarifications:
-                state.clarifications = request.clarifications
-                state.require_clarification = False
-        else:
-            # Create new session
-            if not request.scenario:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Scenario is required for new sessions"
-                )
-            
-            console_logger.info("Creating new session")
-            state = ScenarioState(
-                scenario_data=request.scenario,
-                require_clarification=True
-            )
-        
-        # Process the scenario
-        result = await processor.process(state)
-        
-        # Convert result to state if it's a dict
-        if isinstance(result, dict):
-            state = ScenarioState(**result)
-        else:
-            state = result
-        
-        # Check if clarification is needed
-        if state.require_clarification and state.clarifying_questions:
-            session_id = str(uuid.uuid4())
-            # Store state as dict to avoid serialization issues
-            sessions[session_id] = {
-                "state": state.model_dump() if hasattr(state, 'model_dump') else state,
-                "user_id": user.id
-            }
-            
-            return ScenarioProcessResponse(
-                status="needs_clarification",
-                session_id=session_id,
-                clarifying_questions=state.clarifying_questions
-            )
-        
-        # Processing complete - create scenario
-        # Create a fresh service instance to ensure proper async context
-        try:
-            scenario_service = ScenarioService(db_session)
-            scenario_response = await scenario_service.create_scenario_from_state(user, state)
-            
-            # Clean up session
-            if request.session_id in sessions:
-                del sessions[request.session_id]
-            
-            return ScenarioProcessResponse(
-                status="complete",
-                scenario_id=scenario_response.scenario.id
-            )
-        except Exception as e:
-            console_logger.error(f"Failed to create scenario: {str(e)}")
-            # Try to provide more specific error info
-            if "greenlet" in str(e).lower():
-                raise HTTPException(
-                    status_code=500,
-                    detail="Database connection error. Please try again."
-                )
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to create scenario: {str(e)}"
-            )
-        
+        service = ScenarioService(db_session)
+        result = await service.process_with_clarification_flow(
+            user=user,
+            scenario_data=request.scenario,
+            session_id=request.session_id,
+            clarifications=request.clarifications
+        )
+        return ScenarioProcessResponse(**result)
     except HTTPException:
         raise
     except Exception as e:
         console_logger.error(f"Processing failed: {str(e)}")
-        return ScenarioProcessResponse(
-            status="error",
-            error=str(e)
-        )
+        return ScenarioProcessResponse(status="error", error=str(e))
+    
 
 
-@router.post("/", response_model=ScenarioCreateResponse)
-async def create_scenario(
-    scenario_create_request: ScenarioCreateRequest = Body(...),
+@router.post("/voice-lines/enhance", response_model=VoiceLineEnhancementResponse)
+async def enhance_voice_lines(
+    request: VoiceLineEnhancementRequest = Body(...),
     user: AuthUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
-) -> ScenarioCreateResponse:
-    """
-    Create a new scenario (direct, no clarification support)
-    
-    For backward compatibility - processes immediately without clarification loop
-    """
+) -> VoiceLineEnhancementResponse:
+    """Enhance multiple voice lines with user feedback"""
     try:
         scenario_service = ScenarioService(db_session)
-        result = await scenario_service.create_scenario(user, scenario_create_request)
-        return result
+        result = await scenario_service.enhance_voice_lines_with_feedback(
+            user, request.voice_line_ids, request.user_feedback
+        )
+        return VoiceLineEnhancementResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create scenario: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to enhance voice lines: {str(e)}")
 
+
+# ################################################################################
+# RETRIEVE SCENARIOS
+# ################################################################################
 
 @router.get("/{scenario_id}", response_model=ScenarioResponse)
 async def get_scenario(
@@ -212,23 +133,6 @@ async def get_user_scenarios(
         raise HTTPException(status_code=500, detail=f"Failed to get scenarios: {str(e)}")
 
 
-@router.post("/voice-lines/enhance", response_model=VoiceLineEnhancementResponse)
-async def enhance_voice_lines(
-    request: VoiceLineEnhancementRequest = Body(...),
-    user: AuthUser = Depends(get_current_user),
-    db_session: AsyncSession = Depends(get_db_session),
-) -> VoiceLineEnhancementResponse:
-    """Enhance multiple voice lines with user feedback"""
-    try:
-        scenario_service = ScenarioService(db_session)
-        result = await scenario_service.enhance_voice_lines_with_feedback(
-            user, request.voice_line_ids, request.user_feedback
-        )
-        return VoiceLineEnhancementResponse(**result)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to enhance voice lines: {str(e)}")
 
 
 class EnhanceScenarioRequest(BaseModel):
@@ -286,14 +190,10 @@ async def update_scenario_preferred_voice(
 @router.delete("/sessions/{session_id}")
 async def clear_session(
     session_id: str,
-    user: AuthUser = Depends(get_current_user)
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session)
 ) -> Dict[str, str]:
     """Clear a clarification session"""
-    if session_id in sessions:
-        # Verify ownership
-        if sessions[session_id]["user_id"] != user.id:
-            raise HTTPException(status_code=403, detail="Not authorized")
-        del sessions[session_id]
-        return {"message": f"Session {session_id} cleared"}
-    else:
-        raise HTTPException(status_code=404, detail="Session not found")
+    service = ScenarioService(db_session)
+    service.clear_clarification_session(session_id, user)
+    return {"message": f"Session {session_id} cleared"}

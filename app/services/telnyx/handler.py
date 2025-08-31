@@ -1,12 +1,7 @@
-import io 
-import base64 
-import audioop 
 import asyncio 
 import json 
-from typing import Optional, Dict
+from typing import Dict
 from fastapi import WebSocket, WebSocketDisconnect
-from pydub import AudioSegment 
-
 
 from typing import Tuple
 
@@ -122,6 +117,7 @@ class TelnyxHandler:
 
         elif event_type == "call.answered":
             if session and session.conference_name:
+                pass
                 await self._client.start_media_stream(call_control_id)  
 
         elif event_type == "call.hangup":

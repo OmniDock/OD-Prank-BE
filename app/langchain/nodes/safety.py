@@ -45,53 +45,53 @@ async def safety_node(state: ScenarioState) -> dict:
         }
     
     system_prompt = """
-You are a safety expert for prank call content.
+        You are a safety expert for prank call content.
 
-HARD BLOCK (is_safe=false, recommendation="reject") for:
-- Illegal activities, real threats, actual fraud
-- Requests for REAL sensitive data (passwords, credit cards, bank details)
-- Hate speech, discrimination, harassment
-- Doxxing or publishing private data
-- Content that could cause real financial or physical harm
+        HARD BLOCK (is_safe=false, recommendation="reject") for:
+        - Illegal activities, real threats, actual fraud
+        - Requests for REAL sensitive data (passwords, credit cards, bank details)
+        - Hate speech, discrimination, harassment
+        - Doxxing or publishing private data
+        - Content that could cause real financial or physical harm
 
-ALLOWED for prank calls:
-- Pretending to be delivery services/support (as long as no money/password requests)
-- Absurd questions (door color, tape color, duck tape, glitter tape) are HARMLESS and ALLOWED
-- Confusion is OK as long as respectful
-- Address CONFIRMATION is EXPLICITLY ALLOWED (asking "Can you confirm your address?" is SAFE)
-- DO NOT BLOCK address confirmation - it's a standard service question
-- Asking about package contents is OK (as long as not about value/credit cards)
+        ALLOWED for prank calls:
+        - Pretending to be delivery services/support (as long as no money/password requests)
+        - Absurd questions (door color, tape color, duck tape, glitter tape) are HARMLESS and ALLOWED
+        - Confusion is OK as long as respectful
+        - Address CONFIRMATION is EXPLICITLY ALLOWED (asking "Can you confirm your address?" is SAFE)
+        - DO NOT BLOCK address confirmation - it's a standard service question
+        - Asking about package contents is OK (as long as not about value/credit cards)
 
-RECOMMEND MODIFICATION (is_safe=true, recommendation="modify") for:
-- Borderline language
-- Too personal questions
-- Ambiguous statements
+        RECOMMEND MODIFICATION (is_safe=true, recommendation="modify") for:
+        - Borderline language
+        - Too personal questions
+        - Ambiguous statements
 
-ALLOW (is_safe=true, recommendation="allow") when:
-- Harmless, playful prank
-- No real harm possible
-- Respectful interaction
+        ALLOW (is_safe=true, recommendation="allow") when:
+        - Harmless, playful prank
+        - No real harm possible
+        - Respectful interaction
 
-Be STRICT but FAIR. Only block real dangers.
-"""
+        Be STRICT but FAIR. Only block real dangers.
+    """
 
     user_prompt = """
-Check these prank call lines for safety:
+        Check these prank call lines for safety:
 
-{lines_text}
+        {lines_text}
 
-Context:
-- Scenario: {title}
-- Description: {description}
-- Target Name: {target_name}
+        Context:
+        - Scenario: {title}
+        - Description: {description}
+        - Target Name: {target_name}
 
-Evaluate:
-1. is_safe: true/false
-2. issues: List of problems (if any)
-3. recommendation: allow/modify/review/reject
-4. reasoning: Brief justification
-5. confidence: 0.0-1.0
-"""
+        Evaluate:
+        1. is_safe: true/false
+        2. issues: List of problems (if any)
+        3. recommendation: allow/modify/review/reject
+        4. reasoning: Brief justification
+        5. confidence: 0.0-1.0
+    """
 
     lines_text = "\n".join([f"- {line}" for line in all_lines])
     

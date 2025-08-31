@@ -1,4 +1,3 @@
-import base64
 from pydantic import Field, ConfigDict
 from pydantic_settings import BaseSettings
 from typing import List

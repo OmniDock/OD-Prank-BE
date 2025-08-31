@@ -7,8 +7,6 @@ from uuid import UUID
 
 security = HTTPBearer()
 
-from app.core.logging import console_logger
-
 class AuthUser:
     """Represents an authenticated user from Supabase"""
     def __init__(self, user_id: str, email: str = None, metadata: dict = None):

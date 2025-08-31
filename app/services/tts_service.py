@@ -7,7 +7,8 @@ from app.core.logging import console_logger
 import uuid
 from typing import Optional, Tuple, Dict
 from datetime import datetime, timezone
-from app.core.utils.enums import ElevenLabsModelEnum, ElevenLabsVoiceIdEnum, LanguageEnum, GenderEnum, get_voice_id
+from app.core.utils.enums import ElevenLabsModelEnum, ElevenLabsVoiceIdEnum, LanguageEnum, GenderEnum
+from app.core.utils.voices_catalog import get_voice_id
 import hashlib
 import json
 import re
