@@ -5,6 +5,7 @@ from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
 from app.services.tts_service import TTSService
 from app.repositories.scenario_repository import ScenarioRepository
+from app.repositories.voice_line_repository import VoiceLineRepository
 from app.core.utils.enums import VoiceLineAudioStatusEnum, ElevenLabsModelEnum
 from app.core.config import settings
 from app.core.utils.voices_catalog import get_voices_catalog, PREVIEW_VERSION
@@ -112,7 +113,7 @@ async def generate_single_voice_line(
     """Generate TTS audio for a single voice line"""
     try:
         # Verify user owns the voice line
-        repository = ScenarioRepository(db_session)
+        repository = VoiceLineRepository(db_session)
         voice_line = await repository.get_voice_line_by_id_with_user_check(request.voice_line_id, user.id_str)
         
         if not voice_line:
@@ -222,11 +223,12 @@ async def generate_batch_voice_lines(
 ):
     """Generate TTS audio for multiple voice lines"""
     try:
-        repository = ScenarioRepository(db_session)
+        scenario_repo = ScenarioRepository(db_session)
+        voice_line_repo = VoiceLineRepository(db_session)
         tts_service = TTSService()
         
         # Verify user owns all voice lines
-        voice_lines = await repository.get_voice_lines_by_ids_with_user_check(
+        voice_lines = await voice_line_repo.get_voice_lines_by_ids_with_user_check(
             request.voice_line_ids, user.id
         )
         
@@ -352,7 +354,7 @@ async def generate_batch_voice_lines(
     except HTTPException:
         raise
     except Exception as e:
-        await repository.rollback()
+        await scenario_repo.rollback()
         raise HTTPException(status_code=500, detail=f"Batch TTS generation failed: {str(e)}")
 
 @router.post("/generate/scenario", response_model=TTSResponse)
@@ -364,15 +366,16 @@ async def generate_scenario_voice_lines(
 ):
     """Generate TTS audio for all voice lines in a scenario"""
     try:
-        repository = ScenarioRepository(db_session)
+        scenario_repo = ScenarioRepository(db_session)
+        voice_line_repo = VoiceLineRepository(db_session)
         
         # Verify user owns the scenario
-        scenario = await repository.get_scenario_by_id(request.scenario_id, user.id_str)
+        scenario = await scenario_repo.get_scenario_by_id(request.scenario_id, user.id_str)
         if not scenario:
             raise HTTPException(status_code=404, detail="Scenario not found or access denied")
         
         # Get all voice lines for the scenario
-        voice_lines = await repository.get_voice_lines_by_scenario_id(request.scenario_id)
+        voice_lines = await voice_line_repo.get_voice_lines_by_scenario_id(request.scenario_id)
         
         if not voice_lines:
             raise HTTPException(status_code=404, detail="No voice lines found for this scenario")
@@ -493,7 +496,7 @@ async def generate_scenario_voice_lines(
     except HTTPException:
         raise
     except Exception as e:
-        await repository.rollback()
+        await scenario_repo.rollback()
         raise HTTPException(status_code=500, detail=f"Scenario TTS generation failed: {str(e)}")
 
 @router.post("/regenerate", response_model=TTSResult)
@@ -505,7 +508,7 @@ async def regenerate_voice_line_audio(
 ):
     """Regenerate TTS audio for a voice line (replaces existing audio)"""
     try:
-        repository = ScenarioRepository(db_session)
+        repository = VoiceLineRepository(db_session)
         
         # Verify user owns the voice line and get current storage info
         voice_line = await repository.get_voice_line_by_id_with_user_check(request.voice_line_id, user.id_str)
@@ -614,7 +617,7 @@ async def get_voice_line_audio_url(
     """Get a fresh signed URL for accessing voice line audio"""
     try:
 
-        repository = ScenarioRepository(db_session)
+        repository = VoiceLineRepository(db_session)
         voice_line = await repository.get_voice_line_by_id_with_user_check(voice_line_id, user.id_str)
         
         if not voice_line:

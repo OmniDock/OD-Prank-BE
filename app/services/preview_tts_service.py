@@ -1,10 +1,9 @@
 from typing import List, Optional, Dict, Any
-from supabase import create_client, Client
 from app.core.config import settings
 from app.core.logging import console_logger
-from app.core.utils.enums import ElevenLabsModelEnum
+from app.core.utils.enums import ElevenLabsModelEnum, LanguageEnum, GenderEnum
 from app.services.tts_service import TTSService
-from app.core.utils.voices_catalog import PREVIEW_VERSION
+from app.core.utils.voices_catalog import PREVIEW_VERSION, get_voices_catalog
 import io
 import wave
 
@@ -20,30 +19,42 @@ class PreviewTTSService:
     """
 
     def __init__(self) -> None:
-        self.bucket_name = "voice-lines"
+        # Reuse TTSService client and storage
+        self.tts_service = TTSService()
+        self.bucket_name = self.tts_service.bucket_name
         self.public_prefix = f"public/voice-previews/{PREVIEW_VERSION}"
         
-        # Longer, expressive prank-call style previews with textual cues (eleven_v3)
-        self.preview_text_default_en = (
+        # Longer preview texts; language + gender variants
+        # EN male
+        self.preview_text_en_male = (
             "[exhales] Hey there! Giuseppe from WiFi Support. [confused] Your internet is... "
             "acting really weird right now. [whispers] Quick question though... "
             "[curious] do you guys like pineapple pizza? [slight accent] Mama mia, "
             "[laughs] that's important for the... uh... connection quality!"
         )
-        
-        self.preview_text_default_de = (
+        # EN female
+        self.preview_text_en_female = (
+            "[exhales] Hey there! Valentina from WiFi Support. [confused] Your internet is... "
+            "acting really weird right now. [whispers] Quick question though... "
+            "[curious] do you guys like pineapple pizza? [slight accent] Mama mia, "
+            "[laughs] that's important for the... uh... connection quality!"
+        )
+        # DE male
+        self.preview_text_de_male = (
             "[sighs] Hallo! Giuseppe hier von der Technik. [confused] Ihr Internet macht "
             "gerade echt komische Sachen. [whispers] Aber mal ehrlich... "
             "[curious] mögt ihr eigentlich Ananas-Pizza? [slight accent] Madonna mia, "
             "[laughs] das ist wichtig für die... äh... Verbindungsqualität!"
         )
-
-        # Storage and TTS
-        self.storage_client: Client = create_client(
-            settings.SUPABASE_URL,
-            settings.SUPABASE_SERVICE_ROLE_KEY,
+        # DE female
+        self.preview_text_de_female = (
+            "[sighs] Hallo! Valentina hier von der Technik. [confused] Ihr Internet macht "
+            "gerade echt komische Sachen. [whispers] Aber mal ehrlich... "
+            "[curious] mögt ihr eigentlich Ananas-Pizza? [slight accent] Madonna mia, "
+            "[laughs] das ist wichtig für die... äh... Verbindungsqualität!"
         )
-        self.tts_service = TTSService()
+
+        # Storage is reused from TTSService
 
     def _pcm16_to_wav(self, pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1) -> bytes:
         buf = io.BytesIO()
@@ -63,7 +74,7 @@ class PreviewTTSService:
             # List the directory and check for the file name
             # Example: path = "public/voice-previews/VOICEID.wav"
             directory, file_name = path.rsplit("/", 1)
-            items = self.storage_client.storage.from_(self.bucket_name).list(directory)
+            items = self.tts_service.storage_client.storage.from_(self.bucket_name).list(directory)
             for item in items or []:
                 # Supabase client may return dicts or objects; handle both
                 name = getattr(item, "name", None) if not isinstance(item, dict) else item.get("name")
@@ -74,22 +85,29 @@ class PreviewTTSService:
             console_logger.warning(f"Failed to check existence for {path}: {e}")
             return False
 
-    def preview_voice_settings(self) -> Dict[str, Any]:
-        """More expressive defaults for previews with eleven_v3."""
-        return {
-            "stability": 0.5,            
-            "similarity_boost": 0.75,    
-            "style": 0.0,                
-            "speed": 1.02,               
-            "use_speaker_boost": True,
-        }
+    def _validate_language_and_gender(self, voice_id: str) -> Optional[Dict[str, Any]]:
+        """Ensure the catalog entry exists and includes language and gender."""
+        catalog = get_voices_catalog()
+        item = next((v for v in catalog if v.get("id") == voice_id), None)
+        if not item:
+            console_logger.warning(f"Preview skipped: voice {voice_id} not in catalog")
+            return None
+        langs = item.get("languages") or []
+        gender = item.get("gender")
+        if not langs or not isinstance(langs[0], LanguageEnum):
+            console_logger.warning(f"Preview skipped: missing/invalid language for voice {voice_id}")
+            return None
+        if gender not in (GenderEnum.MALE, GenderEnum.FEMALE):
+            console_logger.warning(f"Preview skipped: missing/invalid gender for voice {voice_id}")
+            return None
+        return item
 
     async def _generate_preview_bytes(self, voice_id: str, preview_text: Optional[str] = None) -> bytes:
         text = preview_text or self.preview_text_default_en
-        # Always use v3 as agreed
+        # Always use v3
         model = ElevenLabsModelEnum.ELEVEN_TTV_V3
-        # Use expressive preview voice settings
-        vs = self.preview_voice_settings()
+        # Reuse standard service settings to keep one ElevenLabs config
+        vs = self.tts_service.default_voice_settings()
         audio_bytes = await self.tts_service.generate_audio(
             text=text,
             voice_id=voice_id,
@@ -100,7 +118,7 @@ class PreviewTTSService:
 
     def _upload_public(self, path: str, data: bytes) -> bool:
         try:
-            res = self.storage_client.storage.from_(self.bucket_name).upload(
+            res = self.tts_service.storage_client.storage.from_(self.bucket_name).upload(
                 path=path,
                 file=data,
                 file_options={
@@ -125,8 +143,17 @@ class PreviewTTSService:
                 path = f"{self.public_prefix}/{vid}.wav"
                 if self._object_exists(path):
                     continue
+                # Validate language and gender using catalog
+                item = self._validate_language_and_gender(vid)
+                if not item:
+                    continue
+                # Select text by language + gender
+                langs = item.get("languages") or []
+                primary_lang = langs[0] if langs else None
+                gender = item.get("gender")
+                chosen_text = preview_text or self._preview_text_for(primary_lang, gender)
                 console_logger.info(f"Generating preview for voice {vid}")
-                audio_bytes = await self._generate_preview_bytes(vid, preview_text)
+                audio_bytes = await self._generate_preview_bytes(vid, chosen_text)
                 wav_bytes = self._pcm16_to_wav(audio_bytes)
                 ok = self._upload_public(path, wav_bytes)
                 if not ok:
@@ -138,15 +165,18 @@ class PreviewTTSService:
         path = f"{self.public_prefix}/{voice_id}.wav"
         return self._public_url(path)
 
-    def _preview_text_for_language(self, primary_language) -> str:
+    def _preview_text_for(self, primary_language, gender) -> str:
         try:
-            from app.core.utils.enums import LanguageEnum
             if primary_language == LanguageEnum.GERMAN:
-                return self.preview_text_default_de
+                if gender == GenderEnum.FEMALE:
+                    return self.preview_text_de_female
+                return self.preview_text_de_male
             # Default English for unknowns/others
-            return self.preview_text_default_en
+            if gender == GenderEnum.FEMALE:
+                return self.preview_text_en_female
+            return self.preview_text_en_male
         except Exception:
-            return self.preview_text_default_en
+            return self.preview_text_en_male
 
     async def ensure_previews_for_catalog(self, voices_catalog: List[Dict[str, Any]]) -> None:
         """Ensure previews using primary language (first in languages list) per voice.
@@ -156,8 +186,12 @@ class PreviewTTSService:
         for item in voices_catalog:
             vid = item.get("id")
             langs = item.get("languages") or []
+            gender = item.get("gender")
+            if not langs or not isinstance(langs[0], LanguageEnum) or gender not in (GenderEnum.MALE, GenderEnum.FEMALE):
+                console_logger.warning(f"Skipping preview for {vid}: invalid language/gender metadata")
+                continue
             primary_lang = langs[0] if langs else None
-            text = self._preview_text_for_language(primary_lang)
+            text = self._preview_text_for(primary_lang, gender)
             try:
                 path = f"{self.public_prefix}/{vid}.wav"
                 if self._object_exists(path):

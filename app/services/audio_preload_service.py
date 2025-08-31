@@ -1,6 +1,5 @@
 # OD-Prank-BE/app/services/audio_preload_service.py
-import aiohttp
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any
 from datetime import datetime, timedelta
 import gc
 from dataclasses import dataclass
@@ -9,7 +8,6 @@ from app.core.database import AsyncSession
 from app.repositories.scenario_repository import ScenarioRepository
 from app.services.tts_service import TTSService
 from app.models.voice_line import VoiceLine
-from app.models.voice_line_audio import VoiceLineAudio
 from app.core.utils.enums import VoiceLineTypeEnum, VoiceLineAudioStatusEnum
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -25,9 +23,6 @@ class PreloadedAudio:
     duration_ms: Optional[int]
     storage_path: str
     
-
-
-
 class AudioPreloadService:
     """Service to preload and manage MP3 files in memory for quick prank call access"""
     
