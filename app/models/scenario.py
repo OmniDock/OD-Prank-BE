@@ -21,6 +21,13 @@ class Scenario(Base, TimestampMixin):
 
     # Scenario analysis from LangChain processing (stored as JSON)
     scenario_analysis: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    
+    # Clarification fields (for V2 LangChain)
+    clarifying_questions: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    clarifications: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    
+    # Quality tracking
+    was_rewritten: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     is_safe: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_not_safe_reason: Mapped[str] = mapped_column(Text, nullable=True)

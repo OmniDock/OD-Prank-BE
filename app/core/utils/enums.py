@@ -38,6 +38,12 @@ class ElevenLabsVoiceIdEnum(enum.Enum):
 
     MALE_MARK = "UgBBYS2sOqTuMpoF3BR0"
 
+
+    # SEBASTIANS NEW FAVORITE
+    MARTIN_R_PRO = "a5qh6GnXXXlZQrD05l99"
+    TIMO = "LiBuTwmXQ5kpwE9fvUP3"
+
+
 class ElevenLabsModelEnum(enum.Enum):
     """ElevenLabs model options"""
     MULTILINGUAL_V2 = "eleven_multilingual_v2"        # Good quality, 29 languages  

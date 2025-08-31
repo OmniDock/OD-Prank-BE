@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select, and_
 from typing import List, Optional
+from uuid import UUID
 from app.models.scenario import Scenario
 from app.models.voice_line import VoiceLine
 from app.models.voice_line_audio import VoiceLineAudio
@@ -48,8 +49,12 @@ class ScenarioRepository:
         console_logger.info(f"Added {len(voice_lines)} voice lines")
         return voice_lines
     
-    async def get_scenario_by_id(self, scenario_id: int, user_id: str) -> Optional[Scenario]:
+    async def get_scenario_by_id(self, scenario_id: int, user_id: str | UUID) -> Optional[Scenario]:
         """Get a scenario by ID with voice lines and preferred voice audios (with RLS check)"""
+        # Convert string to UUID if needed for database comparison
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
+        
         # First, get the scenario with voice lines
         query = (
             select(Scenario)
@@ -98,8 +103,12 @@ class ScenarioRepository:
         
         return scenario
     
-    async def get_user_scenarios(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Scenario]:
+    async def get_user_scenarios(self, user_id: str | UUID, limit: int = 50, offset: int = 0) -> List[Scenario]:
         """Get scenarios for a user"""
+        # Convert string to UUID if needed
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
+        
         query = (
             select(Scenario)
             .options(selectinload(Scenario.voice_lines))
@@ -172,8 +181,12 @@ class ScenarioRepository:
         loaded_scenario = reloaded.scalar_one_or_none()
         return loaded_scenario or scenario
 
-    async def get_voice_line_by_id_with_user_check(self, voice_line_id: int, user_id: str) -> Optional[VoiceLine]:
+    async def get_voice_line_by_id_with_user_check(self, voice_line_id: int, user_id: str | UUID) -> Optional[VoiceLine]:
         """Get a voice line by ID with RLS check through scenario"""
+        # Convert string to UUID if needed
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
+        
         console_logger.info(f"Getting voice line {voice_line_id} for user {user_id}")
         
         query = (

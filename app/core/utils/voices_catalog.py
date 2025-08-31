@@ -12,27 +12,6 @@ PREVIEW_VERSION = "v8"
 # Each item: id, name, description, languages (order matters; first is primary), gender
 VOICES_CATALOG: List[Dict[str, Any]] = [
     {
-        "id": ElevenLabsVoiceIdEnum.ENGLISH_MALE_JARNATHAN.value,
-        "name": "Jarnathan",
-        "description": "Well-rounded, young American voice",
-        "languages": [LanguageEnum.ENGLISH],
-        "gender": GenderEnum.MALE,
-    },
-    {
-        "id": ElevenLabsVoiceIdEnum.ENGLISH_FEMALE_CHELSEA.value,
-        "name": "Chelsea",
-        "description": "Pleasant, British, engaging",
-        "languages": [LanguageEnum.ENGLISH],
-        "gender": GenderEnum.FEMALE,
-    },
-    {
-        "id": ElevenLabsVoiceIdEnum.GERMAN_MALE_FELIX.value,
-        "name": "Felix",
-        "description": "Strong, documentary style",
-        "languages": [LanguageEnum.GERMAN],
-        "gender": GenderEnum.MALE,
-    },
-    {
         "id": ElevenLabsVoiceIdEnum.GERMAN_FEMALE_SUSI.value,
         "name": "Susi",
         "description": "Soft, news presenter style",
@@ -40,31 +19,17 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "gender": GenderEnum.FEMALE,
     },
     {
-        "id": ElevenLabsVoiceIdEnum.GERMAN_MALE_SIMON.value,
-        "name": "Simon",
-        "description": "Young, Conversational",
+        "id": ElevenLabsVoiceIdEnum.MARTIN_R_PRO.value,
+        "name": "Martin",
+        "description": "-",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
     },
     {
-        "id": ElevenLabsVoiceIdEnum.GERMAN_FEMALE_LAURA.value,
-        "name": "Laura",
-        "description": "Young, Conversational",
+        "id": ElevenLabsVoiceIdEnum.TIMO.value,
+        "name": "Timo",
+        "description": "-",
         "languages": [LanguageEnum.GERMAN],
-        "gender": GenderEnum.FEMALE,
-    },
-    {
-        "id": ElevenLabsVoiceIdEnum.MALE_MARK.value,
-        "name": "Mark",
-        "description": "Young, Conversational",
-        "languages": [LanguageEnum.GERMAN, LanguageEnum.ENGLISH],
-        "gender": GenderEnum.MALE,
-    },
-    {
-        "id": ElevenLabsVoiceIdEnum.ENGLISH_MALE_YASH.value,
-        "name": "Yash",
-        "description": "Young, Conversational",
-        "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.MALE,
     },
 ]

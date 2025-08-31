@@ -113,7 +113,7 @@ async def generate_single_voice_line(
     try:
         # Verify user owns the voice line
         repository = ScenarioRepository(db_session)
-        voice_line = await repository.get_voice_line_by_id_with_user_check(request.voice_line_id, user.id)
+        voice_line = await repository.get_voice_line_by_id_with_user_check(request.voice_line_id, user.id_str)
         
         if not voice_line:
             raise HTTPException(status_code=404, detail="Voice line not found or access denied")
@@ -192,7 +192,7 @@ async def generate_single_voice_line(
         background_tasks.add_task(
             background_generate_and_store_audio,
             voice_line_id=request.voice_line_id,
-            user_id=str(user.id),
+            user_id=user.id_str,
             text=voice_line.text,
             voice_id=selected_voice_id,
             model=forced_model,
@@ -314,7 +314,7 @@ async def generate_batch_voice_lines(
                 background_tasks.add_task(
                     background_generate_and_store_audio,
                     voice_line_id=voice_line.id,
-                    user_id=str(user.id),
+                    user_id=user.id_str,
                     text=voice_line.text,
                     voice_id=selected_voice_id,
                     model=forced_model,
@@ -367,7 +367,7 @@ async def generate_scenario_voice_lines(
         repository = ScenarioRepository(db_session)
         
         # Verify user owns the scenario
-        scenario = await repository.get_scenario_by_id(request.scenario_id, user.id)
+        scenario = await repository.get_scenario_by_id(request.scenario_id, user.id_str)
         if not scenario:
             raise HTTPException(status_code=404, detail="Scenario not found or access denied")
         
@@ -455,7 +455,7 @@ async def generate_scenario_voice_lines(
                 background_tasks.add_task(
                     background_generate_and_store_audio,
                     voice_line_id=voice_line.id,
-                    user_id=str(user.id),
+                    user_id=user.id_str,
                     text=voice_line.text,
                     voice_id=selected_voice_id,
                     model=forced_model,
@@ -508,7 +508,7 @@ async def regenerate_voice_line_audio(
         repository = ScenarioRepository(db_session)
         
         # Verify user owns the voice line and get current storage info
-        voice_line = await repository.get_voice_line_by_id_with_user_check(request.voice_line_id, user.id)
+        voice_line = await repository.get_voice_line_by_id_with_user_check(request.voice_line_id, user.id_str)
         
         if not voice_line:
             raise HTTPException(status_code=404, detail="Voice line not found or access denied")
@@ -581,7 +581,7 @@ async def regenerate_voice_line_audio(
         background_tasks.add_task(
             background_generate_and_store_audio,
             voice_line_id=request.voice_line_id,
-            user_id=str(user.id),
+            user_id=user.id_str,
             text=voice_line.text,
             voice_id=selected_voice_id,
             model=forced_model,
@@ -615,7 +615,7 @@ async def get_voice_line_audio_url(
     try:
 
         repository = ScenarioRepository(db_session)
-        voice_line = await repository.get_voice_line_by_id_with_user_check(voice_line_id, user.id)
+        voice_line = await repository.get_voice_line_by_id_with_user_check(voice_line_id, user.id_str)
         
         if not voice_line:
             raise HTTPException(status_code=404, detail="Voice line not found or access denied")

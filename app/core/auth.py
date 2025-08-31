@@ -14,6 +14,7 @@ class AuthUser:
     def __init__(self, user_id: str, email: str = None, metadata: dict = None):
         try:
             self.id = UUID(user_id) if isinstance(user_id, str) else user_id
+            self.id_str = str(self.id)  # Always have string version available
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
