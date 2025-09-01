@@ -139,6 +139,8 @@ class ScenarioRepository:
             return None
         scenario.preferred_voice_id = preferred_voice_id
         await self.db_session.flush()
+        # Ensure the change persists beyond this request
+        await self.db_session.commit()
         
         # Re-load scenario with eager-loaded voice_lines to avoid MissingGreenlet during serialization
         reload_query = (
