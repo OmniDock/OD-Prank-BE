@@ -40,7 +40,7 @@ async def background_generate_and_store_audio(
         async for db_session in get_db_session():
             try:
                 tts_service = TTSService()
-                
+
                 # Generate and store audio
                 success, signed_url, storage_path, error_msg = await tts_service.generate_and_store_audio(
                     text=text,
@@ -50,29 +50,59 @@ async def background_generate_and_store_audio(
                     model=model,
                     voice_settings=voice_settings,
                 )
-                
+
+                # Load the existing PENDING record to update status
+                pending_result = await db_session.execute(
+                    select(VoiceLineAudio).where(
+                        VoiceLineAudio.voice_line_id == voice_line_id,
+                        VoiceLineAudio.content_hash == content_hash,
+                        VoiceLineAudio.status == VoiceLineAudioStatusEnum.PENDING,
+                    ).limit(1)
+                )
+                pending: VoiceLineAudio | None = pending_result.scalar_one_or_none()
+
                 if success and storage_path:
-                    # Create and persist the audio record
-                    asset = VoiceLineAudio(
-                        voice_line_id=voice_line_id,
-                        voice_id=voice_id,
-                        model_id=model,
-                        voice_settings=voice_settings,
-                        storage_path=storage_path,
-                        duration_ms=None,
-                        size_bytes=None,
-                        text_hash=tts_service.compute_text_hash(text),
-                        settings_hash=tts_service.compute_settings_hash(voice_id, model, voice_settings),
-                        content_hash=content_hash,
-                        status=VoiceLineAudioStatusEnum.READY,
-                    )
-                    
-                    db_session.add(asset)
-                    await db_session.commit()
-                    console_logger.info(f"Background TTS generation completed successfully for voice line {voice_line_id}")
+                    if pending:
+                        # Update existing PENDING to READY
+                        pending.storage_path = storage_path
+                        pending.status = VoiceLineAudioStatusEnum.READY
+                        pending.error = None
+                        # Ensure metadata is consistent
+                        pending.voice_id = voice_id
+                        pending.model_id = model
+                        pending.voice_settings = voice_settings
+                        pending.text_hash = tts_service.compute_text_hash(text)
+                        pending.settings_hash = tts_service.compute_settings_hash(voice_id, model, voice_settings)
+                        await db_session.commit()
+                        console_logger.info(f"Background TTS generation completed for voice line {voice_line_id} (updated PENDING->READY)")
+                    else:
+                        # Fallback: no PENDING found, create a fresh READY record
+                        asset = VoiceLineAudio(
+                            voice_line_id=voice_line_id,
+                            voice_id=voice_id,
+                            model_id=model,
+                            voice_settings=voice_settings,
+                            storage_path=storage_path,
+                            duration_ms=None,
+                            size_bytes=None,
+                            text_hash=tts_service.compute_text_hash(text),
+                            settings_hash=tts_service.compute_settings_hash(voice_id, model, voice_settings),
+                            content_hash=content_hash,
+                            status=VoiceLineAudioStatusEnum.READY,
+                        )
+                        db_session.add(asset)
+                        await db_session.commit()
+                        console_logger.info(f"Background TTS generation completed for voice line {voice_line_id} (created READY)")
                 else:
-                    console_logger.error(f"Background TTS generation failed for voice line {voice_line_id}: {error_msg}")
-                    
+                    # Mark PENDING as FAILED with error details
+                    if pending:
+                        pending.status = VoiceLineAudioStatusEnum.FAILED
+                        pending.error = error_msg or "TTS generation failed"
+                        await db_session.commit()
+                        console_logger.error(f"Background TTS generation failed for voice line {voice_line_id}: {error_msg}")
+                    else:
+                        console_logger.error(f"Background TTS generation failed and no PENDING record found for voice line {voice_line_id}: {error_msg}")
+
             except Exception as e:
                 console_logger.error(f"Background TTS generation error for voice line {voice_line_id}: {str(e)}")
                 await db_session.rollback()

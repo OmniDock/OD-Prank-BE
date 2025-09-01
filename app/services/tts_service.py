@@ -15,10 +15,17 @@ import re
 import asyncio
 import wave 
 import io 
+import os
+import random
 
 
 class TTSService: 
     """Unified TTS generation and storage service with user-dependent private storage"""
+
+    # Process-wide concurrency gate for ElevenLabs TTS (simple in-process queue)
+    # Tune via ELEVENLABS_MAX_CONCURRENCY env var; defaults to 2 (e.g., Free plan)
+    _MAX_CONCURRENCY = int(os.getenv("ELEVENLABS_MAX_CONCURRENCY", "8"))
+    _SEM = asyncio.Semaphore(_MAX_CONCURRENCY)
 
     def __init__(self):
         # ElevenLabs client
@@ -101,7 +108,7 @@ class TTSService:
         try:
             # Determine voice ID
             selected_voice_id = self.select_voice_id(voice_id)
- 
+
             vs_dict = voice_settings or self.default_voice_settings()
 
             def _convert_sync() -> bytes:
@@ -115,16 +122,37 @@ class TTSService:
                 )
                 return b"".join(generator)
 
-            # Offload blocking work to a thread
-            audio_bytes = await asyncio.to_thread(_convert_sync)
-            
-            console_logger.info("Audio generation successful")
-            return audio_bytes
-            
-        except Exception as e:
-            console_logger.error(f"TTS generation failed: {str(e)}")
-            console_logger.error(f"Failed text: {text[:100]}...")
-            console_logger.error(f"Voice ID: {selected_voice_id}, Model: {model.value}")
+            # Exponential backoff on rate limiting; queue via process-wide semaphore
+            max_attempts = 15
+            base_delay = 1.0  # seconds
+            async with self._SEM:
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        audio_bytes = await asyncio.to_thread(_convert_sync)
+                        console_logger.info("Audio generation successful")
+                        return audio_bytes
+                    except Exception as e:
+                        msg = str(e).lower()
+                        is_rate_limited = (
+                            "429" in msg
+                            or "too_many_concurrent_requests" in msg
+                            or "system_busy" in msg
+                            or "rate limit" in msg
+                        )
+                        if is_rate_limited and attempt < max_attempts:
+                            delay = min(30.0, base_delay * (2 ** (attempt - 1))) + random.random() * 0.25
+                            console_logger.warning(
+                                f"ElevenLabs rate-limited/busy (attempt {attempt}/{max_attempts}); retrying in {delay:.2f}s"
+                            )
+                            await asyncio.sleep(delay)
+                            continue
+                        console_logger.error(f"TTS generation failed on attempt {attempt}: {str(e)}")
+                        console_logger.error(f"Failed text: {text[:100]}...")
+                        console_logger.error(f"Voice ID: {selected_voice_id}, Model: {model.value}")
+                        raise
+
+        except Exception:
+            # Already logged above; re-raise to caller
             raise
 
     def _get_storage_path(self, user_id: str, voice_line_id: int) -> str:
