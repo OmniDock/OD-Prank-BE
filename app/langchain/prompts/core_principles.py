@@ -11,15 +11,15 @@ DEADPAN_PRINCIPLES = """
     - No made-up company names like "ServicePlus24"
     - Use known entities or vague descriptions ("Technical Support", "Building Management")
 
-    2. INSERT ONE ABSURD DETAIL
-    - Exactly ONE strange question/requirement that doesn't fit - or a random side fact 
+    2. INSERT ABSURD DETAILS
+    - Strange question/requirement that doesn't fit - or a random side fact 
     - Deliver it completely deadpan, as if totally normal
     - The more mundane the absurd question, the better
 
     3. NEVER ACKNOWLEDGE THE ABSURDITY
-    - Blame it on "the system" or "the protocol"
-    - Get slightly annoyed if questioned
-    - Stay in character as a tired bureaucrat
+    - Character takes the absurd question/requirement as normal and serious
+    - Character creates explanations for the absurdity if questions
+    - Stay in character 
 """
 
 # Language-specific guidelines

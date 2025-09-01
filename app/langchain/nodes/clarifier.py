@@ -18,40 +18,51 @@ async def clarifier_node(state: ScenarioState) -> dict:
         console_logger.info("Skipping clarification - not required or already provided")
         return {"clarifying_questions": []}
     
-    system_prompt = """
-        You are an expert in creating deadpan-serious prank call scenarios.
+
+    questions_prompt = """
+        You are an expert comdey script writer with 15+ years of experience in creating prank call scenarios.
+        You are given a prank call scenario and tasked to decide if it has enough content to create a memorable and funny prank call from it
+        Your job is to ensure that tthe scenario has the details for a memorable and funny prank.
+
+        NECESSARY CONTENT OF THE SCENARIO:
+        - A believable but memorable core situation/scenario, that has aspects which can be used to create a hilarious prank call situation.
+        - A caller/character that is fitting for the scenario and supports its humorous aspects.
+        - Room for comedic escalation the keeps the scenario and character believable but heightens the funny aspects of both.
+
+        <important>If the scenario has the necessary content, respond with "NO QUESTIONS".</important>
+        <important>If the scenario is underdeveloped, respond with "YES"</important>
+        <important>DO NOT respond with anything other than "YES" or "NO QUESTIONS" under any circumstances.</important>
+        """
         
-        Your job is to ensure the scenario has the ESSENTIAL details for a memorable prank.
         
-        Only ask questions if CRITICAL information is missing. Ask 1-3 questions MAXIMUM.
-        Focus on what's absolutely necessary:
-        1. The CORE situation/problem (what's the main premise)
-        2. ONE key absurd element that makes it funny
-        3. The caller's basic personality (if not clear from context)
-        
-        DO NOT ask about:
-        - How the situation escalates (let creativity handle that)
-        - Multiple twists or complications
-        - Specific dialogue or phrases
-        - When the actual call should happen
-        - Real contact information
-        - Payment or personal data
-        
-        Examples of descriptions that DON'T need questions:
-        - "Pizza delivery insisting the customer ordered 50 pizzas with anchovies"
-        - "Bank calling about suspicious purchase of 1000 rubber ducks"
-        - "Package delivery for a life-size cardboard cutout of Nicolas Cage"
-        - "Dentist office confirming appointment for wisdom teeth removal for their pet hamster"
-        
-        Examples that MIGHT need 1-2 questions:
-        - "A funny prank call" → What's the situation? Who's calling?
-        - "Pizza delivery prank" → What's special about this delivery? What has gone wrong? 
-        
-        <important>Default to NO questions unless something is truly unclear.</important>
-        <important>If you can understand the basic premise, don't ask for more details.</important>
-        <important>Never ask more than 3 questions, even if more details could help.</important>
-        <important>Do NOT ask how things escalate or develop - that's for the scenario generation.</important>
-    """
+    questions_prompt ="""
+        You are expert audio based comedy write and teacher, with 15+ years of experience in funny, entertaining and absurd dialogue.
+
+        NECESSARY CONTENT OF THE SCENARIO:
+        - A believable but memorable core situation/scenario, that has aspects which can be used to create a hilarious prank call situation.
+        - A caller/character that is fitting for the scenario and supports its humorous aspects.
+        - Room for comedic escalation the keeps the scenario and character believable but heightens the funny aspects of them.
+
+        TASK:
+        - You are given a prank scenario that needs to be improved. 
+        - You are to come up with questions that will help add the NECESSARY CONTENT to the scenario and character, while staying true to the original description
+        - The caller is not known by the target unless the user explicitly says otherwise.
+
+        QUESTIONS SHOULD:
+        - Be open-ended and focuse on adding the NECESSARY CONTENT to the scenario and character.
+        - Be highly relevant to the scenario, character and the prank call dynamics.
+        - Stay true to the original description.
+
+        QUESTIONS SHOULD NOT:
+        - Ask about specific reactions, answers, or behaviors, quriks, etc. of the target.
+        - Include a set of specific ideas, direct quotes, lines, etc. to choose from 
+        - Be simple yes/no questions.
+        - Ask about the relationship between the prankster and the target.
+        - Ask for specific quotes, questions, responses or any other direct lines.
+
+        Your goal: Generate 2-4 clarifying questions that will lead to a richer and funnier scenario and charcter description than the user’s initial input. Each question should feel tailored to their idea and improve what makes
+        that idea funny and abusrd.
+        """
 
     user_prompt = """
         Title: {title}
@@ -59,23 +70,54 @@ async def clarifier_node(state: ScenarioState) -> dict:
         Target Name: {target_name}
         Language: {language}
 
-        Check if the CORE premise is clear. If yes, respond with "NO QUESTIONS".
+        Analyze if the scenario has the details for a memorable and funny prank or is underdeveloped.
         
-        Only ask 1-3 questions if you truly cannot understand what the prank is about.
-        Focus only on the missing ESSENTIAL information.
-        
-        Return questions in {language} language.
-        
-        Remember: If you understand the basic idea, that's enough. Don't ask for elaboration.
+        Return questions in {language} language.        
     """
 
+    user_questions_prompt = """ 
+        {title}
+        {description}
+        {target_name}
+        {language}
+        Analyze if the scenario has the details for a memorable and funny prank or is underdeveloped.
+
+        Respond with "YES" if the scenario is underdeveloped or "NO QUESTIONS" if it has the necessary details. NOTHING ELSE.
+    """
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+
+    routing_prompt =  ChatPromptTemplate.from_messages([
+        ("system", questions_prompt),
+        ("user", user_questions_prompt)
+    ])
+
+    question_decision_chain = routing_prompt | llm
+
+    try: 
+        question_decision = await question_decision_chain.ainvoke({
+            "title": state.scenario_data.title,
+            "description": state.scenario_data.description or "",
+            "target_name": state.scenario_data.target_name,
+            "language": getattr(state.scenario_data.language, 'value', str(state.scenario_data.language))
+        })
+
+        question_decision_content = question_decision.content.strip()
+
+        print(question_decision_content)
+
+        if "NO QUESTIONS" in question_decision_content.upper():
+                console_logger.info("No clarifying questions needed")
+                return {"clarifying_questions": []}
+    except Exception as e:
+        console_logger.error(f"Clarifier failed: {str(e)}")
+        return {"clarifying_questions": []}
+
     prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
+        ("system", questions_prompt),
         ("user", user_prompt)
     ])
     
-    chain = prompt | llm
+    chain = prompt | llm 
     
     try:
         result = await chain.ainvoke({
@@ -87,10 +129,10 @@ async def clarifier_node(state: ScenarioState) -> dict:
         
         content = result.content.strip()
         
-        # Check if no questions needed
-        if "NO QUESTIONS" in content.upper():
-            console_logger.info("No clarifying questions needed")
-            return {"clarifying_questions": []}
+        # # Check if no questions needed
+        # if "NO QUESTIONS" in content.upper():
+        #     console_logger.info("No clarifying questions needed")
+        #     return {"clarifying_questions": []}
         
         # Parse questions
         questions = []
@@ -111,3 +153,5 @@ async def clarifier_node(state: ScenarioState) -> dict:
     except Exception as e:
         console_logger.error(f"Clarifier failed: {str(e)}")
         return {"clarifying_questions": []}
+
+
