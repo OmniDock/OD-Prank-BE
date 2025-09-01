@@ -372,7 +372,8 @@ class ScenarioService:
 
     async def get_scenario(self, user: AuthUser, scenario_id: int) -> ScenarioResponse:
         """Get a scenario by ID"""
-        scenario = await self.repository.get_scenario_by_id(scenario_id, user.id_str)
+        # Load audio for detail view - it needs to show play buttons
+        scenario = await self.repository.get_scenario_by_id(scenario_id, user.id_str, load_audio=True)
         
         if not scenario:
             raise ValueError(f"Scenario {scenario_id} not found")
@@ -392,15 +393,16 @@ class ScenarioService:
                                     preferred_voice_id: str) -> ScenarioResponse:
         """Update the preferred voice for a scenario"""
         
-        scenario = await self.repository.get_scenario_by_id(scenario_id, user.id_str)
+        # Use the repository method that already has the update logic
+        updated_scenario = await self.repository.update_scenario_preferred_voice(
+            scenario_id, user.id_str, preferred_voice_id
+        )
         
-        if not scenario:
+        if not updated_scenario:
             raise ValueError(f"Scenario {scenario_id} not found")
         
-        scenario.preferred_voice_id = preferred_voice_id
-        await self.db_session.commit()
-
-        return await self.get_scenario(user, scenario_id)
+        # Return the updated scenario without audio - it's already loaded with voice_lines
+        return await self._to_scenario_response(updated_scenario, include_audio=False)
     
 
     async def _persist_scenario_from_state(self, user: AuthUser, state: ScenarioState) -> Scenario:
@@ -411,5 +413,5 @@ class ScenarioService:
         if voice_lines_payload:
             await self.voice_line_repository.add_voice_lines(scenario.id, voice_lines_payload)
         await self.db_session.commit()
-        scenario = await self.repository.get_scenario_by_id(scenario.id, user.id_str)
+        scenario = await self.repository.get_scenario_by_id(scenario.id, user.id_str, load_audio=False)
         return scenario
