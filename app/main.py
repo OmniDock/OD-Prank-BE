@@ -12,14 +12,14 @@ from app.services.cache_service import CacheService
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    # Startup: Initialize Global Cache (class-level)
-    cache = await CacheService.get_global()
-    app.state.cache = cache
+    # # Startup: Initialize Global Cache (class-level)
+    # cache = await CacheService.get_global()
+    # app.state.cache = cache
 
-    # Startup: Ensure voice previews
-    service = PreviewTTSService()
-    catalog = get_voices_catalog()
-    await service.ensure_previews_for_catalog(catalog)
+    # # Startup: Ensure voice previews
+    # service = PreviewTTSService()
+    # catalog = get_voices_catalog()
+    # await service.ensure_previews_for_catalog(catalog)
     yield
 
     # Shutdown: close global cache

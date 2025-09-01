@@ -42,6 +42,9 @@ def get_language_guidelines(language: str) -> str:
             - Common phrases: "That's odd", "System's acting up", "Not sure why"
         """
 
+
+
+
 # Concrete examples (not templates!)
 GOOD_EXAMPLES = {
     "OPENING": [
@@ -100,3 +103,4 @@ AVOID_PATTERNS = [
     "Made-up company names ('TechnoHelp24')",
     "Exaggerated emotions or laughter"
 ]
+

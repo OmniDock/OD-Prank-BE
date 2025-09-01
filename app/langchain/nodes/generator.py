@@ -91,12 +91,13 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
 
         IMPORTANT RULES:
         - Short sentences (5-12 words)
-        - No youth slang or obvious jokes
+        - No youth slang unless it specificaly fits to the character 
+        - No obvious or jokes
         - Maximum ONE absurd detail, delivered deadpan
         - Use natural pauses with "..." or fillers
         - ALWAYS stay in character
         - NO REPETITION - each line must be unique
-        - Avoid excessive name usage (max 1x per type)
+        - Avoid excessive name usage 
     """
 
     # Include relevant examples

@@ -39,29 +39,30 @@ async def clarifier_node(state: ScenarioState) -> dict:
         You are expert audio based comedy write and teacher, with 15+ years of experience in funny, entertaining and absurd dialogue.
 
         NECESSARY CONTENT OF THE SCENARIO:
-        - A believable but memorable core situation/scenario, that has aspects which can be used to create a hilarious prank call situation.
+        - A believable but memorable and funny core situation/scenario, that can be used to create a hilarious prank call situation.
         - A caller/character that is fitting for the scenario and supports its humorous aspects.
         - Room for comedic escalation the keeps the scenario and character believable but heightens the funny aspects of them.
 
         TASK:
-        - You are given a prank scenario that needs to be improved. 
-        - You are to come up with questions that will help add the NECESSARY CONTENT to the scenario and character, while staying true to the original description
-        - The caller is not known by the target unless the user explicitly says otherwise.
+        - You are given a prank scenario that is missing parts of its NECESSARY CONTENT as described above.
+        - You are to come up with questions that will help fill out the NECESSARY CONTENT to the scenario and character, while staying true to the original description.
+        - 
 
         QUESTIONS SHOULD:
-        - Be open-ended and focuse on adding the NECESSARY CONTENT to the scenario and character.
+        - FOCUS on adding the NECESSARY CONTENT to the scenario and character and nothing beyond that.
+        - Be open-ended.
         - Be highly relevant to the scenario, character and the prank call dynamics.
         - Stay true to the original description.
 
-        QUESTIONS SHOULD NOT:
-        - Ask about specific reactions, answers, or behaviors, quriks, etc. of the target.
-        - Include a set of specific ideas, direct quotes, lines, etc. to choose from 
-        - Be simple yes/no questions.
-        - Ask about the relationship between the prankster and the target.
-        - Ask for specific quotes, questions, responses or any other direct lines.
+        IMPORTANT:
+        - The caller is NOT known by the target unless the user explicitly says otherwise.
+        - DO NOT ASK ABOUT ANY specific characteristics, reactions, answers, or behaviors, quriks, etc. of the target.
+        - DO not include a set of specific ideas, direct quotes, lines, etc. to choose from 
+        - No simple yes/no questions.
+        - Do not ask about the relationship between the prankster and the target.
+        - Do not ask for specific quotes, questions, responses or any other direct line for the character.
 
-        Your goal: Generate 2-4 clarifying questions that will lead to a richer and funnier scenario and charcter description than the user’s initial input. Each question should feel tailored to their idea and improve what makes
-        that idea funny and abusrd.
+        Your goal: Generate 2-4 clarifying questions that add the aspects of the NECESSARY CONTENT of the scenario and character that are missing.
         """
 
     user_prompt = """
@@ -102,8 +103,6 @@ async def clarifier_node(state: ScenarioState) -> dict:
         })
 
         question_decision_content = question_decision.content.strip()
-
-        print(question_decision_content)
 
         if "NO QUESTIONS" in question_decision_content.upper():
                 console_logger.info("No clarifying questions needed")
