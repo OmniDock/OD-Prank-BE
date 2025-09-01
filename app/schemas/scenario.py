@@ -89,15 +89,6 @@ class ScenarioResponse(BaseModel):
         use_enum_values = True
 
 
-class ScenarioCreateResponse(BaseModel):
-    """Schema for scenario creation response"""
-    scenario: ScenarioResponse
-    processing_summary: dict  # Summary of the LangChain processing results
-    
-    class Config:
-        from_attributes = True
-
-
 
 class VoiceLineEnhancementRequest(BaseModel):
     """Schema for voice line enhancement request"""
@@ -120,7 +111,7 @@ class VoiceLineEnhancementResult(BaseModel):
     enhanced_text: Optional[str] = None
     error: Optional[str] = None
     safety_passed: bool
-    safety_issues: List[str] = []
+    safety_issues: List[str] = Field(default_factory=list)
 
 
 class VoiceLineEnhancementResponse(BaseModel):
@@ -129,6 +120,6 @@ class VoiceLineEnhancementResponse(BaseModel):
     total_processed: int
     successful_count: int
     failed_count: int
-    successful_enhancements: List[VoiceLineEnhancementResult] = []
-    failed_enhancements: List[VoiceLineEnhancementResult] = []
+    successful_enhancements: List[VoiceLineEnhancementResult] = Field(default_factory=list)
+    failed_enhancements: List[VoiceLineEnhancementResult] = Field(default_factory=list)
     user_feedback: str

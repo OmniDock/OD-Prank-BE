@@ -2,25 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from app.core.auth import get_current_user, AuthUser
 from app.schemas.scenario import (
     ScenarioCreateRequest, 
-    ScenarioCreateResponse, 
     ScenarioResponse, 
     VoiceLineEnhancementRequest, 
     VoiceLineEnhancementResponse
 )
 from app.services.scenario_service import ScenarioService
 from app.core.database import AsyncSession, get_db_session
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 from app.core.logging import console_logger
-import uuid
 
 router = APIRouter(tags=["scenario"])
 
-
-
-# ################################################################################
-# PROCESS SCENARIO WITH CLARIFICATION SUPPORT
-# ################################################################################
+# ========= PROCESS SCENARIO WITH CLARIFICATION SUPPORT =========
 
 class ScenarioProcessRequest(BaseModel):
     """Request for processing a scenario with clarification support"""
@@ -96,9 +90,7 @@ async def enhance_voice_lines(
         raise HTTPException(status_code=500, detail=f"Failed to enhance voice lines: {str(e)}")
 
 
-# ################################################################################
-# RETRIEVE SCENARIOS
-# ################################################################################
+# ========= RETRIEVE SCENARIOS AND CRUD =========
 
 @router.get("/{scenario_id}", response_model=ScenarioResponse)
 async def get_scenario(
@@ -133,41 +125,8 @@ async def get_user_scenarios(
         raise HTTPException(status_code=500, detail=f"Failed to get scenarios: {str(e)}")
 
 
-
-
-class EnhanceScenarioRequest(BaseModel):
-    """Request for enhancing an entire scenario"""
-    scenario_id: int = Field(description="Scenario ID to enhance")
-    user_feedback: str = Field(description="User's improvement feedback")
-
-
-@router.post("/{scenario_id}/enhance", response_model=ScenarioResponse)
-async def enhance_scenario(
-    scenario_id: int,
-    request: EnhanceScenarioRequest = Body(...),
-    user: AuthUser = Depends(get_current_user),
-    db_session: AsyncSession = Depends(get_db_session),
-) -> ScenarioResponse:
-    """
-    Enhance an entire scenario based on user feedback
-    
-    This creates a new version of all voice lines based on the feedback
-    """
-    try:
-        scenario_service = ScenarioService(db_session)
-        enhanced_scenario = await scenario_service.enhance_full_scenario(
-            user, scenario_id, request.user_feedback
-        )
-        return enhanced_scenario
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to enhance scenario: {str(e)}")
-
-
 class ScenarioUpdatePreferredVoice(BaseModel):
     preferred_voice_id: str
-
 
 @router.patch("/{scenario_id}/preferred-voice", response_model=ScenarioResponse)
 async def update_scenario_preferred_voice(

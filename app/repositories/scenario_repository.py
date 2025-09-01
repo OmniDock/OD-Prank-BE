@@ -35,6 +35,7 @@ class ScenarioRepository:
         # Convert string to UUID if needed for database comparison
         if isinstance(user_id, str):
             user_id = UUID(user_id)
+            
         
         # First, get the scenario with voice lines
         query = (
