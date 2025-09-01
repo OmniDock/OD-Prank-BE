@@ -37,6 +37,8 @@ class ScenarioCreateRequest(BaseModel):
         }
 
 
+
+
 class VoiceLineAudioResponse(BaseModel):
     """Schema for voice line audio response"""
     id: int
@@ -88,6 +90,14 @@ class ScenarioResponse(BaseModel):
         from_attributes = True
         use_enum_values = True
 
+
+class ScenarioCreateResponse(BaseModel):
+    """Schema for scenario creation response"""
+    scenario: ScenarioResponse
+    processing_summary: dict
+    
+    class Config:
+        from_attributes = True
 
 
 class VoiceLineEnhancementRequest(BaseModel):
