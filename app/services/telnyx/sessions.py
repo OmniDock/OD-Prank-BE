@@ -13,9 +13,12 @@ class CallSession:
     scenario_id: int
     to_number: str
     from_number: str
-    call_leg_id: Optional[str] = None
-    call_control_id: Optional[str] = None
-    call_session_id: Optional[str] = None
+    outbound_call_leg_id: Optional[str] = None
+    outbound_call_control_id: Optional[str] = None
+    outbound_call_session_id: Optional[str] = None
+    webrtc_call_leg_id: Optional[str] = None
+    webrtc_call_control_id: Optional[str] = None
+    webrtc_call_session_id: Optional[str] = None
     conference_name: Optional[str] = None
     voice_line_audios: Optional[Dict[int, PreloadedAudio]] = None
     
@@ -51,169 +54,142 @@ class TelnyxSessionService:
     _websocket_sessions: Dict[str, Dict[int, WebSocket]] = {}
     
     # Configuration
-    _session_ttl_seconds = 3600  # 1 hour TTL for call sessions  
+    _session_ttl_seconds = 3600  
 
-    async def add_session(self, session: CallSession):
+    async def add_conference_session(self, session: CallSession):
+
+        console_logger.info(f"Adding session {session.conference_name} to Redis")
         """Add a call session to Redis"""
         cache = await CacheService.get_global()
         
         # Store the session
         await cache.set_json(
-            session.call_control_id,
+            session.conference_name,
             session.to_dict(),
             ttl=self._session_ttl_seconds,
             prefix="telnyx:session"
         )
-        
-        # Update conference mapping if needed
-        if session.conference_name:
-            # Get existing ccids for this conference
-            ccids = await cache.get_json(
-                session.conference_name,
-                prefix="telnyx:conf_ccids"
-            ) or []
-            
-            # Add this ccid if not already present
-            if session.call_control_id not in ccids:
-                ccids.append(session.call_control_id)
-                await cache.set_json(
-                    session.conference_name,
-                    ccids,
-                    ttl=self._session_ttl_seconds,
-                    prefix="telnyx:conf_ccids"
-                )
-        
-        console_logger.info(f"Added session {session.call_control_id} to Redis")
+                
+        console_logger.info(f"Added session {session.conference_name} to Redis")
 
-    async def get_session(self, call_control_id: str) -> Optional[CallSession]:
+    async def get_conference_session(self, conference_name: str) -> Optional[CallSession]:
         """Get a call session from Redis"""
         cache = await CacheService.get_global()
+
+        console_logger.info(f"Getting session {conference_name} from Redis")
         
         # Try direct lookup first
         session_data = await cache.get_json(
-            call_control_id,
+            conference_name,
             prefix="telnyx:session"
         )
         
         if session_data:
             return CallSession.from_dict(session_data)
         
-        # If not found directly, check if it's part of a conference
-        # (This handles the case where we have a conference member ccid)
-        # Note: This is a more expensive operation, consider if really needed
+        console_logger.info(f"No session found for conference {conference_name} in Redis")
         return None
+
     
-    async def get_session_by_conference(self, conference_name: str) -> Optional[CallSession]:
-        """Get the first session associated with a conference"""
-        cache = await CacheService.get_global()
-        
-        # Get ccids for this conference
-        ccids = await cache.get_json(
-            conference_name,
-            prefix="telnyx:conf_ccids"
-        ) or []
-        
-        # Return the first valid session
-        for ccid in ccids:
-            session_data = await cache.get_json(
-                ccid,
-                prefix="telnyx:session"
-            )
-            if session_data:
-                return CallSession.from_dict(session_data)
-        
-        return None
-    
-    async def remove_session(self, call_control_id: str):
+    async def remove_conference_session(self, conference_name: str):
         """Remove a call session from Redis"""
+
+        console_logger.info(f"Removing session {conference_name} from Redis")
         cache = await CacheService.get_global()
-        
-        # Get session to check conference name
-        session_data = await cache.get_json(
-            call_control_id,
-            prefix="telnyx:session"
-        )
-        
-        # Remove the session
-        await cache.delete(call_control_id, prefix="telnyx:session")
+        session = await self.get_conference_session(conference_name)
+        await cache.delete(conference_name, prefix="telnyx:session")
         
         # Clean up WebSockets
-        self._websocket_sessions.pop(call_control_id, None)
+        webrtc_ccid = session.webrtc_call_control_id
+        outbound_ccid = session.outbound_call_control_id
+
+        if webrtc_ccid:
+            console_logger.info(f"Removing WebSocket for webrtc_ccid {webrtc_ccid}")
+            ws = self._websocket_sessions.get(webrtc_ccid)
+            if ws:
+                await ws.close()
+                self._websocket_sessions.pop(webrtc_ccid, None)
+        else:
+            console_logger.info(f"No WebSocket found for webrtc_ccid {webrtc_ccid}")
+
+        if outbound_ccid:
+            ws = self._websocket_sessions.get(outbound_ccid)
+            if ws:
+                await ws.close()
+                self._websocket_sessions.pop(outbound_ccid, None)
+        else:
+            console_logger.info(f"No WebSocket found for outbound_ccid {outbound_ccid}")
+
+    async def get_websockets(self, conference_name: str) -> List[WebSocket]:
+        session = await self.get_conference_session(conference_name)
+        if not session:
+            console_logger.info(f"No session found for conference {conference_name}")
+            return []
         
-        # Update conference mapping if needed
-        if session_data and session_data.get('conference_name'):
-            conference_name = session_data['conference_name']
-            ccids = await cache.get_json(
-                conference_name,
-                prefix="telnyx:conf_ccids"
-            ) or []
-            
-            if call_control_id in ccids:
-                ccids.remove(call_control_id)
-                if ccids:
-                    # Update the list
-                    await cache.set_json(
-                        conference_name,
-                        ccids,
-                        ttl=self._session_ttl_seconds,
-                        prefix="telnyx:conf_ccids"
-                    )
-                else:
-                    # Remove empty conference mapping
-                    await cache.delete(conference_name, prefix="telnyx:conf_ccids")
-        
-        console_logger.info(f"Removed session {call_control_id} from Redis")
+        ws_list = [] 
+
+        webrtc_ccid = session.webrtc_call_control_id
+        if webrtc_ccid:
+            ws = self._websocket_sessions.get(webrtc_ccid)
+            if ws:
+                ws_list.append(ws)
+            else:
+                console_logger.info(f"No WebSocket found for webrtc_ccid {webrtc_ccid}")
+        else:
+            console_logger.info(f"No WebSocket found for webrtc_ccid {webrtc_ccid}")
+
+        outbound_ccid = session.outbound_call_control_id
+        if outbound_ccid:
+            ws = self._websocket_sessions.get(outbound_ccid)
+            if ws:
+                ws_list.append(ws)
+            else:
+                console_logger.info(f"No WebSocket found for outbound_ccid {outbound_ccid}")
+        else:
+            console_logger.info(f"No WebSocket found for outbound_ccid {outbound_ccid}")
+
+        return ws_list
+
+
 
     def add_websocket(self, call_control_id: str, ws: WebSocket) -> None:
+
+        console_logger.info(f"Adding WebSocket for call_control_id {call_control_id}")
         bucket = self._websocket_sessions.setdefault(call_control_id, {})
         bucket[id(ws)] = ws
 
+
+
     def remove_websocket(self, call_control_id: str, ws: WebSocket) -> None:
+
+        console_logger.info(f"Removing WebSocket for call_control_id {call_control_id}")
         bucket = self._websocket_sessions.get(call_control_id)
         if not bucket:
+            console_logger.info(f"No WebSocket found for call_control_id {call_control_id}")
             return
         bucket.pop(id(ws), None)
         if not bucket:
             self._websocket_sessions.pop(call_control_id, None)
+        else:
+            console_logger.info(f"No WebSocket found for call_control_id {call_control_id}")
 
-    def get_websockets(self, call_control_id: str) -> List[WebSocket]:
-        return list(self._websocket_sessions.get(call_control_id, {}).values())
+
+    async def add_ccid_to_conference(self, conference_name: str, ccid: str) -> None:
+        cache = await CacheService.get_global()
+        await cache.set(f"{ccid}", conference_name, ttl=self._session_ttl_seconds, prefix="telnyx:conf_ccids")
+
+    async def get_conference_name_by_ccid(self, ccid: str) -> Optional[str]:
+        cache = await CacheService.get_global()
+        conference_name = await cache.get(f"{ccid}", prefix="telnyx:conf_ccids")
+        console_logger.info(f"Conference name by ccid {ccid}: {conference_name}")
+        return conference_name
 
 
     async def get_ccids_by_conference(self, conference_name: str) -> List[str]:
-        """Get all call control IDs for a conference"""
-        cache = await CacheService.get_global()
-        ccids = await cache.get_json(
-            conference_name,
-            prefix="telnyx:conf_ccids"
-        ) or []
-        return ccids
-    
-    async def add_ccid_to_conference(self, conference_name: str, ccid: str):
-        """Add a call control ID to a conference mapping"""
-        cache = await CacheService.get_global()
+        session = await self.get_conference_session(conference_name)
+        if not session:
+            console_logger.info(f"No session found for conference {conference_name}")
+            return []
         
-        # Get existing ccids
-        ccids = await cache.get_json(
-            conference_name,
-            prefix="telnyx:conf_ccids"
-        ) or []
-        
-        # Add if not present
-        if ccid not in ccids:
-            ccids.append(ccid)
-            await cache.set_json(
-                conference_name,
-                ccids,
-                ttl=self._session_ttl_seconds,
-                prefix="telnyx:conf_ccids"
-            )
-
-    async def get_conference_websockets(self, conference_name: str) -> List[WebSocket]:
-        """Get all WebSockets for a conference"""
-        out: List[WebSocket] = []
-        ccids = await self.get_ccids_by_conference(conference_name)
-        for ccid in ccids:
-            out.extend(self.get_websockets(ccid))
-        return out
-    
+        console_logger.info(f"CCIDs by conference {conference_name}: {session.webrtc_call_control_id, session.outbound_call_control_id}")
+        return [session.webrtc_call_control_id, session.outbound_call_control_id]
