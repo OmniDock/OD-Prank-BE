@@ -11,12 +11,10 @@ from app.models.voice_line import VoiceLine
 from app.core.utils.enums import VoiceLineTypeEnum
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select
-
+from app.services.cache_service import CacheService
 
 class ScenarioService: 
     """Service for managing scenarios with LangChain processing"""
-
-    _clarification_sessions: Dict[str, Any] = {}
 
     def __init__(self, db_session: AsyncSession):
         self.repository = ScenarioRepository(db_session)
@@ -43,20 +41,26 @@ class ScenarioService:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="Either 'scenario' or 'session_id' must be provided")
 
-        sessions: Dict[str, Any] = ScenarioService._clarification_sessions  # type: ignore[attr-defined]
+        cache = await CacheService.get_global()
+        cached_session = None
+        try:
+            cached = await cache.get_json(session_id, prefix="scenario:clarify")
+            if cached:
+                cached_session = cached
+        except Exception:
+            pass
 
         # Import here to avoid circular dependency
         processor = ScenarioProcessor()
 
         # Continuation path
-        if session_id and session_id in sessions:
+        if session_id and cached_session:
             console_logger.info(f"Continuing session {session_id}")
-            stored = sessions[session_id]
-            if stored.get("user_id") != user.id:
+            if cached_session.get("user_id") != user.id_str:
                 from fastapi import HTTPException
                 raise HTTPException(status_code=403, detail="Not authorized")
 
-            stored_state = stored["state"]
+            stored_state = cached_session["state"]
             state = ScenarioState(**stored_state) if isinstance(stored_state, dict) else stored_state
             if clarifications:
                 state.clarifications = clarifications
@@ -77,10 +81,11 @@ class ScenarioService:
         if getattr(state, "require_clarification", False) and getattr(state, "clarifying_questions", None):
             import uuid
             new_session_id = str(uuid.uuid4())
-            sessions[new_session_id] = {
+            cache.set_json(new_session_id, {
                 "state": state.model_dump() if hasattr(state, "model_dump") else state,
-                "user_id": user.id
-            }
+                "user_id": user.id_str
+            }, ttl=900, prefix="scenario:clarify")
+
             return {
                 "status": "needs_clarification",
                 "session_id": new_session_id,
@@ -90,8 +95,8 @@ class ScenarioService:
         # Otherwise, create the scenario
         created = await self.create_scenario_from_state(user, state)
         # Clean up old session if present
-        if session_id and session_id in sessions:
-            del sessions[session_id]
+        if session_id and cached_session:
+            await cache.delete(session_id, prefix="scenario:clarify")
         return {
             "status": "complete",
             "scenario_id": created.scenario.id
@@ -114,7 +119,7 @@ class ScenarioService:
                 select(VoiceLine)
                 .join(Scenario)
                 .where(VoiceLine.id.in_(voice_line_ids))
-                .where(Scenario.user_id == user.id_str)
+                .where(Scenario.user_id == user.id)
                 .options(
                     selectinload(VoiceLine.audios),
                     selectinload(VoiceLine.scenario)
@@ -211,30 +216,11 @@ class ScenarioService:
             await self.db_session.rollback()
             raise
 
-
-    # ====== Caching - TODO: Exchange with Redis Service ======
-
-    def clear_clarification_session(self, session_id: str, user: AuthUser) -> None:
-        """Remove a stored clarification session, enforcing ownership."""
-        sessions: Dict[str, Any] = ScenarioService._clarification_sessions  # type: ignore[attr-defined]
-        if session_id in sessions:
-            if sessions[session_id].get("user_id") != user.id:
-                from fastapi import HTTPException
-                raise HTTPException(status_code=403, detail="Not authorized")
-            del sessions[session_id]
-            return
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    
-
-
-
     # ===== DRY helpers below =====
 
     async def create_scenario_from_state(self, user: AuthUser, state: ScenarioState) -> ScenarioCreateResponse:
         """Create a scenario from an already processed state"""
-        console_logger.info(f"Creating scenario from state for user {user.id}")
+        console_logger.info(f"Creating scenario from state for user {user.id_str}")
         
         try:
             scenario = await self._persist_scenario_from_state(user, state)
@@ -249,7 +235,7 @@ class ScenarioService:
 
     def _scenario_payload_from_state(self, user: AuthUser, state: ScenarioState) -> dict:
         return {
-            "user_id": user.id,
+            "user_id": user.id_str,
             "title": state.scenario_data.title,
             "description": state.scenario_data.description,
             "language": state.scenario_data.language,

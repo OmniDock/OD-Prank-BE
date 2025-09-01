@@ -34,7 +34,7 @@ async def start_call(
 
         call_leg_id, call_control_id, call_session_id, conference_name = await telnyx_handler.initiate_call(
             db_session=db,
-            user_id=user.id,
+            user_id=str(user.id),
             scenario_id=body.scenario_id,
             to_number=body.to_number,
         )
@@ -88,7 +88,7 @@ async def play_voice_line(
 ):
     try:
         console_logger.info(f"Playing voice line {body.voice_line_id} for user {user.id} in conference {body.conference_name}")
-        await telnyx_handler.play_voice_line(user_id=user.id, conference_name=body.conference_name, voice_line_id=body.voice_line_id)
+        await telnyx_handler.play_voice_line(user_id=str(user.id), conference_name=body.conference_name, voice_line_id=body.voice_line_id)
         return PlayVoiceLineResponse(success=True, message="Voice line streaming started")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -108,7 +108,7 @@ async def stop_voice_line(
     user: AuthUser = Depends(get_current_user),
 ):
     try:
-        await telnyx_handler.stop_voice_line(user_id=user.id, conference_name=body.conference_name)
+        await telnyx_handler.stop_voice_line(user_id=str(user.id), conference_name=body.conference_name)
         return StopVoiceLineResponse(success=True, message="Voice line streaming stopped")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -129,7 +129,7 @@ async def hangup_call(
 ):
     try:
         console_logger.info(f"Hanging up call for user {user.id} in conference {body.conference_name}")
-        await telnyx_handler.hangup_call(user_id=user.id, conference_name=body.conference_name)
+        await telnyx_handler.hangup_call(user_id=str(user.id), conference_name=body.conference_name)
         return HangupCallResponse(success=True, message="Call terminated successfully")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

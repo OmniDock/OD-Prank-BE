@@ -6,16 +6,24 @@ from app.core.config import settings
 from app.services.preview_tts_service import PreviewTTSService
 from app.core.utils.voices_catalog import get_voices_catalog
 from app.core.middleware import RequestLoggingMiddleware, ErrorHandlingMiddleware
+from app.services.cache_service import CacheService 
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: ensure voice previews
+
+    # Startup: Initialize Global Cache (class-level)
+    cache = await CacheService.get_global()
+    app.state.cache = cache
+
+    # Startup: Ensure voice previews
     service = PreviewTTSService()
     catalog = get_voices_catalog()
     await service.ensure_previews_for_catalog(catalog)
     yield
-    # Shutdown: nothing to clean up
 
+    # Shutdown: close global cache
+    await CacheService.close_global()
 
 app = FastAPI(
     title="Omnidock Prank Call Backend",

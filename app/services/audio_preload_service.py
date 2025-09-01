@@ -2,15 +2,17 @@
 from typing import Dict, Optional, Tuple, Any
 from datetime import datetime, timedelta
 import gc
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 from app.core.database import AsyncSession
 from app.repositories.scenario_repository import ScenarioRepository
 from app.services.tts_service import TTSService
+from app.services.cache_service import CacheService
 from app.models.voice_line import VoiceLine
 from app.core.utils.enums import VoiceLineTypeEnum, VoiceLineAudioStatusEnum
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from app.core.logging import console_logger
 
 
 @dataclass
@@ -24,12 +26,10 @@ class PreloadedAudio:
     storage_path: str
     
 class AudioPreloadService:
-    """Service to preload and manage MP3 files in memory for quick prank call access"""
+    """Service to preload and manage MP3 files in Redis cache for quick prank call access"""
     
-    # Class-level cache to store preloaded audio sessions
-    _preload_cache: Dict[str, Dict[int, PreloadedAudio]] = {}
-    _cache_timestamps: Dict[str, datetime] = {}
-    _max_cache_age_minutes = 30  # Auto-cleanup after 30 minutes
+    # Configuration
+    _max_cache_age_minutes = 30  # TTL for cached audio metadata
     _max_concurrent_downloads = 5  # Limit concurrent downloads
     
     def __init__(self, db_session: AsyncSession):
@@ -42,26 +42,7 @@ class AudioPreloadService:
         """Generate cache key for user-scenario combination"""
         return f"user_{user_id}_scenario_{scenario_id}"
     
-    @classmethod
-    def _cleanup_expired_cache(cls):
-        """Remove expired cache entries"""
-        now = datetime.utcnow()
-        expired_keys = []
-        
-        for cache_key, timestamp in cls._cache_timestamps.items():
-            if now - timestamp > timedelta(minutes=cls._max_cache_age_minutes):
-                expired_keys.append(cache_key)
-        
-        for key in expired_keys:
-            if key in cls._preload_cache:
-                audio_count = len(cls._preload_cache[key])
-                total_size = sum(audio.size_bytes for audio in cls._preload_cache[key].values())
-                del cls._preload_cache[key]
-                del cls._cache_timestamps[key]
-        
-        # Force garbage collection if we cleaned up anything
-        if expired_keys:
-            gc.collect()
+    # Redis TTL handles expiration automatically, no cleanup needed
     
 
     async def preload_scenario_audio(self, user_id: str, scenario_id: int, preferred_voice_id: Optional[str] = None) -> Tuple[bool, str, Dict[str, Any]]:
@@ -76,16 +57,14 @@ class AudioPreloadService:
             Tuple[success: bool, message: str, stats: Dict[str, Any]]
         """
         try:
-            # Cleanup expired cache first
-            self._cleanup_expired_cache()
-            
+            cache = await CacheService.get_global()
             cache_key = self._get_cache_key(user_id, scenario_id)
             
-            # Check if already preloaded and not expired
-            if cache_key in self._preload_cache:
-                cached_time = self._cache_timestamps.get(cache_key, datetime.min)
-                if datetime.utcnow() - cached_time < timedelta(minutes=self._max_cache_age_minutes):
-                    return True, f"Audio already preloaded"
+            # Check if already preloaded in Redis
+            cached_data = await cache.get_json(cache_key, prefix="audio:preload")
+            if cached_data:
+                console_logger.info(f"Audio already preloaded for {cache_key}")
+                return True, f"Audio already preloaded"
             
             
             # Get scenario with voice lines and audio   
@@ -103,7 +82,7 @@ class AudioPreloadService:
                 return False, f"No voice lines found for scenario {scenario_id}"
             
             # Verify user owns this scenario
-            if voice_lines[0].scenario.user_id != user_id:
+            if str(voice_lines[0].scenario.user_id) != user_id:
                 return False, "Unauthorized access to scenario"
             
             # Find ready audio files to preload
@@ -148,11 +127,26 @@ class AudioPreloadService:
                 )
                 preloaded_audio[voice_line.id] = preloaded
             
-            # Cache the results
+            # Cache the results in Redis
             if preloaded_audio:
-                self._preload_cache[cache_key] = preloaded_audio
-                self._cache_timestamps[cache_key] = datetime.utcnow()
+                # Convert PreloadedAudio objects to dicts for JSON serialization
+                serializable_data = {
+                    str(k): {
+                        **asdict(v),
+                        'voice_line_type': v.voice_line_type.value  # Enum to string
+                    } for k, v in preloaded_audio.items()
+                }
                 
+                # Store in Redis with TTL
+                ttl_seconds = self._max_cache_age_minutes * 60
+                await cache.set_json(
+                    cache_key, 
+                    serializable_data, 
+                    ttl=ttl_seconds, 
+                    prefix="audio:preload"
+                )
+                
+                console_logger.info(f"Cached {len(preloaded_audio)} audio files for {cache_key}")
                 return True, f"Successfully preloaded {len(preloaded_audio)} audio files"
             else:
                 return False, "Failed to preload any audio files"
@@ -160,18 +154,22 @@ class AudioPreloadService:
         except Exception as e:
             return False, f"Preload failed: {str(e)}"
     
-    def get_preloaded_audio(self, user_id: str, scenario_id: int, voice_line_id: Optional[int] = None) -> Optional[Dict[int, PreloadedAudio]]:
+    async def get_preloaded_audio(self, user_id: str, scenario_id: int, voice_line_id: Optional[int] = None) -> Optional[Dict[int, PreloadedAudio]]:
+        """Get preloaded audio from Redis cache"""
+        cache = await CacheService.get_global()
         cache_key = self._get_cache_key(user_id, scenario_id)
-        if cache_key not in self._preload_cache:
+        
+        # Get from Redis
+        cached_data = await cache.get_json(cache_key, prefix="audio:preload")
+        if not cached_data:
             return None
         
-        # Check if cache is expired
-        cached_time = self._cache_timestamps.get(cache_key, datetime.min)
-        if datetime.utcnow() - cached_time > timedelta(minutes=self._max_cache_age_minutes):
-            self.drop_preloaded_audio(user_id, scenario_id) 
-            return None
-        
-        preloaded_data = self._preload_cache[cache_key]
+        # Convert back to PreloadedAudio objects
+        preloaded_data = {}
+        for str_id, audio_dict in cached_data.items():
+            # Convert voice_line_type string back to enum
+            audio_dict['voice_line_type'] = VoiceLineTypeEnum[audio_dict['voice_line_type']]
+            preloaded_data[int(str_id)] = PreloadedAudio(**audio_dict)
         
         if voice_line_id is not None:
             if voice_line_id in preloaded_data:
@@ -179,5 +177,5 @@ class AudioPreloadService:
             else:
                 return None
         
-        return preloaded_data.copy()
+        return preloaded_data
     

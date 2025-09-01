@@ -146,13 +146,3 @@ async def update_scenario_preferred_voice(
         raise HTTPException(status_code=500, detail=f"Failed to update preferred voice: {str(e)}")
 
 
-@router.delete("/sessions/{session_id}")
-async def clear_session(
-    session_id: str,
-    user: AuthUser = Depends(get_current_user),
-    db_session: AsyncSession = Depends(get_db_session)
-) -> Dict[str, str]:
-    """Clear a clarification session"""
-    service = ScenarioService(db_session)
-    service.clear_clarification_session(session_id, user)
-    return {"message": f"Session {session_id} cleared"}
