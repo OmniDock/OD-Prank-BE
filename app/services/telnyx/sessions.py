@@ -1,11 +1,11 @@
 from dataclasses import dataclass, asdict
-from typing import Optional, Dict, List, Set
+from typing import Optional, Dict, List
 from app.services.audio_preload_service import PreloadedAudio
 from app.services.cache_service import CacheService
 from app.core.logging import console_logger
 from app.core.utils.enums import VoiceLineTypeEnum
 from fastapi import WebSocket
-import json
+
 
 @dataclass
 class CallSession:
@@ -44,6 +44,7 @@ class CallSession:
             audios = {}
             for str_id, audio_dict in data['voice_line_audios'].items():
                 audio_dict['voice_line_type'] = VoiceLineTypeEnum[audio_dict['voice_line_type']]
+                # signed_url is optional, so it's fine if it's not present
                 audios[int(str_id)] = PreloadedAudio(**audio_dict)
             data['voice_line_audios'] = audios
         return cls(**data)
@@ -58,7 +59,7 @@ class TelnyxSessionService:
 
     async def add_conference_session(self, session: CallSession):
 
-        console_logger.info(f"Adding session {session.conference_name} to Redis")
+        console_logger.debug(f"Adding session {session.conference_name} to Redis")
         """Add a call session to Redis"""
         cache = await CacheService.get_global()
         
@@ -70,13 +71,13 @@ class TelnyxSessionService:
             prefix="telnyx:session"
         )
                 
-        console_logger.info(f"Added session {session.conference_name} to Redis")
+        console_logger.debug(f"Added session {session.conference_name} to Redis")
 
     async def get_conference_session(self, conference_name: str) -> Optional[CallSession]:
         """Get a call session from Redis"""
         cache = await CacheService.get_global()
 
-        console_logger.info(f"Getting session {conference_name} from Redis")
+        console_logger.debug(f"Getting session {conference_name} from Redis")
         
         # Try direct lookup first
         session_data = await cache.get_json(
@@ -87,14 +88,14 @@ class TelnyxSessionService:
         if session_data:
             return CallSession.from_dict(session_data)
         
-        console_logger.info(f"No session found for conference {conference_name} in Redis")
+        console_logger.debug(f"No session found for conference {conference_name} in Redis")
         return None
 
     
     async def remove_conference_session(self, conference_name: str):
         """Remove a call session from Redis"""
 
-        console_logger.info(f"Removing session {conference_name} from Redis")
+        console_logger.debug(f"Removing session {conference_name} from Redis")
         cache = await CacheService.get_global()
         session = await self.get_conference_session(conference_name)
         await cache.delete(conference_name, prefix="telnyx:session")
@@ -104,13 +105,13 @@ class TelnyxSessionService:
         outbound_ccid = session.outbound_call_control_id
 
         if webrtc_ccid:
-            console_logger.info(f"Removing WebSocket for webrtc_ccid {webrtc_ccid}")
+            console_logger.debug(f"Removing WebSocket for webrtc_ccid {webrtc_ccid}")
             ws = self._websocket_sessions.get(webrtc_ccid)
             if ws:
                 await ws.close()
                 self._websocket_sessions.pop(webrtc_ccid, None)
         else:
-            console_logger.info(f"No WebSocket found for webrtc_ccid {webrtc_ccid}")
+            console_logger.debug(f"No WebSocket found for webrtc_ccid {webrtc_ccid}")
 
         if outbound_ccid:
             ws = self._websocket_sessions.get(outbound_ccid)
@@ -118,12 +119,12 @@ class TelnyxSessionService:
                 await ws.close()
                 self._websocket_sessions.pop(outbound_ccid, None)
         else:
-            console_logger.info(f"No WebSocket found for outbound_ccid {outbound_ccid}")
+            console_logger.debug(f"No WebSocket found for outbound_ccid {outbound_ccid}")
 
     async def get_websockets(self, conference_name: str) -> List[WebSocket]:
         session = await self.get_conference_session(conference_name)
         if not session:
-            console_logger.info(f"No session found for conference {conference_name}")
+            console_logger.debug(f"No session found for conference {conference_name}")
             return []
         
         ws_list = [] 
@@ -134,9 +135,9 @@ class TelnyxSessionService:
             if ws:
                 ws_list.append(ws)
             else:
-                console_logger.info(f"No WebSocket found for webrtc_ccid {webrtc_ccid}")
+                console_logger.debug(f"No WebSocket found for webrtc_ccid {webrtc_ccid}")
         else:
-            console_logger.info(f"No WebSocket found for webrtc_ccid {webrtc_ccid}")
+            console_logger.debug(f"No WebSocket found for webrtc_ccid {webrtc_ccid}")
 
         outbound_ccid = session.outbound_call_control_id
         if outbound_ccid:
@@ -144,9 +145,9 @@ class TelnyxSessionService:
             if ws:
                 ws_list.append(ws)
             else:
-                console_logger.info(f"No WebSocket found for outbound_ccid {outbound_ccid}")
+                console_logger.debug(f"No WebSocket found for outbound_ccid {outbound_ccid}")
         else:
-            console_logger.info(f"No WebSocket found for outbound_ccid {outbound_ccid}")
+            console_logger.debug(f"No WebSocket found for outbound_ccid {outbound_ccid}")
 
         return ws_list
 
@@ -154,7 +155,7 @@ class TelnyxSessionService:
 
     def add_websocket(self, call_control_id: str, ws: WebSocket) -> None:
 
-        console_logger.info(f"Adding WebSocket for call_control_id {call_control_id}")
+        console_logger.debug(f"Adding WebSocket for call_control_id {call_control_id}")
         bucket = self._websocket_sessions.setdefault(call_control_id, {})
         bucket[id(ws)] = ws
 
@@ -162,16 +163,16 @@ class TelnyxSessionService:
 
     def remove_websocket(self, call_control_id: str, ws: WebSocket) -> None:
 
-        console_logger.info(f"Removing WebSocket for call_control_id {call_control_id}")
+        console_logger.debug(f"Removing WebSocket for call_control_id {call_control_id}")
         bucket = self._websocket_sessions.get(call_control_id)
         if not bucket:
-            console_logger.info(f"No WebSocket found for call_control_id {call_control_id}")
+            console_logger.debug(f"No WebSocket found for call_control_id {call_control_id}")
             return
         bucket.pop(id(ws), None)
         if not bucket:
             self._websocket_sessions.pop(call_control_id, None)
         else:
-            console_logger.info(f"No WebSocket found for call_control_id {call_control_id}")
+            console_logger.debug(f"No WebSocket found for call_control_id {call_control_id}")
 
 
     async def add_ccid_to_conference(self, conference_name: str, ccid: str) -> None:
@@ -181,15 +182,15 @@ class TelnyxSessionService:
     async def get_conference_name_by_ccid(self, ccid: str) -> Optional[str]:
         cache = await CacheService.get_global()
         conference_name = await cache.get(f"{ccid}", prefix="telnyx:conf_ccids")
-        console_logger.info(f"Conference name by ccid {ccid}: {conference_name}")
+        console_logger.debug(f"Conference name by ccid {ccid}: {conference_name}")
         return conference_name
 
 
     async def get_ccids_by_conference(self, conference_name: str) -> List[str]:
         session = await self.get_conference_session(conference_name)
         if not session:
-            console_logger.info(f"No session found for conference {conference_name}")
+            console_logger.debug(f"No session found for conference {conference_name}")
             return []
         
-        console_logger.info(f"CCIDs by conference {conference_name}: {session.webrtc_call_control_id, session.outbound_call_control_id}")
+        console_logger.debug(f"CCIDs by conference {conference_name}: {session.webrtc_call_control_id, session.outbound_call_control_id}")
         return [session.webrtc_call_control_id, session.outbound_call_control_id]

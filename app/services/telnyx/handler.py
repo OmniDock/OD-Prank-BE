@@ -7,25 +7,20 @@ from typing import Tuple
 
 from app.core.database import AsyncSession 
 from app.core.logging import console_logger 
-
 from app.services.telnyx.client import TelnyxHTTPClient 
 from app.services.telnyx.sessions import TelnyxSessionService, CallSession 
 from app.services.audio_preload_service import AudioPreloadService 
 from app.services.tts_service import TTSService
 
 
-
 class TelnyxHandler: 
 
     _session_service = TelnyxSessionService()
     _client = TelnyxHTTPClient()
-    # Active playback tasks stay in memory (process-specific, can't serialize asyncio.Task)
-    # These are ephemeral and will be recreated if the process restarts
     _active_playbacks_tasks: Dict[str, asyncio.Task] = {}
 
     def __init__(self):
         self.logger = console_logger 
-
 
     async def initiate_call(
             self,
@@ -46,24 +41,21 @@ class TelnyxHandler:
         
         # INITIATING THE CALL 
         call_leg_id, call_control_id, call_session_id, conference_name = await self._client.initiate_call(to_number)
-
-
         preloaded_audio = await audio_service.get_preloaded_audio(user_id, scenario_id)
-        console_logger.debug(f"Preloaded audio: {preloaded_audio}")
 
-        # STORE SESSION IN MEMORY (FOR NOW LATER WE WILL USE A DB OR CACHE)
         session = CallSession(
             user_id=str(user_id),
             scenario_id=scenario_id,
             to_number=to_number,
             from_number=self._client.FROM_NUMBER,
-            call_leg_id=call_leg_id,
-            call_control_id=call_control_id,
-            call_session_id=call_session_id,
+            outbound_call_leg_id=call_leg_id,
+            outbound_call_control_id=call_control_id,
+            outbound_call_session_id=call_session_id,
             conference_name=conference_name,
             voice_line_audios = preloaded_audio
         )
-        await self._session_service.add_session(session)
+        await self._session_service.add_conference_session(session)
+        await self._session_service.add_ccid_to_conference(conference_name, call_control_id)
 
         self.logger.info(f"Initiated call {call_leg_id} (control_id={call_control_id}) to {to_number}")
 
@@ -87,74 +79,89 @@ class TelnyxHandler:
         payload = data.get("payload", {})
         call_control_id = payload.get("call_control_id")
 
-        self.logger.info(f"Telnyx webhook event: {event_type} (call_control_id={call_control_id})")
+        self.logger.info(f"Telnyx webhook event: {event_type}")
 
         if not call_control_id:
-            self.logger.warning("Webhook without call_control_id; ignoring.")
+            console_logger.warning("Webhook without call_control_id; ignoring.")
             return
-
-        session = await self._session_service.get_session(call_control_id)
 
         if event_type == "call.initiated":
             # Differentiate between inbound and outbound calls. 
             direction = payload.get("direction")
             if direction == "outgoing":
                 # Outbound Calls from the API are answered by the called person.
-                pass 
+                return 
             elif direction == "incoming":
+
+                existing_conference = await self._session_service.get_conference_name_by_ccid(call_control_id)
+                if existing_conference:
+                    console_logger.debug(f"Already processed incoming call {call_control_id}, skipping duplicate webhook")
+                    return
+                
                 # Inbound Calls from Browsers need to be answered and joined to the conference. 
                 custom_headers = { (h.get("name") or "").lower(): (h.get("value") or "") for h in (payload.get("custom_headers") or []) }
                 conference_name = custom_headers.get("x-conference-name")
+                console_logger.debug(f"Conference name: {conference_name}")
                 if conference_name:
+
+                    session = await self._session_service.get_conference_session(conference_name)
+                    if not session:
+                        raise RuntimeError(f"No session found for conference {conference_name} (Incoming Call)")
+                    
+                    session.webrtc_call_control_id = call_control_id
+                    await self._session_service.add_conference_session(session)
+                    await self._session_service.add_ccid_to_conference(conference_name, call_control_id)
                     await self._client.answer_with_retry(call_control_id)
                     await self._client.join_conference_by_name(call_control_id, conference_name, mute=True)
-                    await self._session_service.add_ccid_to_conference(conference_name, call_control_id)
-                    await self._client.start_media_stream(call_control_id)
+
                 else:
-                    self.logger.warning(f"No conference name found in custom headers")
+                    self.logger.warning(f"(call.initiated) (outgoing) No conference name found in custom headers")
                     return
             else:
-                self.logger.warning(f"Unknown direction: {direction}")
                 return 
 
         elif event_type == "call.answered":
-            if session and session.conference_name:
-                pass
-                await self._client.start_media_stream(call_control_id)  
+            pass
 
         elif event_type == "call.hangup":
-            await self._session_service.remove_session(call_control_id)
+            conference_name = await self._session_service.get_conference_name_by_ccid(call_control_id)
+            if not conference_name:
+                self.logger.warning(f"(call.hangup) No conference name found for call control id {call_control_id}")
+                return
+            session = await self._session_service.get_conference_session(conference_name)
+            if not session:
+                self.logger.warning(f"(call.hangup) No session found for conference name {conference_name}")
+                return
+
+            outbound_ccid = session.outbound_call_control_id
+            if outbound_ccid and outbound_ccid != call_control_id:
+                await self._client.hangup_call(outbound_ccid)
+
+            inbound_ccid = session.webrtc_call_control_id
+            if inbound_ccid and inbound_ccid != call_control_id:
+                await self._client.hangup_call(inbound_ccid)
+
+            await self._session_service.remove_conference_session(conference_name)
 
 
 
     async def handle_media_ws(self, ws: WebSocket, call_control_id: str):
         await ws.accept()
 
-        console_logger.info(f"Media WS connected: {call_control_id}")
-
-        session = await self._session_service.get_session(call_control_id)
+        conference_name = await self._session_service.get_conference_name_by_ccid(call_control_id)
+        session = await self._session_service.get_conference_session(conference_name)
         if not session:
             await ws.close()
+            console_logger.error(f"(xyz) No session found for call control id {call_control_id}")
             return
         
         self._session_service.add_websocket(call_control_id, ws)
-
-        send_task = None
         try:
-            stream_id = None
-            while True:
-                msg = await ws.receive_text()
-                data = json.loads(msg)
-                if data.get("event") == "start":
-                    stream_id = data.get("stream_id") or data.get("streamId")
-                    break
-            # Keep consuming inbound to keep socket healthy
             while True:
                 inbound_msg = await ws.receive_text()
                 inbound = json.loads(inbound_msg)
                 if inbound.get("event") in ("stop", "streaming_stopped"):
                     break
-
         except WebSocketDisconnect:
             pass
         except Exception as e:
@@ -165,11 +172,10 @@ class TelnyxHandler:
 
 
     async def play_voice_line(self, user_id: str, conference_name: str, voice_line_id: int):
-        # Validate session and ownership
-        session = await self._session_service.get_session_by_conference(conference_name)
+        session = await self._session_service.get_conference_session(conference_name)
         if not session:
             raise RuntimeError(f"No session found for conference {conference_name}")
-        if str(session.user_id) != user_id:
+        if str(session.user_id) != str(user_id):
             raise RuntimeError(f"User {user_id} does not have access to conference {conference_name}")
 
         # Ensure voice line exists in session
@@ -178,11 +184,13 @@ class TelnyxHandler:
 
         audio = session.voice_line_audios[voice_line_id]
 
-        # Generate a short-lived signed URL from Supabase Storage
-        tts = TTSService()
-        signed_url = await tts.get_audio_url(audio.storage_path, expires_in=600)
+        # Use pre-cached signed URL if available, otherwise generate new one
+        signed_url = audio.signed_url
         if not signed_url:
-            raise RuntimeError("Failed to create signed URL for audio")
+            tts = TTSService()
+            signed_url = await tts.get_audio_url(audio.storage_path, expires_in=1800)
+            if not signed_url:
+                raise RuntimeError("Failed to create signed URL for audio")
 
         # Prefer conference-level playback so all participants hear it
         try:
@@ -201,7 +209,7 @@ class TelnyxHandler:
         """
         Stop any active voice line playback for a conference.
         """
-        session = await self._session_service.get_session_by_conference(conference_name)
+        session = await self._session_service.get_conference_session(conference_name)
         if session and str(session.user_id) != user_id:
             raise RuntimeError(f"User {user_id} does not have access to conference {conference_name}")
 
@@ -221,7 +229,7 @@ class TelnyxHandler:
         Hangup all calls in a conference.
         """
         # CHECK IF SESSION EXISTS 
-        session = await self._session_service.get_session_by_conference(conference_name)
+        session = await self._session_service.get_conference_session(conference_name)
         if not session:
             raise RuntimeError(f"No session found for conference {conference_name}")
         
@@ -244,7 +252,7 @@ class TelnyxHandler:
         
         # Clean up sessions
         for ccid in ccids:
-            await self._session_service.remove_session(ccid)
+            await self._session_service.remove_conference_session(conference_name)
         
         console_logger.info(f"Hung up {len(ccids)} calls in conference {conference_name}")
         return True
