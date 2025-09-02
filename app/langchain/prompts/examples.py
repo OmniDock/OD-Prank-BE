@@ -82,3 +82,30 @@ Filler
 - Dochdochdoch.
 '''
 
+
+autounfall_question_example ='''
+Title: Autounfall
+Description: Der Nachbar ruft an um zu sagen,dass sein Sohn mit seinem Dreirad gegen Max’ Auto gefahren ist. 
+Target Name: Max Müller 
+Language: German
+
+Good Examples:
+
+Was für Charaktereigenschaften oder Eigenarten hat der Nachbar? 
+Was für eine Art Auto hat Max, das angefahren wurde?
+Wie ist der Schaden passiert, normaler Unfall oder absurde Begründung?
+Wie ist die Einstellung des Nachbarn zum Schaden, fühlt er sich schuldig oder ist er frech und spielt ihn runter?
+
+
+Bad Examples
+
+Wie reagiert Max auf die Nachricht?
+Wie kennen sich Max und der Nachbar?
+Welche Farbe hat das Dreirad?
+“NO QUESTIONS”
+'''
+
+
+klima_kleber_question_example = '''
+
+'''
