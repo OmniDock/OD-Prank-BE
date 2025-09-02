@@ -29,6 +29,7 @@ async def clarifier_node(state: ScenarioState) -> dict:
         - A caller character that is fitting for the scenario and has clear personality traits that support humorous aspects of the situation. 
         - Room for comedic escalation the keeps the scenario and character believable and grounded but heightens the funny aspects of the situation.
         - If important objects are involved (e.g. Car, House, bike, etc.) they need minor details. (e.g. 'red BMW' instead of 'Car', 'blue mountain bike' instead of 'bike')
+        - Likely reaction of the target {target_name} to the caller and the scenario.
 
         <important>If the scenario is missing or not well developed, in any of the NECESSARY ASPECTS, respond with "YES"</important>
         <important>If the scenario has the NECESSARY ASPECTS, respond with "NO QUESTIONS".</important>

@@ -91,8 +91,6 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         {get_type_instructions(voice_type)}
 
         IMPORTANT RULES:
-        - Short sentences (5-12 words)
-        - No youth slang unless it specificaly fits to the character 
         - No obvious or jokes
         - Maximum ONE absurd detail, delivered deadpan
         - Use natural pauses with "..." or fillers
