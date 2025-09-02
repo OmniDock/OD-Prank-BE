@@ -409,6 +409,17 @@ class ScenarioService:
         # Return the updated scenario without audio - it's already loaded with voice_lines
         return await self._to_scenario_response(updated_scenario, include_audio=False)
     
+    async def delete_scenario(self, user: AuthUser, scenario_id: int) -> None:
+        """Delete a scenario and all its related data"""
+        # First check if the scenario exists and belongs to the user
+        scenario = await self.repository.get_scenario_by_id(scenario_id, user.id_str, load_audio=False)
+        if not scenario:
+            raise ValueError(f"Scenario {scenario_id} not found or access denied")
+        
+        # Delete the scenario (cascade will handle voice_lines and audio)
+        await self.repository.delete_scenario(scenario_id, user.id_str)
+        await self.db_session.commit()
+        console_logger.info(f"Deleted scenario {scenario_id} for user {user.id_str}")
 
     async def _persist_scenario_from_state(self, user: AuthUser, state: ScenarioState) -> Scenario:
         """Persist scenario + voice lines using repository helpers."""

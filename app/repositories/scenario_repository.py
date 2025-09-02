@@ -152,3 +152,31 @@ class ScenarioRepository:
         reloaded = await self.db_session.execute(reload_query)
         loaded_scenario = reloaded.scalar_one_or_none()
         return loaded_scenario or scenario
+    
+    async def delete_scenario(self, scenario_id: int, user_id: str | UUID) -> None:
+        """Delete a scenario and all its related data
+        
+        Args:
+            scenario_id: The scenario ID to delete
+            user_id: The user ID for RLS check
+        """
+        # Convert string to UUID if needed for database comparison
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
+        
+        # Get the scenario first to ensure it exists and belongs to the user
+        query = select(Scenario).where(
+            and_(
+                Scenario.id == scenario_id,
+                Scenario.user_id == user_id
+            )
+        )
+        result = await self.db_session.execute(query)
+        scenario = result.scalar_one_or_none()
+        
+        if not scenario:
+            raise ValueError(f"Scenario {scenario_id} not found or access denied")
+        
+        # Delete the scenario (cascade will handle related data)
+        await self.db_session.delete(scenario)
+        console_logger.info(f"Deleted scenario {scenario_id} for user {user_id}")
