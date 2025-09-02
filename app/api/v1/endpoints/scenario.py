@@ -116,11 +116,12 @@ async def get_user_scenarios(
     db_session: AsyncSession = Depends(get_db_session),
     limit: int = Query(50, ge=1, le=100, description="Number of scenarios to return"),
     offset: int = Query(0, ge=0, description="Number of scenarios to skip"),
+    only_active: bool = Query(True, description="Whether to filter scenarios by active status"),
 ) -> List[ScenarioResponse]:
     """Get scenarios for the current user"""
     try:
         scenario_service = ScenarioService(db_session)
-        return await scenario_service.get_user_scenarios(user, limit, offset)
+        return await scenario_service.get_user_scenarios(user, limit, offset, only_active=only_active)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get scenarios: {str(e)}")
 

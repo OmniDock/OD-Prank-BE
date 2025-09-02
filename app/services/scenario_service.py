@@ -248,7 +248,7 @@ class ScenarioService:
             "is_safe": state.safety.is_safe if state.safety else True,
             "is_not_safe_reason": state.safety.reasoning if state.safety and not state.safety.is_safe else None,
             "is_public": False,
-            "is_active": True
+            "is_active": False
         }
     
     def _build_scenario_analysis(self, state: ScenarioState) -> Dict[str, Any]:
@@ -385,9 +385,9 @@ class ScenarioService:
         return await self._to_scenario_response(scenario, include_audio=True)
     
 
-    async def get_user_scenarios(self, user: AuthUser, limit: int = 50, offset: int = 0) -> List[ScenarioResponse]:
+    async def get_user_scenarios(self, user: AuthUser, limit: int = 50, offset: int = 0, only_active: bool = True) -> List[ScenarioResponse]:
         """Get all scenarios for a user"""
-        scenarios = await self.repository.get_user_scenarios(user.id_str, limit, offset)
+        scenarios = await self.repository.get_user_scenarios(user.id_str, limit, offset, only_active)
         responses: List[ScenarioResponse] = []
         for s in scenarios:
             responses.append(await self._to_scenario_response(s, include_audio=False))
@@ -424,6 +424,7 @@ class ScenarioService:
     async def _persist_scenario_from_state(self, user: AuthUser, state: ScenarioState) -> Scenario:
         """Persist scenario + voice lines using repository helpers."""
         scenario_data = self._scenario_payload_from_state(user, state)
+        console_logger.info(f"Creating scenario: {scenario_data.get('title')}")
         scenario = await self.repository.create_scenario(scenario_data)
         voice_lines_payload = self._voice_lines_payload_from_state(state)
         if voice_lines_payload:

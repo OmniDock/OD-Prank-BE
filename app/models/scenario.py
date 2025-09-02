@@ -33,7 +33,7 @@ class Scenario(Base, TimestampMixin):
     is_not_safe_reason: Mapped[str] = mapped_column(Text, nullable=True)
     
     is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     
     voice_lines: Mapped[List["VoiceLine"]] = relationship(
         "VoiceLine", 
