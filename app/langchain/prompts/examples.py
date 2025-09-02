@@ -5,7 +5,7 @@ Input :
 {
  "scenario": {
    "title": "Straßenkleber
-   "description": ".",
+   "description": "Strassenkleber rufen bei Sebi an um über die morgige Strassenklebunng zu informieren und zum ",
    "target_name": "Sebi",
    "language": "GERMAN"
  }

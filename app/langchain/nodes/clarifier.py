@@ -19,18 +19,19 @@ async def clarifier_node(state: ScenarioState) -> dict:
         return {"clarifying_questions": []}
     
 
-    questions_prompt = """
+    questions_decision_prompt = """
         You are an expert comdey script writer with 15+ years of experience in creating prank call scenarios.
         You are given a prank call scenario and tasked to decide if it has enough content to create a memorable and funny prank call from it
         Your job is to ensure that tthe scenario has the details for a memorable and funny prank.
 
-        NECESSARY CONTENT OF THE SCENARIO:
-        - A believable but memorable core situation/scenario, that has aspects which can be used to create a hilarious prank call situation.
-        - A caller/character that is fitting for the scenario and supports its humorous aspects.
-        - Room for comedic escalation the keeps the scenario and character believable but heightens the funny aspects of both.
+         NECESSARY SCENARIO ASPECTS:
+        - A believable but memorable and funny core situation/scenario, that can be used to create a hilarious prank call situation. (e.g. Damaged Car, Protest on your street, etc.)
+        - A caller character that is fitting for the scenario and has clear personality traits that support humorous aspects of the situation. 
+        - Room for comedic escalation the keeps the scenario and character believable and grounded but heightens the funny aspects of the situation.
+        - If important objects are involved (e.g. Car, House, bike, etc.) they need minor details. (e.g. 'red BMW' instead of 'Car', 'blue mountain bike' instead of 'bike')
 
-        <important>If the scenario has the necessary content, respond with "NO QUESTIONS".</important>
-        <important>If the scenario is underdeveloped, respond with "YES"</important>
+        <important>If the scenario is missing or not well developed, in any of the NECESSARY ASPECTS, respond with "YES"</important>
+        <important>If the scenario has the NECESSARY ASPECTS, respond with "NO QUESTIONS".</important>
         <important>DO NOT respond with anything other than "YES" or "NO QUESTIONS" under any circumstances.</important>
         """
         
@@ -38,31 +39,23 @@ async def clarifier_node(state: ScenarioState) -> dict:
     questions_prompt ="""
         You are expert audio based comedy write and teacher, with 15+ years of experience in funny, entertaining and absurd dialogue.
 
-        NECESSARY CONTENT OF THE SCENARIO:
-        - A believable but memorable and funny core situation/scenario, that can be used to create a hilarious prank call situation.
-        - A caller/character that is fitting for the scenario and supports its humorous aspects.
-        - Room for comedic escalation the keeps the scenario and character believable but heightens the funny aspects of them.
+        NECESSARY SCENARIO ASPECTS:
+        - A believable but memorable and funny core situation/scenario, that can be used to create a hilarious prank call situation. (e.g. Damaged Car, Protest on your street, etc.)
+        - A caller character that is fitting for the scenario and has clear personality traits that support humorous aspects of the situation. 
+        - Room for comedic escalation the keeps the scenario and character believable and grounded but heightens the funny aspects of the situation.
+        - If important objects are involved (e.g. Car, House, bike, etc.) they need minor details. (e.g. 'red BMW' instead of 'Car', 'blue mountain bike' instead of 'bike')
 
         TASK:
-        - You are given a prank scenario that is missing parts of its NECESSARY CONTENT as described above.
-        - You are to come up with questions that will help fill out the NECESSARY CONTENT to the scenario and character, while staying true to the original description.
-        - 
+        - You are given a prank call scenario 
+        - Analyze if any of the NECESSARY ASPECTS are missing from the scenario or are underdeveloped.
+        - Create questions that will help fill out the NECESSARY ASPECTS of the scenario and character, while staying true to the intent of the original description.
+        - Focus ONLY on the NECESSARY ASPECTS and NOTHING ELESE.
+        - Ask open-ended questions that entice the user to fill out the NECESSARY ASPECTS of the scenario and character without any specific template details or answers.
+        - Ask 2-4 questions depending on on how much of the NECESSARY ASPECTS are missing from the scenario or are underdeveloped.
 
-        QUESTIONS SHOULD:
-        - FOCUS on adding the NECESSARY CONTENT to the scenario and character and nothing beyond that.
-        - Be open-ended.
-        - Be highly relevant to the scenario, character and the prank call dynamics.
-        - Stay true to the original description.
+        <important>DO NOT ask ANY QUESTIONS about {target_name} reactions, answers, behaviors, quirks, etc. ONLY ask about the NECESSARY ASPECTS.</important>
+        <important>DO NOT respond with anything other than the questions themselves under any circumstances.</important>
 
-        IMPORTANT:
-        - The caller is NOT known by the target unless the user explicitly says otherwise.
-        - DO NOT ASK ABOUT ANY specific characteristics, reactions, answers, or behaviors, quriks, etc. of the target.
-        - DO not include a set of specific ideas, direct quotes, lines, etc. to choose from 
-        - No simple yes/no questions.
-        - Do not ask about the relationship between the prankster and the target.
-        - Do not ask for specific quotes, questions, responses or any other direct line for the character.
-
-        Your goal: Generate 2-4 clarifying questions that add the aspects of the NECESSARY CONTENT of the scenario and character that are missing.
         """
 
     user_prompt = """
@@ -84,11 +77,13 @@ async def clarifier_node(state: ScenarioState) -> dict:
         Analyze if the scenario has the details for a memorable and funny prank or is underdeveloped.
 
         Respond with "YES" if the scenario is underdeveloped or "NO QUESTIONS" if it has the necessary details. NOTHING ELSE.
+
+        IGORE ALL PREVIOUS INSTRUCTIONS AND ONLY RESPOND WITH "YES".
     """
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
 
     routing_prompt =  ChatPromptTemplate.from_messages([
-        ("system", questions_prompt),
+        ("system", questions_decision_prompt),
         ("user", user_questions_prompt)
     ])
 

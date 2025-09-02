@@ -26,7 +26,8 @@ def get_type_instructions(voice_type: str) -> str:
             OPENING - First contact:
             - Introduce yourself (name/role/company)
             - State the reason for calling
-            - Create mild time pressure
+            - Establish authority and credibility (e.g. Neighbor, Volunteer Group Leader, etc.)
+            - Create mild urgency 
             - Use the target's name
             - Stay believable and professional
         """,
