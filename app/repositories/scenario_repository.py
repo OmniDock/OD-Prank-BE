@@ -30,8 +30,14 @@ class ScenarioRepository:
     
     # Voice line operations moved to VoiceLineRepository
     
-    async def get_scenario_by_id(self, scenario_id: int, user_id: str | UUID) -> Optional[Scenario]:
-        """Get a scenario by ID with voice lines and preferred voice audios (with RLS check)"""
+    async def get_scenario_by_id(self, scenario_id: int, user_id: str | UUID, load_audio: bool = False) -> Optional[Scenario]:
+        """Get a scenario by ID with voice lines (with RLS check)
+        
+        Args:
+            scenario_id: The scenario ID
+            user_id: The user ID for RLS check
+            load_audio: If True, also loads preferred audio for voice lines (expensive operation)
+        """
         # Convert string to UUID if needed for database comparison
         if isinstance(user_id, str):
             user_id = UUID(user_id)
@@ -48,11 +54,15 @@ class ScenarioRepository:
         result = await self.db_session.execute(query)
         scenario = result.scalar_one_or_none()
         
-        if not scenario or not scenario.preferred_voice_id:
+        if not scenario:
+            return scenario
+            
+        # Only load audio if explicitly requested and scenario has a preferred voice
+        if not load_audio or not scenario.preferred_voice_id:
             return scenario
         
-        # If scenario has a preferred voice, load the corresponding audios for all voice lines
-        console_logger.info(f"Loading preferred voice audios for scenario {scenario_id} with voice {scenario.preferred_voice_id}")
+        # Load the corresponding audios for all voice lines (only when needed for detail view)
+        console_logger.debug(f"Loading preferred voice audios for scenario {scenario_id}")
         
         # Get all voice line IDs for this scenario
         voice_line_ids = [vl.id for vl in scenario.voice_lines]
@@ -129,6 +139,9 @@ class ScenarioRepository:
             return None
         scenario.preferred_voice_id = preferred_voice_id
         await self.db_session.flush()
+        # Ensure the change persists beyond this request
+        await self.db_session.commit()
+        
         # Re-load scenario with eager-loaded voice_lines to avoid MissingGreenlet during serialization
         reload_query = (
             select(Scenario)
@@ -139,11 +152,31 @@ class ScenarioRepository:
         reloaded = await self.db_session.execute(reload_query)
         loaded_scenario = reloaded.scalar_one_or_none()
         return loaded_scenario or scenario
-
-    # Voice line operations moved to VoiceLineRepository
-
-    # Voice line operations moved to VoiceLineRepository
-
-    # Voice line operations moved to VoiceLineRepository
-
-    # Voice line operations moved to VoiceLineRepository
+    
+    async def delete_scenario(self, scenario_id: int, user_id: str | UUID) -> None:
+        """Delete a scenario and all its related data
+        
+        Args:
+            scenario_id: The scenario ID to delete
+            user_id: The user ID for RLS check
+        """
+        # Convert string to UUID if needed for database comparison
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
+        
+        # Get the scenario first to ensure it exists and belongs to the user
+        query = select(Scenario).where(
+            and_(
+                Scenario.id == scenario_id,
+                Scenario.user_id == user_id
+            )
+        )
+        result = await self.db_session.execute(query)
+        scenario = result.scalar_one_or_none()
+        
+        if not scenario:
+            raise ValueError(f"Scenario {scenario_id} not found or access denied")
+        
+        # Delete the scenario (cascade will handle related data)
+        await self.db_session.delete(scenario)
+        console_logger.info(f"Deleted scenario {scenario_id} for user {user_id}")

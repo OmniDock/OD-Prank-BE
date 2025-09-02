@@ -319,17 +319,22 @@ class ScenarioService:
     async def _to_scenario_response(self, scenario: Scenario, include_audio: bool = False) -> ScenarioResponse:
         """Convert a Scenario ORM object into ScenarioResponse"""
         voice_lines_response: List[VoiceLineResponse] = []
+
+        # Batch sign preferred audios (if requested and available), with caching
+        signed_map: Dict[str, Optional[str]] = {}
+        if include_audio:
+            storage_paths: List[str] = []
+            for vl in scenario.voice_lines:
+                if hasattr(vl, '_preferred_audio') and vl._preferred_audio and getattr(vl._preferred_audio, 'storage_path', None):
+                    storage_paths.append(vl._preferred_audio.storage_path)
+            if storage_paths:
+                tts_service = TTSService()
+                signed_map = await tts_service.get_audio_urls_batch(storage_paths, expires_in=3600)
         for vl in scenario.voice_lines:
             preferred_audio = None
             if include_audio and hasattr(vl, '_preferred_audio') and vl._preferred_audio:
                 audio = vl._preferred_audio
-                signed_url = None
-                if audio.storage_path:
-                    try:
-                        tts_service = TTSService()
-                        signed_url = await tts_service.get_audio_url(audio.storage_path)
-                    except Exception as e:
-                        console_logger.warning(f"Failed to generate signed URL for audio {audio.id}: {str(e)}")
+                signed_url = signed_map.get(audio.storage_path) if audio.storage_path else None
                 preferred_audio = VoiceLineAudioResponse(
                     id=audio.id,
                     voice_id=audio.voice_id,
@@ -372,7 +377,8 @@ class ScenarioService:
 
     async def get_scenario(self, user: AuthUser, scenario_id: int) -> ScenarioResponse:
         """Get a scenario by ID"""
-        scenario = await self.repository.get_scenario_by_id(scenario_id, user.id_str)
+        # Load audio for detail view - it needs to show play buttons
+        scenario = await self.repository.get_scenario_by_id(scenario_id, user.id_str, load_audio=True)
         
         if not scenario:
             raise ValueError(f"Scenario {scenario_id} not found")
@@ -392,16 +398,28 @@ class ScenarioService:
                                     preferred_voice_id: str) -> ScenarioResponse:
         """Update the preferred voice for a scenario"""
         
-        scenario = await self.repository.get_scenario_by_id(scenario_id, user.id_str)
+        # Use the repository method that already has the update logic
+        updated_scenario = await self.repository.update_scenario_preferred_voice(
+            scenario_id, user.id_str, preferred_voice_id
+        )
         
-        if not scenario:
+        if not updated_scenario:
             raise ValueError(f"Scenario {scenario_id} not found")
         
-        scenario.preferred_voice_id = preferred_voice_id
-        await self.db_session.commit()
-
-        return await self.get_scenario(user, scenario_id)
+        # Return the updated scenario without audio - it's already loaded with voice_lines
+        return await self._to_scenario_response(updated_scenario, include_audio=False)
     
+    async def delete_scenario(self, user: AuthUser, scenario_id: int) -> None:
+        """Delete a scenario and all its related data"""
+        # First check if the scenario exists and belongs to the user
+        scenario = await self.repository.get_scenario_by_id(scenario_id, user.id_str, load_audio=False)
+        if not scenario:
+            raise ValueError(f"Scenario {scenario_id} not found or access denied")
+        
+        # Delete the scenario (cascade will handle voice_lines and audio)
+        await self.repository.delete_scenario(scenario_id, user.id_str)
+        await self.db_session.commit()
+        console_logger.info(f"Deleted scenario {scenario_id} for user {user.id_str}")
 
     async def _persist_scenario_from_state(self, user: AuthUser, state: ScenarioState) -> Scenario:
         """Persist scenario + voice lines using repository helpers."""
@@ -411,5 +429,5 @@ class ScenarioService:
         if voice_lines_payload:
             await self.voice_line_repository.add_voice_lines(scenario.id, voice_lines_payload)
         await self.db_session.commit()
-        scenario = await self.repository.get_scenario_by_id(scenario.id, user.id_str)
+        scenario = await self.repository.get_scenario_by_id(scenario.id, user.id_str, load_audio=False)
         return scenario

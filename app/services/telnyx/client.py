@@ -185,6 +185,11 @@ class TelnyxHTTPClient:
                 self.logger.warning(f"Call {call_control_id} not found, may already be terminated")
                 return
             
+            if resp.status_code == 422:
+                # Call might already be hung up
+                self.logger.warning(f"Call {call_control_id} not found, may already be terminated")
+                return
+            
             resp.raise_for_status()
             
             if self.logging_enabled:

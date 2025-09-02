@@ -24,6 +24,7 @@ class PreloadedAudio:
     voice_id: str
     duration_ms: Optional[int]
     storage_path: str
+    signed_url: Optional[str] = None  # Pre-cached signed URL
     
 class AudioPreloadService:
     """Service to preload and manage MP3 files in Redis cache for quick prank call access"""
@@ -112,8 +113,11 @@ class AudioPreloadService:
             if not audio_files_to_load:
                 return False, "No ready audio files found for preloading"
             
+            # Batch generate signed URLs for all storage paths
+            storage_paths = [audio.storage_path for _, audio in audio_files_to_load]
+            signed_urls = await self.tts_service.get_audio_urls_batch(storage_paths, expires_in=3600)
             
-            # Download audio files with concurrency limit
+            # Build preloaded audio with signed URLs
             preloaded_audio = {}
                 
             for voice_line, audio in audio_files_to_load:   
@@ -123,7 +127,8 @@ class AudioPreloadService:
                     order_index=voice_line.order_index,
                     voice_id=audio.voice_id,
                     duration_ms=audio.duration_ms,
-                    storage_path=audio.storage_path
+                    storage_path=audio.storage_path,
+                    signed_url=signed_urls.get(audio.storage_path)  # Include pre-cached signed URL
                 )
                 preloaded_audio[voice_line.id] = preloaded
             

@@ -5,7 +5,7 @@ from supabase import create_client, Client
 from app.core.config import settings
 from app.core.logging import console_logger
 import uuid
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, List
 from datetime import datetime, timezone
 from app.core.utils.enums import ElevenLabsModelEnum, ElevenLabsVoiceIdEnum, LanguageEnum, GenderEnum
 from app.core.utils.voices_catalog import get_voice_id
@@ -17,6 +17,7 @@ import wave
 import io 
 import os
 import random
+from app.services.cache_service import CacheService
 
 
 class TTSService: 
@@ -129,7 +130,7 @@ class TTSService:
                 for attempt in range(1, max_attempts + 1):
                     try:
                         audio_bytes = await asyncio.to_thread(_convert_sync)
-                        console_logger.info("Audio generation successful")
+                        console_logger.debug("Audio generation successful")
                         return audio_bytes
                     except Exception as e:
                         msg = str(e).lower()
@@ -175,8 +176,8 @@ class TTSService:
             # Generate user-dependent private path
             file_path = self._get_storage_path(user_id, voice_line_id)
             
-            console_logger.info(f"Storing private audio file: {file_path}")
-            console_logger.info(f"Audio data size: {len(audio_data)} bytes")
+            console_logger.debug(f"Storing private audio file: {file_path}")
+            console_logger.debug(f"Audio data size: {len(audio_data)} bytes")
             
             # Upload to Supabase Storage (blocking client) in a thread
             def _upload_sync():
@@ -194,7 +195,7 @@ class TTSService:
             
             # Modern Supabase client doesn't have .error attribute
             # Instead, check if upload was successful by examining the response
-            console_logger.info(f"Upload successful, response: {response}")
+            console_logger.debug(f"Upload successful, response: {response}")
             
             # Generate signed URL for private access (valid for 1 hour)
             def _signed_url_sync():
@@ -217,7 +218,7 @@ class TTSService:
                 console_logger.error(f"Failed to create signed URL: {signed_url_response}")
                 return None, None
             
-            console_logger.info(f"Private audio stored successfully with signed URL")
+            console_logger.debug(f"Private audio stored successfully with signed URL")
             return signed_url, file_path
             
         except Exception as e:
@@ -256,6 +257,63 @@ class TTSService:
             console_logger.error(f"Error getting audio URL: {str(e)}")
             return None
 
+    async def get_audio_urls_batch(self, storage_paths: List[str], expires_in: int = 3600) -> Dict[str, Optional[str]]:
+        """
+        Create signed URLs in bulk using Supabase's Python API and cache results in Redis.
+        Docs: https://supabase.com/docs/reference/python/storage-from-createsignedurls
+        """
+        if not storage_paths:
+            return {}
+
+        cache = await CacheService.get_global()
+        cache_prefix = "tts:signed"
+
+        results: Dict[str, Optional[str]] = {}
+        missing: List[str] = []
+        for path in storage_paths:
+            try:
+                cached = await cache.get(path, prefix=cache_prefix)
+            except Exception:
+                cached = None
+            if cached:
+                results[path] = cached
+            else:
+                missing.append(path)
+
+        if missing:
+            def _batch_sign_sync():
+                return (
+                    self.storage_client
+                    .storage
+                    .from_(self.bucket_name)
+                    .create_signed_urls(missing, expires_in)
+                )
+
+            response = await asyncio.to_thread(_batch_sign_sync)
+            # Normalize response to a list of item dicts
+            if hasattr(response, "data"):
+                items = response.data
+            elif isinstance(response, dict):
+                items = response.get("data", [])
+            elif isinstance(response, list):
+                items = response
+            else:
+                items = []
+            for idx, path in enumerate(missing):
+                signed_url = None
+                if idx < len(items) and isinstance(items[idx], dict):
+                    signed_url = items[idx].get("signedURL")
+                results[path] = signed_url
+                if signed_url:
+                    # Cache slightly shorter than expiry to reduce stale entries
+                    ttl = max(60, expires_in - 60)
+                    try:
+                        await cache.set(path, signed_url, ttl=ttl, prefix=cache_prefix)
+                    except Exception:
+                        pass
+
+        return results
+
     async def generate_and_store_audio(self, text: str, voice_line_id: int, user_id: str,
                                      voice_id: str = None, model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,
                                      voice_settings: Optional[Dict] = None) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
@@ -266,7 +324,7 @@ class TTSService:
             Tuple[success: bool, signed_url: Optional[str], storage_path: Optional[str], error_message: Optional[str]]
         """
         try:
-            console_logger.info(f"Generating and storing audio for voice line {voice_line_id} (user: {user_id})")
+            console_logger.debug(f"Generating and storing audio for voice line {voice_line_id} (user: {user_id})")
             
             # Step 1: Generate audio with voice selection
             audio_data = await self.generate_audio(text, voice_id, model, voice_settings)
@@ -276,7 +334,7 @@ class TTSService:
             signed_url, storage_path = await self.store_audio_file(wav_bytes, voice_line_id, user_id)
             
             if signed_url and storage_path:
-                console_logger.info(f"Voice line {voice_line_id} successfully generated and stored")
+                console_logger.debug(f"Voice line {voice_line_id} successfully generated and stored")
                 return True, signed_url, storage_path, None
             else:
                 error_msg = "Audio generation succeeded but storage failed"
@@ -291,7 +349,7 @@ class TTSService:
     async def delete_audio_file(self, storage_path: str) -> bool:
         """Delete audio file from Supabase Storage using storage path"""
         try:
-            console_logger.info(f"Deleting audio file: {storage_path}")
+            console_logger.debug(f"Deleting audio file: {storage_path}")
             
             def _remove_sync():
                 return self.storage_client.storage.from_(self.bucket_name).remove([storage_path])
@@ -300,7 +358,7 @@ class TTSService:
             
             # Modern Supabase client doesn't have .error attribute
             # If no exception is raised, consider it successful
-            console_logger.info(f"Audio file deleted successfully: {storage_path}")
+            console_logger.debug(f"Audio file deleted successfully: {storage_path}")
             return True
             
         except Exception as e:
@@ -318,7 +376,7 @@ class TTSService:
             Tuple[success: bool, new_signed_url: Optional[str], new_storage_path: Optional[str], error_message: Optional[str]]
         """
         try:
-            console_logger.info(f"Regenerating audio for voice line {voice_line_id}")
+            console_logger.debug(f"Regenerating audio for voice line {voice_line_id}")
             
             # Generate new audio first
             success, new_signed_url, new_storage_path, error_msg = await self.generate_and_store_audio(
@@ -332,7 +390,7 @@ class TTSService:
                     if not delete_success:
                         console_logger.warning(f"Failed to delete old audio file: {old_storage_path}")
                 
-                console_logger.info(f"Audio regeneration successful for voice line {voice_line_id}")
+                console_logger.debug(f"Audio regeneration successful for voice line {voice_line_id}")
                 return True, new_signed_url, new_storage_path, None
             else:
                 return False, None, None, error_msg

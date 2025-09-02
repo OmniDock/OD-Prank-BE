@@ -146,3 +146,22 @@ async def update_scenario_preferred_voice(
         raise HTTPException(status_code=500, detail=f"Failed to update preferred voice: {str(e)}")
 
 
+@router.delete("/{scenario_id}")
+async def delete_scenario(
+    scenario_id: int,
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> Dict[str, bool]:
+    """Delete a scenario by ID"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        await scenario_service.delete_scenario(user, scenario_id)
+        return {"success": True}
+    except ValueError as e:
+        console_logger.warning(f"Scenario {scenario_id} not found: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        console_logger.error(f"Error deleting scenario {scenario_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete scenario: {str(e)}")
+
+
