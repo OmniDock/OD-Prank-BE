@@ -81,7 +81,7 @@ class ScenarioService:
         if getattr(state, "require_clarification", False) and getattr(state, "clarifying_questions", None):
             import uuid
             new_session_id = str(uuid.uuid4())
-            cache.set_json(new_session_id, {
+            await cache.set_json(new_session_id, {
                 "state": state.model_dump() if hasattr(state, "model_dump") else state,
                 "user_id": user.id_str
             }, ttl=900, prefix="scenario:clarify")
@@ -398,14 +398,28 @@ class ScenarioService:
                                     preferred_voice_id: str) -> ScenarioResponse:
         """Update the preferred voice for a scenario"""
         
-        # Use the repository method that already has the update logic
+        # Load current scenario to capture existing active state
+        current = await self.repository.get_scenario_by_id(scenario_id, user.id_str, load_audio=False)
+        if not current:
+            raise ValueError(f"Scenario {scenario_id} not found")
+
+        was_active = current.is_active
+
+        # Update preferred voice
         updated_scenario = await self.repository.update_scenario_preferred_voice(
             scenario_id, user.id_str, preferred_voice_id
         )
-        
         if not updated_scenario:
             raise ValueError(f"Scenario {scenario_id} not found")
-        
+
+        # If the scenario was active, ensure the new voice has complete audio coverage; otherwise deactivate
+        if was_active:
+            status = await self.get_audio_generation_status(user, scenario_id)
+            if not status.get("is_complete", False):
+                # Deactivate when incomplete for the new voice
+                updated_scenario.is_active = False
+                await self.db_session.commit()
+
         # Return the updated scenario without audio - it's already loaded with voice_lines
         return await self._to_scenario_response(updated_scenario, include_audio=False)
     
