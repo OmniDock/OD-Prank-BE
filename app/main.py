@@ -17,9 +17,9 @@ async def lifespan(app: FastAPI):
     app.state.cache = cache
 
     # Startup: Ensure voice previews
-    # service = PreviewTTSService()
-    # catalog = get_voices_catalog()
-    # await service.ensure_previews_for_catalog(catalog)
+    service = PreviewTTSService()
+    catalog = get_voices_catalog()
+    await service.ensure_previews_for_catalog(catalog)
     yield
 
     # Shutdown: close global cache
