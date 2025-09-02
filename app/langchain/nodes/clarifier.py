@@ -43,7 +43,7 @@ async def clarifier_node(state: ScenarioState) -> dict:
         - A believable but memorable and funny core situation/scenario, that can be used to create a hilarious prank call situation. (e.g. Damaged Car, Protest on your street, etc.)
         - A caller character that is fitting for the scenario and has clear personality traits that support humorous aspects of the situation. 
         - A Path for comedic escalation the keeps the scenario and character believable and grounded but heightens the funny aspects of the situation over time.
-        - If important objects are involved that belong to the target (e.g. Car, House, bike, etc.) they need minor details. (e.g. 'red BMW' instead of 'Car', 'blue mountain bike' instead of 'bike')
+        - If objects are involved that belong directly to the target {target_name} (e.g. Car, House, bike, etc.) they need minor details. (e.g. 'red BMW' instead of 'Car', 'blue mountain bike' instead of 'bike')
 
         TASK:
         - You are given a prank call scenario 
