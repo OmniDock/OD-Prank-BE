@@ -147,6 +147,50 @@ async def update_scenario_preferred_voice(
         raise HTTPException(status_code=500, detail=f"Failed to update preferred voice: {str(e)}")
 
 
+class ScenarioSetActiveRequest(BaseModel):
+    is_active: bool
+
+class AudioGenerationStatusResponse(BaseModel):
+    total_voice_lines: int
+    generated_count: int
+    pending_count: int
+    is_complete: bool
+    can_activate: bool  # True if is_safe and all audios generated
+
+@router.patch("/{scenario_id}/active", response_model=ScenarioResponse)
+async def set_scenario_active(
+    scenario_id: int,
+    payload: ScenarioSetActiveRequest = Body(...),
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    """Set scenario active/inactive status"""
+    try:
+        service = ScenarioService(db_session)
+        updated = await service.set_active_status(user, scenario_id, payload.is_active)
+        return updated
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update active status: {str(e)}")
+
+@router.get("/{scenario_id}/audio-status", response_model=AudioGenerationStatusResponse)
+async def get_audio_generation_status(
+    scenario_id: int,
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    """Get audio generation status for all voice lines in a scenario"""
+    try:
+        service = ScenarioService(db_session)
+        status = await service.get_audio_generation_status(user, scenario_id)
+        return status
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get audio status: {str(e)}")
+
+
 @router.delete("/{scenario_id}")
 async def delete_scenario(
     scenario_id: int,
