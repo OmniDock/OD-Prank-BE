@@ -3,20 +3,20 @@ Core principles and examples for deadpan prank calls (English prompts)
 """
 
 # The 3 core principles for all generation
-DEADPAN_PRINCIPLES = """
+CORE_PRINCIPLES = """
     THREE CORE PRINCIPLES for believable prank calls:
 
     1. START BELIEVABLE
-    - Use real, everyday situations (package delivery, internet issues, building management)
-    - No made-up company names like "ServicePlus24"
-    - Use known entities or vague descriptions ("Technical Support", "Building Management")
+    - Use believable, grounded but slightly unusual situation
+    - Use realistic sounding entities or vague descriptions that make sense in the context of the situation
+    - Assert some sense of authority or credibility (e.g. Representative of an entity, neighbor, etc.)
+    - Create immediate releveance to the target (e.g. "I'm calling about your package", "Are you the owner of the house?")
 
     2. INSERT ABSURD DETAILS
     - Strange question/requirement that doesn't fit - or a random side fact 
     - Deliver it completely deadpan, as if totally normal
-    - The more mundane the absurd question, the better
 
-    3. NEVER ACKNOWLEDGE THE ABSURDITY
+    3. STAY IN CHARACTER
     - Character takes the absurd question/requirement as normal and serious
     - Character creates explanations for the absurdity if questions
     - Stay in character 
@@ -27,19 +27,9 @@ def get_language_guidelines(language: str) -> str:
     """Get language-specific speech patterns"""
     if language.lower() in ["de", "german", "deutsch"]:
         return """
-            GERMAN SPEECH PATTERNS:
-                - Polite-distant "Sie" form
-                - Bureaucratic phrases: "laut System" (according to system), "gemäß Protokoll" (per protocol), "für die Unterlagen" (for documentation)
-                - Natural fillers: "äh", "also", "moment"
-                - Typical phrases: "Das ist merkwürdig" (that's odd), "Das System spinnt" (system's acting up), "Keine Ahnung warum" (no idea why)
         """
     else:
         return """
-            ENGLISH SPEECH PATTERNS:
-            - Professional but tired tone
-            - Bureaucratic phrases: "according to the system", "per protocol", "for documentation"
-            - Natural fillers: "uh", "well", "hold on"
-            - Common phrases: "That's odd", "System's acting up", "Not sure why"
         """
 
 
@@ -93,6 +83,10 @@ GOOD_EXAMPLES = {
         "Okay."
     ]
 }
+
+
+
+
 
 # Bad patterns to avoid
 AVOID_PATTERNS = [

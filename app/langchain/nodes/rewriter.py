@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState
-from app.langchain.prompts.core_principles import GOOD_EXAMPLES, DEADPAN_PRINCIPLES
+from app.langchain.prompts.core_principles import GOOD_EXAMPLES, CORE_PRINCIPLES
 from app.core.logging import console_logger
 
 
@@ -30,7 +30,7 @@ async def rewriter_node(state: ScenarioState) -> dict:
         return {}
     
     system_prompt = f"""
-        {DEADPAN_PRINCIPLES}
+        {CORE_PRINCIPLES}
 
         The generated lines have quality issues:
         - Seriousness: {state.quality.seriousness:.2f} (Target: > 0.7)

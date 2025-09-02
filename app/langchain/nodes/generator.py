@@ -7,10 +7,11 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState
 from app.langchain.prompts.core_principles import (
-    DEADPAN_PRINCIPLES, 
+    CORE_PRINCIPLES, 
     get_language_guidelines,
     GOOD_EXAMPLES
 )
+from app.langchain.prompts.examples import kleber_generator_example, refugee_camp_generator_example
 from app.core.logging import console_logger
 
 
@@ -79,7 +80,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         voice_context = f"\nCHARACTER VOICE: {state.analysis.voice_hints}"
     
     system_prompt = f"""
-        {DEADPAN_PRINCIPLES}
+        {CORE_PRINCIPLES}
 
         {get_language_guidelines(getattr(state.scenario_data.language, 'value', 'de'))}
 
@@ -97,6 +98,11 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         - ALWAYS stay in character
         - NO REPETITION - each line must be unique
         - Avoid excessive name usage 
+
+        GOOD EXAMPLES:
+        {kleber_generator_example}
+        {refugee_camp_generator_example}
+
     """
 
     # Include relevant examples
