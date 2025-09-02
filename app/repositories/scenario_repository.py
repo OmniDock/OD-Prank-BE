@@ -95,21 +95,31 @@ class ScenarioRepository:
         
         return scenario
     
-    async def get_user_scenarios(self, user_id: str | UUID, limit: int = 50, offset: int = 0) -> List[Scenario]:
+    async def get_user_scenarios(self, user_id: str | UUID, limit: int = 50, offset: int = 0, only_active: bool = True) -> List[Scenario]:
         """Get scenarios for a user"""
         # Convert string to UUID if needed
         if isinstance(user_id, str):
             user_id = UUID(user_id)
         
-        query = (
-            select(Scenario)
-            .options(selectinload(Scenario.voice_lines))
-            .where(Scenario.user_id == user_id)
-            .where(Scenario.is_active == True)
-            .order_by(Scenario.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
+        if only_active:
+            query = (
+                select(Scenario)
+                .options(selectinload(Scenario.voice_lines))
+                .where(Scenario.user_id == user_id)
+                .where(Scenario.is_active == True)
+                .order_by(Scenario.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
+        else:
+            query = (
+                select(Scenario)
+                .options(selectinload(Scenario.voice_lines))
+                .where(Scenario.user_id == user_id)
+                .order_by(Scenario.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
         
         result = await self.db_session.execute(query)
         return result.scalars().all()
