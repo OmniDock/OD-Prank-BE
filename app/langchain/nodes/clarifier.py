@@ -34,9 +34,8 @@ async def clarifier_node(state: ScenarioState) -> dict:
         <important>If the scenario has the NECESSARY ASPECTS, respond with "NO QUESTIONS".</important>
         <important>DO NOT respond with anything other than "YES" or "NO QUESTIONS" under any circumstances.</important>
         """
-    
-    
-        
+
+
     questions_prompt ="""
        You are expert audio based comedy write and teacher, with 15+ years of experience in funny, entertaining and absurd dialogue.
 
@@ -53,6 +52,7 @@ async def clarifier_node(state: ScenarioState) -> dict:
         - Focus ONLY on the NECESSARY ASPECTS.
         - If all NECESSARY ASPECTS are present and well developed, respond with "NO QUESTIONS".
         - Ask open-ended questions that entice the user to fill out the NECESSARY ASPECTS of the scenario and character without any specific template details or answers.
+        - Ask at most 4 questions.
 
         <important>DO NOT respond with anything other than the questions themselves or 'NO QUESTIONS' under any circumstances.</important>
 
