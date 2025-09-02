@@ -25,7 +25,7 @@ class TTSService:
 
     # Process-wide concurrency gate for ElevenLabs TTS (simple in-process queue)
     # Tune via ELEVENLABS_MAX_CONCURRENCY env var; defaults to 2 (e.g., Free plan)
-    _MAX_CONCURRENCY = int(os.getenv("ELEVENLABS_MAX_CONCURRENCY", "8"))
+    _MAX_CONCURRENCY = int(os.getenv("ELEVENLABS_MAX_CONCURRENCY", "10"))
     _SEM = asyncio.Semaphore(_MAX_CONCURRENCY)
 
     def __init__(self):
