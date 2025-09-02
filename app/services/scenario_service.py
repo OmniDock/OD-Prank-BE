@@ -432,3 +432,79 @@ class ScenarioService:
         await self.db_session.commit()
         scenario = await self.repository.get_scenario_by_id(scenario.id, user.id_str, load_audio=False)
         return scenario
+    
+    async def set_active_status(self, user: AuthUser, scenario_id: int, is_active: bool) -> ScenarioResponse:
+        """Set scenario active/inactive status"""
+        console_logger.info(f"Setting scenario {scenario_id} active status to {is_active}")
+        
+        # Get scenario and verify ownership
+        scenario = await self.repository.get_scenario_by_id(scenario_id, user.id_str, load_audio=True)
+        if not scenario:
+            raise ValueError(f"Scenario {scenario_id} not found")
+        
+        # Check if scenario can be activated
+        if is_active:
+            # Check if scenario is safe
+            if not scenario.is_safe:
+                raise ValueError("Cannot activate unsafe scenario")
+            
+            # Check if all voice lines have audio
+            audio_status = await self.get_audio_generation_status(user, scenario_id)
+            if not audio_status["is_complete"]:
+                raise ValueError("Cannot activate scenario without all audio files generated")
+        
+        # Update active status
+        scenario.is_active = is_active
+        await self.db_session.commit()
+        
+        return await self._to_scenario_response(scenario, include_audio=True)
+    
+    async def get_audio_generation_status(self, user: AuthUser, scenario_id: int) -> dict:
+        """Get audio generation status for all voice lines"""
+        from app.models.voice_line_audio import VoiceLineAudio
+        from app.core.utils.enums import VoiceLineAudioStatusEnum
+        from sqlalchemy import select, and_
+        
+        scenario = await self.repository.get_scenario_by_id(scenario_id, user.id_str, load_audio=False)
+        if not scenario:
+            raise ValueError(f"Scenario {scenario_id} not found")
+        
+        total_voice_lines = len(scenario.voice_lines)
+        generated_count = 0
+        pending_count = 0
+        
+        # Get all voice line IDs
+        voice_line_ids = [vl.id for vl in scenario.voice_lines]
+        
+        if voice_line_ids and scenario.preferred_voice_id:
+            # Query for audios that match the preferred voice
+            audio_query = (
+                select(VoiceLineAudio)
+                .where(
+                    and_(
+                        VoiceLineAudio.voice_line_id.in_(voice_line_ids),
+                        VoiceLineAudio.voice_id == scenario.preferred_voice_id
+                    )
+                )
+            )
+            
+            audio_result = await self.db_session.execute(audio_query)
+            audios = audio_result.scalars().all()
+            
+            # Count by status
+            for audio in audios:
+                if audio.status == VoiceLineAudioStatusEnum.READY:
+                    generated_count += 1
+                elif audio.status == VoiceLineAudioStatusEnum.PENDING:
+                    pending_count += 1
+        
+        is_complete = generated_count == total_voice_lines
+        can_activate = scenario.is_safe and is_complete
+        
+        return {
+            "total_voice_lines": total_voice_lines,
+            "generated_count": generated_count,
+            "pending_count": pending_count,
+            "is_complete": is_complete,
+            "can_activate": can_activate
+        }
