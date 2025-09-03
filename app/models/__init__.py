@@ -7,4 +7,4 @@ import sqlalchemy_continuum
 # Initialize continuum (Similar to Django's django-simple-history)
 sqlalchemy_continuum.make_versioned(user_cls=None)
 
-__all__ = ["Base", "Scenario", "VoiceLine", "VoiceLineAudio"]
+__all__ = ["Base", "Scenario", "VoiceLine", "VoiceLineAudio", "Blacklist"]
