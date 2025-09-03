@@ -26,11 +26,11 @@ class ScenarioProcessRequest(BaseModel):
         None,
         description="Session ID for continuing with clarifications"
     )
-    clarifying_questions: Optional[List[str]] = Field(
+    clarifying_questions: Optional[str] = Field(
         None,
         description="Clarifying questions"
     )
-    clarifications: Optional[List[str]] = Field(
+    clarifications: Optional[str] = Field(
         None,
         description="Answers to clarifying questions"
     )
@@ -40,7 +40,7 @@ class ScenarioProcessResponse(BaseModel):
     """Response from scenario processing"""
     status: str = Field(description="Status: needs_clarification, complete, error")
     session_id: Optional[str] = Field(None, description="Session ID for continuation")
-    clarifying_questions: Optional[List[str]] = None
+    clarifying_questions: Optional[str] = None
     scenario_id: Optional[int] = Field(None, description="Created scenario ID")
     error: Optional[str] = None
 
@@ -61,6 +61,7 @@ async def process_scenario(
     console_logger.info(f"Request: {request}")
     try:
         service = ScenarioService(db_session)
+
         result = await service.process_with_clarification_flow(
             user=user,
             scenario_data=request.scenario,
@@ -68,6 +69,8 @@ async def process_scenario(
             clarifying_questions=request.clarifying_questions,
             clarifications=request.clarifications
         )
+
+        result["clarifying_questions"] = " ".join(result["clarifying_questions"])
         return ScenarioProcessResponse(**result)
     except HTTPException:
         raise
