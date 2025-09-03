@@ -11,7 +11,7 @@ from app.langchain.prompts.core_principles import (
     get_language_guidelines,
     GOOD_EXAMPLES
 )
-from app.langchain.prompts.examples import kleber_generator_example, refugee_camp_generator_example
+from app.langchain.prompts.examples import kleber_generator_example, refugee_camp_generator_example, trash_generator_example
 from app.core.logging import console_logger
 
 
@@ -102,6 +102,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         GOOD EXAMPLES:
         {kleber_generator_example}
         {refugee_camp_generator_example}
+        {trash_generator_example}
     """
 
     # Include relevant examples

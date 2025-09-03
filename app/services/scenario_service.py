@@ -30,6 +30,7 @@ class ScenarioService:
         user: AuthUser,
         scenario_data: Optional[ScenarioCreateRequest],
         session_id: Optional[str],
+        clarifying_questions: Optional[List[str]],
         clarifications: Optional[List[str]]
     ) -> Dict[str, Any]:
         """
@@ -62,6 +63,8 @@ class ScenarioService:
 
             stored_state = cached_session["state"]
             state = ScenarioState(**stored_state) if isinstance(stored_state, dict) else stored_state
+            if clarifying_questions:
+                state.clarifying_questions = clarifying_questions
             if clarifications:
                 state.clarifications = clarifications
                 state.require_clarification = False
@@ -76,6 +79,7 @@ class ScenarioService:
         # Process scenario via LangChain graph
         result = await processor.process(state)
         state = ScenarioState(**result) if isinstance(result, dict) else result
+
 
         # Needs clarification → store session and return questions
         if getattr(state, "require_clarification", False) and getattr(state, "clarifying_questions", None):

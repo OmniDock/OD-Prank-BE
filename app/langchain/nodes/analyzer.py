@@ -80,35 +80,21 @@ Return all text in {language} language.
     # Add clarifications if available
     clarifications_text = ""
     if state.clarifications and state.clarifying_questions:
-        clarifications_text = "\nAdditional Information:\n"
+        clarifications_text = "\CRUCIAL INFORMATION TO USE: Questions with answers about the scenarion and persona that help add detail. :\n"
         # Pair questions with answers
         for i, question in enumerate(state.clarifying_questions):
             if i < len(state.clarifications):
                 answer = state.clarifications[i]
                 clarifications_text += f"- Question: {question}\n  Answer: {answer}\n"
-    print(f"Clarifications text: {clarifications_text}")
+
 
     llm = ChatOpenAI(model="gpt-4.1", temperature=0.3).with_structured_output(AnalysisOutput)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)
     ])
-
-    chain = prompt | llm
-    print(state)
-     # Extract the formatted prompt
-    formatted_prompt = prompt.format_messages(
-        title=state.scenario_data.title,
-        description=state.scenario_data.description or "",
-        target_name=state.scenario_data.target_name,
-        language=getattr(state.scenario_data.language, 'value', str(state.scenario_data.language)),
-        clarifications_text=clarifications_text
-    )
     
-    # Log the formatted prompt for debugging
-    console_logger.info("Full Analysis Prompt:")
-    for message in formatted_prompt:
-        console_logger.info(f"{message.type}: {message.content}")
+    chain = prompt | llm
     
     try:
         result = await chain.ainvoke({

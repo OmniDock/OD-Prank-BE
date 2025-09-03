@@ -16,7 +16,7 @@ async def clarifier_node(state: ScenarioState) -> dict:
     # Skip if clarification not required or already provided
     if not state.require_clarification or state.clarifications:
         console_logger.info("Skipping clarification - not required or already provided")
-        return {"clarifying_questions": []}
+        return {"clarifying_questions": state.clarifying_questions}
     
 
     questions_decision_prompt = """
@@ -43,7 +43,7 @@ async def clarifier_node(state: ScenarioState) -> dict:
         NECESSARY SCENARIO ASPECTS:
         - A believable but memorable and funny core situation/scenario, that can be used to create a hilarious prank call situation. (e.g. Damaged Car, Protest on your street, etc.)
         - A caller character that is fitting for the scenario and has clear personality traits that support humorous aspects of the situation. Do not ask for his name 
-        - A Relationship of the caller to the situation or goal of the caller regarding the situation and target. 
+        - Relevant infos about the target {target_name} that are relevant for the scenario.
         - A Path for comedic escalation the keeps the scenario and character believable and grounded but heightens the funny aspects of the situation over time.
         - If objects are involved that belong directly to the target {target_name} and have an important role in the scenario (e.g. Car, House, bike, etc.) they need minor details. (e.g. 'red BMW' instead of 'Car', 'blue mountain bike' instead of 'bike')
 
@@ -114,7 +114,6 @@ async def clarifier_node(state: ScenarioState) -> dict:
         ("system", questions_prompt),
         ("user", user_prompt)
     ])
-    
     chain = prompt | llm 
     
     try:
