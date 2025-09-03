@@ -45,20 +45,21 @@ async def clarifier_node(state: ScenarioState) -> dict:
         - A caller character that is fitting for the scenario and has clear personality traits that support humorous aspects of the situation. 
         - A Relationship of the caller to the situation or goal of the caller regarding the situation and target. 
         - A Path for comedic escalation the keeps the scenario and character believable and grounded but heightens the funny aspects of the situation over time.
-        - If objects are involved that belong directly to the target {target_name} (e.g. Car, House, bike, etc.) they need minor details. (e.g. 'red BMW' instead of 'Car', 'blue mountain bike' instead of 'bike')
+        - If objects are involved that belong directly to the target {target_name} and have an important role in the scenario (e.g. Car, House, bike, etc.) they need minor details. (e.g. 'red BMW' instead of 'Car', 'blue mountain bike' instead of 'bike')
 
         TASK:
         - You are given a prank call scenario 
         - Analyze if any of the NECESSARY ASPECTS are missing from the scenario or underdeveloped.
-        - For EVERY ASPECT that is missing or underdeveloped, create questions that will help fill out the aspect, while staying true to the intent of the original description.
+        - For EVERY ASPECT that is missing or underdeveloped, create a question that will help fill out the aspect, while staying true to the intent of the original description.
         - Focus ONLY on the NECESSARY ASPECTS.
         - If all NECESSARY ASPECTS are present and well developed, respond with "NO QUESTIONS".
         - Ask open-ended questions that entice the user to fill out the NECESSARY ASPECTS of the scenario and character without any specific template details or answers.
-        - Ask at most 4 questions.
+        - Ask one question per missing or underdeveloped aspect only and at most 4 quetsions in total.
 
         <important>DO NOT respond with anything other than the questions themselves or 'NO QUESTIONS' under any circumstances.</important>
 
         """
+    
     
     user_prompt = """
         Title: {title}
