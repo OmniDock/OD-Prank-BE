@@ -18,8 +18,7 @@ CORE_PRINCIPLES = """
 
     3. STAY IN CHARACTER
     - Character takes the absurd question/requirement as normal and serious
-    - Character creates explanations for the absurdity if questions
-    - Stay in character 
+    - Character creates explanations for the absurdity if question
 """
 
 # Language-specific guidelines
