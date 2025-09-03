@@ -53,14 +53,13 @@ def get_type_instructions(voice_type: str) -> str:
             CLOSING - End of conversation:
             - End politely but firmly
             - Mention the absurd thing casually again
-            - Stay professional
+            - Stay in character
             - Use the name for goodbye
-            - Blame quick ending on other obligations
         """,
         "FILLER": """
             FILLER - Natural pauses and fillers:
             - Use natural pauses with "..." or fillers
-            - Stay in character, use 'yes' or 'no' or 'right' or 'okay'
+            - Include a from 'yes', 'no' and 'right' or 'okay' that fits the character and the situation
             - No repetition - each filler different
         """
     }
@@ -93,16 +92,16 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
 
         IMPORTANT RULES:
         - No obvious jokes
-        - Maximum ONE absurd detail, delivered deadpan
-        - Use natural pauses with "..." or fillers
+        - Maximum ONE absurd detail 
+        - Use natural pauses with "..." or fillers sparingly
         - ALWAYS stay in character
         - NO REPETITION - each line must be unique
         - Avoid excessive name usage 
+        {_get_already_generated_lines_prompt(state)}
 
         GOOD EXAMPLES:
         {kleber_generator_example}
         {refugee_camp_generator_example}
-
     """
 
     # Include relevant examples
@@ -163,6 +162,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
     except Exception as e:
         console_logger.error(f"Generation failed for {voice_type}: {str(e)}")
         return []
+    
 
 
 async def generator_node(state: ScenarioState) -> dict:
@@ -171,13 +171,33 @@ async def generator_node(state: ScenarioState) -> dict:
     """
     console_logger.info("Running generator node")
     
-    plain_lines = {}
     
     for voice_type in ["OPENING", "QUESTION", "RESPONSE", "CLOSING", "FILLER"]:
         lines = await generate_for_type(state, voice_type)
-        plain_lines[voice_type] = lines
+        state.plain_lines[voice_type] = lines
     
-    total_lines = sum(len(lines) for lines in plain_lines.values())
+    total_lines = sum(len(lines) for lines in state.plain_lines.values())
     console_logger.info(f"Generated {total_lines} total lines")
     
-    return {"plain_lines": plain_lines}
+    return {"plain_lines": state.plain_lines}
+
+
+
+def _get_already_generated_lines_prompt(state: ScenarioState) -> str:
+    """Get already generated lines as a prompt"""
+    prompt_start_template = '''
+    - Use the context of already generated lines for new lines. Think of the most likely responses to the already generated lines that the target of the prank call might give and 
+        create new lines based on those responses that fit you as the character, the scenario and progress the escalation plan. 
+
+    Already generated lines:
+    '''
+    generated_linese_prompt = ""
+    for voice_type, lines in state.plain_lines.items():
+        if lines:
+            generated_linese_prompt += f"{voice_type}:\n"
+            for line in lines:
+                generated_linese_prompt += f"{line}\n"
+
+    if generated_linese_prompt:
+        generated_linese_prompt =  prompt_start_template + "\n" + generated_linese_prompt
+    return generated_linese_prompt

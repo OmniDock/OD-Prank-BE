@@ -31,10 +31,7 @@ def get_language_guidelines(language: str) -> str:
     else:
         return """
         """
-
-
-
-
+    
 # Concrete examples (not templates!)
 GOOD_EXAMPLES = {
     "OPENING": [
