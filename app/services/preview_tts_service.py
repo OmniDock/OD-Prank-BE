@@ -85,7 +85,7 @@ class PreviewTTSService:
             console_logger.warning(f"Failed to check existence for {path}: {e}")
             return False
 
-    def _validate_language_and_gender(self, voice_id: str) -> Optional[Dict[str, Any]]:
+    def _validate_language_gender_intro(self, voice_id: str) -> Optional[Dict[str, Any]]:
         """Ensure the catalog entry exists and includes language and gender."""
         catalog = get_voices_catalog()
         item = next((v for v in catalog if v.get("id") == voice_id), None)
@@ -94,12 +94,16 @@ class PreviewTTSService:
             return None
         langs = item.get("languages") or []
         gender = item.get("gender")
+        intro = item.get("intro")
         if not langs or not isinstance(langs[0], LanguageEnum):
             console_logger.warning(f"Preview skipped: missing/invalid language for voice {voice_id}")
             return None
         if gender not in (GenderEnum.MALE, GenderEnum.FEMALE):
             console_logger.warning(f"Preview skipped: missing/invalid gender for voice {voice_id}")
             return None
+        # Note: intro is optional - voices without intro will use fallback texts
+        if not intro:
+            console_logger.warning(f"Preview skipped: missing/invalid intro for voice {voice_id}")
         return item
 
     async def _generate_preview_bytes(self, voice_id: str, preview_text: Optional[str] = None) -> bytes:
@@ -124,7 +128,7 @@ class PreviewTTSService:
                 file_options={
                     "content-type": "audio/wav",
                     "cache-control": "2592000",  # 30 days
-                    "upsert": "false",
+                    "upsert": "false", # set to true to force regeneration
                 },
             )
             console_logger.info(f"Uploaded preview to {path}: {res}")
@@ -141,18 +145,24 @@ class PreviewTTSService:
         for vid in voice_ids:
             try:
                 path = f"{self.public_prefix}/{vid}.wav"
+                # Idempotent: existing files are not overwritten (upsert=false). Comment this out to force regeneration.
                 if self._object_exists(path):
                     continue
                 # Validate language and gender using catalog
-                item = self._validate_language_and_gender(vid)
+                item = self._validate_language_gender_intro(vid)
                 if not item:
                     continue
                 # Select text by language + gender
+                intro = item.get("intro")
                 langs = item.get("languages") or []
                 primary_lang = langs[0] if langs else None
                 gender = item.get("gender")
-                chosen_text = preview_text or self._preview_text_for(primary_lang, gender)
-                console_logger.info(f"Generating preview for voice {vid}")
+                if intro and intro.strip():
+                    console_logger.info(f"Using intro text: {intro[:100]}...")
+                else:
+                    console_logger.info(f"Using fallback text for {primary_lang} {gender}")
+                chosen_text = intro if intro and intro.strip() else self._preview_text_for(primary_lang, gender)
+                console_logger.info(f"Generating preview for voice {vid} with {'intro text' if intro and intro.strip() else 'fallback text'}")
                 audio_bytes = await self._generate_preview_bytes(vid, chosen_text)
                 wav_bytes = self._pcm16_to_wav(audio_bytes)
                 ok = self._upload_public(path, wav_bytes)
@@ -181,22 +191,29 @@ class PreviewTTSService:
     async def ensure_previews_for_catalog(self, voices_catalog: List[Dict[str, Any]]) -> None:
         """Ensure previews using primary language (first in languages list) per voice.
 
+        Idempotent: existing files are not overwritten (upsert=false).
         voices_catalog items must contain: id (str), languages (List[LanguageEnum]).
         """
         for item in voices_catalog:
             vid = item.get("id")
             langs = item.get("languages") or []
             gender = item.get("gender")
+            intro = item.get("intro")
             if not langs or not isinstance(langs[0], LanguageEnum) or gender not in (GenderEnum.MALE, GenderEnum.FEMALE):
                 console_logger.warning(f"Skipping preview for {vid}: invalid language/gender metadata")
                 continue
             primary_lang = langs[0] if langs else None
-            text = self._preview_text_for(primary_lang, gender)
+            text = intro if intro and intro.strip() else self._preview_text_for(primary_lang, gender)
             try:
                 path = f"{self.public_prefix}/{vid}.wav"
+                 # Idempotent: existing files are not overwritten (upsert=false). Comment this out to force regeneration.
                 if self._object_exists(path):
                     continue
-                console_logger.info(f"Generating preview for voice {vid} (lang: {primary_lang})")
+                console_logger.info(f"Generating preview for voice {vid} (lang: {primary_lang}) with {'intro text' if intro and intro.strip() else 'fallback text'}")
+                if intro and intro.strip():
+                    console_logger.info(f"Using intro text: {intro[:100]}...")
+                else:
+                    console_logger.info(f"Using fallback text for {primary_lang} {gender}")
                 audio_bytes = await self._generate_preview_bytes(vid, text)
                 wav_bytes = self._pcm16_to_wav(audio_bytes)
                 ok = self._upload_public(path, wav_bytes)

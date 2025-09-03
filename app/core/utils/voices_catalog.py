@@ -10,35 +10,36 @@ from app.core.utils.enums import (
 # Central curated voices catalog used by API and preview generation
 # ################################################################################
 
-PREVIEW_VERSION = "v8"
+PREVIEW_VERSION = "v9"
 VOICES_CATALOG: List[Dict[str, Any]] = [
-    {
-        "id": ElevenLabsVoiceIdEnum.SUSI.value,
-        "name": "Susi",
-        "description": "Soft, news presenter style",
-        "languages": [LanguageEnum.GERMAN],
-        "gender": GenderEnum.FEMALE,
-    },
-    {
-        "id": ElevenLabsVoiceIdEnum.MARTIN.value,
-        "name": "Martin",
-        "description": "-",
-        "languages": [LanguageEnum.GERMAN],
-        "gender": GenderEnum.MALE,
-    },
-    {
-        "id": ElevenLabsVoiceIdEnum.TIMO.value,
-        "name": "Timo",
-        "description": "-",
-        "languages": [LanguageEnum.GERMAN],
-        "gender": GenderEnum.MALE,
-    },
+    # {
+    #     "id": ElevenLabsVoiceIdEnum.SUSI.value,
+    #     "name": "Susi",
+    #     "description": "Soft, news presenter style",
+    #     "languages": [LanguageEnum.GERMAN],
+    #     "gender": GenderEnum.FEMALE,
+    # },
+    # {
+    #     "id": ElevenLabsVoiceIdEnum.MARTIN.value,
+    #     "name": "Martin",
+    #     "description": "-",
+    #     "languages": [LanguageEnum.GERMAN],
+    #     "gender": GenderEnum.MALE,
+    # },
+    # {
+    #     "id": ElevenLabsVoiceIdEnum.TIMO.value,
+    #     "name": "Timo",
+    #     "description": "-",
+    #     "languages": [LanguageEnum.GERMAN],
+    #     "gender": GenderEnum.MALE,
+    # },
     {
         "id": ElevenLabsVoiceIdEnum.SIMON.value,
         "name": "Simon",
         "description": "Young german voice with a warm, realtable tone and a naturally slow pace",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
+        "intro": "[exhales] Hey! Ich bin Simon – und ja, ich weiß, meine Stimme klingt vielleicht ein bisschen zu nett für das hier.[curious] Aber genau deshalb wird’s witzig. [laughs] Versprochen.",
     },
     {
         "id": ElevenLabsVoiceIdEnum.THOMAS.value,
@@ -46,6 +47,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Conversational German male voice.",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
+        "intro": "[sighs] Hey, ich bin Thomas. [curious] Und bevor du fragst: Nein, ich hab keine Ahnung, worauf du dich hier eingelassen hast.[laughs] Aber genau das macht’s ja spannend, oder? [whispers] Nur du, ich… und ein bisschen Chaos.",
     },
     {
         "id": ElevenLabsVoiceIdEnum.BASTI.value,
@@ -53,6 +55,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Authentic modern voice from Germany",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
+        "intro": "Jo, ich bin Basti. [laughs] Kein Plan, wie ich hier gelandet bin – aber jetzt bin ich da.[curious]Und wenn du dachtest, das hier wird normal… [whispers] nope.[excited] Also lehn dich zurück und genieß die Show.",
     },
     {
         "id": ElevenLabsVoiceIdEnum.YVONNE.value,
@@ -60,6 +63,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "German Female voice. Great for casual conversations.",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.FEMALE,
+        "intro": "Hey du, ich bin Yvonne. [curious] Keine Sorge, ich beiß nicht – zumindest meistens nicht [laughs]. [exhales]Ich bin hier für den Spaß… und vielleicht ein kleines bisschen Chaos.[whispers] Aber pssst, nicht weitersagen. Also… bereit?",
     },
     {
         "id": ElevenLabsVoiceIdEnum.RAMONA.value,
@@ -67,6 +71,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Voice that creates calmness, while keeping the audience hooked.",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.FEMALE,
+        "intro": "[exhales] Hallo. Ich bin Ramona. [curious] Ich weiß… das hier fühlt sich gerade ein bisschen zu ruhig an für das, was gleich passiert. [laughs] Aber keine Sorge – ich hab alles unter Kontrolle. [whispers] Atme einmal tief durch… denn gleich wird’s wild.",
     },
     {
         "id": ElevenLabsVoiceIdEnum.DANA.value,
@@ -74,6 +79,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Middle aged German female with deep, warm, nasal voice.",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.FEMALE,
+        "intro": "Hallo, ich bin Dana. [curious] Und ja… ich hab diese Stimme, bei der man nie so ganz weiß, ob man gleich lacht oder gegrillt wird [laughs]. [whispers] Ich sag nur: Gut festhalten. Denn jetzt wird’s interessant.",
     },
     {
         "id": ElevenLabsVoiceIdEnum.ANNY.value,
@@ -81,6 +87,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Natural, soft female voice for storytelling",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.FEMALE,
+        "intro": "Hey, ich bin Anny. [curious] Stell dir einfach vor, ich erzähl dir ’ne kleine Geschichte… [laughs] …nur dass sie völlig aus dem Ruder läuft. [whispers] Aber genau das macht’s spannend, oder?",
     },
     {
         "id": ElevenLabsVoiceIdEnum.ROBERT.value,
@@ -88,6 +95,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Young aussie voice perfect for conversations.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.MALE,
+        "intro": "Hey mate, I’m Robert – all the way from Australia. I know [laughs], the accent gives it away[laughs]. But don’t worry, I’m not here to wrestle a kangaroo [laughs]. [whispers] Just here to mess with people a little. [slight accent] You in?",
     },
     {
         "id": ElevenLabsVoiceIdEnum.MAHESH.value,
@@ -95,6 +103,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Young Indian voice to engage, assist and connect in natural conversations.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.MALE,
+        "intro": "[exhales] Hi, I’m Mahesh – your friendly voice from India. [curious] I’m here to help... or maybe just stir up a little fun. [laughs] Depends on how you look at it. Ready for something unexpected?",
     },
     {
         "id": ElevenLabsVoiceIdEnum.MIKE.value,
@@ -102,6 +111,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Old american voice. Great for conversations.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.MALE,
+        "intro": "Hey there, name’s Mike. [curious] Been around long enough to know when something’s about to go sideways. [laughs] And trust me… this one’s heading there fast. [whispers] You sure you’re ready for this?",
     },
     {
         "id": ElevenLabsVoiceIdEnum.LUKE.value,
@@ -109,6 +119,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Italian man speaking english with an italian accent.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.MALE,
+        "intro": "[very excited] Ciao, I’m Luke – yes, from Italy. [strong accent] You can probably hear it already. [curious] They told me this was just a little joke... [laughs] but I think we might take it a bit too far.",
     },
     {
         "id": ElevenLabsVoiceIdEnum.BLONDIE.value,
@@ -116,6 +127,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "British woman with a warm, natural voice.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.FEMALE,
+        "intro": "[exhales] Hey love, I’m Blondie – and yes, the name fits. [laughs] But don’t let that fool you. [curious] I know exactly what I’m doing… most of the time. [whispers] Just play along and smile.",
     },
     {
         "id": ElevenLabsVoiceIdEnum.EMILY.value,
@@ -123,6 +135,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "A soft soothing voice that radiates warmth and kindness.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.FEMALE,
+        "intro": "Hi there, I’m Emily. [curious] I know… I sound way too gentle for whatever THIS is. [laughs] But don’t worry – I promise to be nice. Mostly. [whispers] Just breathe… and trust me. You’re in good hands.",
     },
     {
         "id": ElevenLabsVoiceIdEnum.IVANNA.value,
@@ -130,6 +143,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "A natural conversational American female voice with a youthful tone",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.FEMALE,
+        "intro": "[exhales] Hey! I’m Ivanna. [curious] I sound pretty chill, right? [laughs] Yeah… that’s usually how it starts [whispers] Just act normal and maybe no one gets pranked. [laughs] Kidding.",
     },
     {
         "id": ElevenLabsVoiceIdEnum.LEONI.value,
@@ -137,6 +151,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "International Cosmopolitan and educated voice",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.FEMALE,
+        "intro": "Hello, I’m Leoni. [curious] I usually keep things elegant and under control… [laughs] But today, we’re making a little exception. [whispers] Just between us – it’s more fun that way. [excited] Shall we?",
     }
 ]
 
