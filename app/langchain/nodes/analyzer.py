@@ -8,6 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState, ScenarioAnalysis
 from app.langchain.prompts.core_principles import CORE_PRINCIPLES, get_language_guidelines
 from app.core.logging import console_logger
+import pprint as pp
 
 
 class AnalysisOutput(BaseModel):
@@ -85,14 +86,29 @@ Return all text in {language} language.
             if i < len(state.clarifications):
                 answer = state.clarifications[i]
                 clarifications_text += f"- Question: {question}\n  Answer: {answer}\n"
+    print(f"Clarifications text: {clarifications_text}")
 
     llm = ChatOpenAI(model="gpt-4.1", temperature=0.3).with_structured_output(AnalysisOutput)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)
     ])
-    
+
     chain = prompt | llm
+    print(state)
+     # Extract the formatted prompt
+    formatted_prompt = prompt.format_messages(
+        title=state.scenario_data.title,
+        description=state.scenario_data.description or "",
+        target_name=state.scenario_data.target_name,
+        language=getattr(state.scenario_data.language, 'value', str(state.scenario_data.language)),
+        clarifications_text=clarifications_text
+    )
+    
+    # Log the formatted prompt for debugging
+    console_logger.info("Full Analysis Prompt:")
+    for message in formatted_prompt:
+        console_logger.info(f"{message.type}: {message.content}")
     
     try:
         result = await chain.ainvoke({
