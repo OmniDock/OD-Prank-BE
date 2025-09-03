@@ -51,7 +51,7 @@ class ScenarioState(BaseModel):
     
     # Clarification flow
     clarifying_questions: List[str] = Field(default_factory=list)
-    clarifications: List[str] = Field(default_factory=list)  # Simple list of answers
+    clarifications: List[str] = Field(default_factory=list)
     
     # Processing results
     analysis: Optional[ScenarioAnalysis] = None
