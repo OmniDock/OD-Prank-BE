@@ -27,4 +27,5 @@ dependencies = [
     "supabase>=2.18.1",
     "telnyx>=2.1.6",
     "uvicorn>=0.35.0",
+    "phonenumbers>=8.13.48",
 ]

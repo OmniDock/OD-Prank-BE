@@ -903,6 +903,7 @@ dependencies = [
     { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "numpy" },
+    { name = "phonenumbers" },
     { name = "pydantic-settings" },
     { name = "pydub" },
     { name = "python-dotenv" },
@@ -929,6 +930,7 @@ requires-dist = [
     { name = "langchain-openai", specifier = ">=0.3.30" },
     { name = "langgraph", specifier = ">=0.6.5" },
     { name = "numpy", specifier = ">=2.3.2" },
+    { name = "phonenumbers", specifier = ">=8.13.48" },
     { name = "pydantic-settings", specifier = ">=2.10.1" },
     { name = "pydub", specifier = ">=0.25.1" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
@@ -1041,6 +1043,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b96ca8f8c3ba19e6a61c8253c72794544580a7b6c24d/packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f", size = 165727 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469 },
+]
+
+[[package]]
+name = "phonenumbers"
+version = "9.0.13"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d4/9a/66002928beba17a01e39c4cd17d0a73677788ddaf314b500ceeeae6b2323/phonenumbers-9.0.13.tar.gz", hash = "sha256:eca06e01382412c45316868f86a44bb217c02f9ee7196589041556a2f54a7639", size = 2297900 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e3/d8/fb5066b2cbb03fd373833b54d8a6a2c1a2b54a369a1c469db47d2d21ea84/phonenumbers-9.0.13-py2.py3-none-any.whl", hash = "sha256:b97661e177773e7509c6d503e0f537cd0af22aa3746231654590876eb9430915", size = 2583732 },
 ]
 
 [[package]]

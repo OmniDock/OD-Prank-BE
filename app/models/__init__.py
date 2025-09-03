@@ -2,6 +2,7 @@ from .base import Base
 from .scenario import Scenario
 from .voice_line import VoiceLine
 from .voice_line_audio import VoiceLineAudio
+from .blacklist import Blacklist
 import sqlalchemy_continuum
 
 # Initialize continuum (Similar to Django's django-simple-history)
