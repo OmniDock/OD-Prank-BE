@@ -12,7 +12,7 @@ from app.services.cache_service import CacheService
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    # Startup: Initialize Global Cache (class-level)
+    # # Startup: Initialize Global Cache (class-level)
     cache = await CacheService.get_global()
     app.state.cache = cache
 

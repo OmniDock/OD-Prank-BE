@@ -26,6 +26,10 @@ class ScenarioProcessRequest(BaseModel):
         None,
         description="Session ID for continuing with clarifications"
     )
+    clarifying_questions: Optional[List[str]] = Field(
+        None,
+        description="Clarifying questions"
+    )
     clarifications: Optional[List[str]] = Field(
         None,
         description="Answers to clarifying questions"
@@ -54,12 +58,14 @@ async def process_scenario(
     1. Initial request with scenario → may return clarifying questions
     2. Follow-up with session_id and clarifications → creates scenario
     """
+    console_logger.info(f"Request: {request}")
     try:
         service = ScenarioService(db_session)
         result = await service.process_with_clarification_flow(
             user=user,
             scenario_data=request.scenario,
             session_id=request.session_id,
+            clarifying_questions=request.clarifying_questions,
             clarifications=request.clarifications
         )
         return ScenarioProcessResponse(**result)

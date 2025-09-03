@@ -6,8 +6,9 @@ from typing import List, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState, ScenarioAnalysis
-from app.langchain.prompts.core_principles import DEADPAN_PRINCIPLES, get_language_guidelines
+from app.langchain.prompts.core_principles import CORE_PRINCIPLES, get_language_guidelines
 from app.core.logging import console_logger
+import pprint as pp
 
 
 class AnalysisOutput(BaseModel):
@@ -31,7 +32,7 @@ async def analyzer_node(state: ScenarioState) -> dict:
     console_logger.info("Running analyzer node")
     
     system_prompt = f"""
-{DEADPAN_PRINCIPLES}
+{CORE_PRINCIPLES}
 
 {get_language_guidelines(getattr(state.scenario_data.language, 'value', 'de'))}
 
@@ -79,12 +80,13 @@ Return all text in {language} language.
     # Add clarifications if available
     clarifications_text = ""
     if state.clarifications and state.clarifying_questions:
-        clarifications_text = "\nAdditional Information:\n"
+        clarifications_text = "\CRUCIAL INFORMATION TO USE: Questions with answers about the scenarion and persona that help add detail. :\n"
         # Pair questions with answers
         for i, question in enumerate(state.clarifying_questions):
             if i < len(state.clarifications):
                 answer = state.clarifications[i]
                 clarifications_text += f"- Question: {question}\n  Answer: {answer}\n"
+
 
     llm = ChatOpenAI(model="gpt-4.1", temperature=0.3).with_structured_output(AnalysisOutput)
     prompt = ChatPromptTemplate.from_messages([
@@ -113,6 +115,7 @@ Return all text in {language} language.
         )
         
         console_logger.info(f"Created persona: {analysis.persona_name} from {analysis.company_service}")
+        console_logger.info(f"Analysis: {analysis}")
         return {"analysis": analysis}
         
     except Exception as e:

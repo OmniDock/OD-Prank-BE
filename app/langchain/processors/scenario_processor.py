@@ -1,7 +1,7 @@
 """
 Main processor for LangChain v2 scenario generation
 """
-from typing import Optional
+from typing import Optional, List
 from langgraph.graph import StateGraph, START, END
 from app.langchain.state import ScenarioState
 from app.langchain.nodes.clarifier import clarifier_node
@@ -116,7 +116,6 @@ class ScenarioProcessor:
             Processed state with generated content or clarifying questions
         """
         console_logger.info(f"Processing scenario: {state.scenario_data.title}")
-        
         try:
             # Run the workflow
             result = await self.workflow.ainvoke(state)
@@ -138,6 +137,7 @@ class ScenarioProcessor:
     async def process_with_clarifications(
         self, 
         state: ScenarioState, 
+        clarifying_questions: Optional[List[str]] = None,
         clarifications: Optional[dict] = None
     ) -> ScenarioState:
         """
@@ -151,6 +151,7 @@ class ScenarioProcessor:
             Processed state
         """
         if clarifications:
+            state.clarifying_questions = clarifying_questions
             state.clarifications = clarifications
             state.require_clarification = False
             console_logger.info("Processing with clarifications provided")
