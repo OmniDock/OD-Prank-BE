@@ -13,7 +13,7 @@ class ClarifierOutput(BaseModel):
     """Structured output for clarifier"""
     title: Optional[str] = Field(description="Title of the prank call scenario")
     target_name: Optional[str] = Field(description="Name of the target that is getting pranked")
-    language: Optional[str] = Field(description=f"Language of the prank call scenario. Must be one of: {', '.join([lang.value for lang in LanguageEnum])}")
+    language: str = Field(description=f"Language of the prank call scenario. Must be one of: {', '.join([lang.value for lang in LanguageEnum])}")
 
 
 async def extractor_node(state: ScenarioState) -> dict:
@@ -29,7 +29,7 @@ async def extractor_node(state: ScenarioState) -> dict:
 
         EXTRACT INFORMATION FROM DESCRIPTION:
         - The Name of the target that is getting pranked.
-        - The Language of the prank call (must be one of: {', '.join([lang.value for lang in LanguageEnum])})
+        - The Language of the prank call (must be one of: {', '.join([lang.value for lang in LanguageEnum])}). If not provided explicitly, use the language of the description.
         - IMPORTANT: If any of the above information is not available or cannot be determined from the description, set that field to None. Do not make assumptions or guess values.
 
         CREATE TITLE:
