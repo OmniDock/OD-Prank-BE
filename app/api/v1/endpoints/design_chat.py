@@ -1,0 +1,213 @@
+"""
+Design Chat WebSocket endpoint for interactive scenario design
+"""
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi.responses import JSONResponse
+from typing import Dict, Any, Optional
+import json
+import uuid
+
+from app.core.auth import get_current_user, AuthUser
+from app.core.database import AsyncSession, get_db_session
+from app.langchain.processors.design_chat_processor import DesignChatProcessor
+from app.langchain.state import DesignChatState
+from app.services.cache_service import CacheService
+from app.core.logging import console_logger
+
+router = APIRouter()
+
+
+async def get_current_user_ws(websocket: WebSocket) -> Optional[AuthUser]:
+    """
+    Extract and validate user from WebSocket connection
+    """
+    try:
+        # Try to get token from query params
+        token = websocket.query_params.get("token")
+        if not token:
+            # Try to get from headers
+            auth_header = websocket.headers.get("authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+        
+        if not token:
+            await websocket.close(code=1008, reason="No authentication token")
+            return None
+        
+        # Validate token using existing auth system
+        from app.core.auth import verify_jwt_token, AuthUser
+        payload = await verify_jwt_token(token)
+        
+        # Create AuthUser from payload
+        user = AuthUser(
+            user_id=payload.get("sub"),
+            email=payload.get("email"),
+            metadata=payload.get("user_metadata", {})
+        )
+        return user
+        
+    except Exception as e:
+        console_logger.error(f"WebSocket auth failed: {str(e)}")
+        await websocket.close(code=1008, reason="Authentication failed")
+        return None
+
+
+@router.websocket("/ws")
+async def design_chat_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for interactive design chat
+    
+    Message format:
+    Inbound:
+        - {"type": "message", "content": "user message"}
+        - {"type": "finalize"}
+        
+    Outbound:
+        - {"type": "response", "suggestion": "...", "draft": "...", "is_ready": bool, "missing": [...]}
+        - {"type": "finalized", "description": "...", "target_name": "...", "title": "..."}
+        - {"type": "error", "message": "..."}
+    """
+    await websocket.accept()
+    
+    # Authenticate user
+    user = await get_current_user_ws(websocket)
+    if not user:
+        return
+    
+    console_logger.info(f"Design chat started for user {user.id}")
+    
+    processor = DesignChatProcessor()
+    cache = await CacheService.get_global()
+    session_id = str(uuid.uuid4())
+    
+    # Initialize state
+    state = DesignChatState()
+    
+    # Send initial greeting
+    await websocket.send_json({
+        "type": "response",
+        "suggestion": "Was für einen Prank hast du im Kopf?",
+        "draft": "",
+        "is_ready": False,
+        "missing": [],
+        "target_name": None,
+        "title": None
+    })
+    
+    try:
+        while True:
+            # Receive message from client
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            
+            if message.get("type") == "message":
+                # Add user message to state
+                state.messages.append({
+                    "role": "user",
+                    "content": message.get("content", "")
+                })
+                
+                # Send typing indicator
+                await websocket.send_json({
+                    "type": "typing",
+                    "status": "start"
+                })
+                
+                # Stream the processing for real-time updates
+                partial_suggestion = ""
+                async for event in processor.stream(state):
+                    # Check if we have a partial suggestion update
+                    if isinstance(event, dict):
+                        for node_name, node_data in event.items():
+                            if node_name == "suggest" and "next_suggestion" in node_data:
+                                # Send partial suggestion as it's being generated
+                                suggestion_chunk = node_data.get("next_suggestion", "")
+                                if suggestion_chunk and suggestion_chunk != partial_suggestion:
+                                    await websocket.send_json({
+                                        "type": "stream",
+                                        "content": suggestion_chunk[len(partial_suggestion):],
+                                        "node": node_name
+                                    })
+                                    partial_suggestion = suggestion_chunk
+                            
+                            # Update state with node results
+                            if isinstance(node_data, dict):
+                                for key, value in node_data.items():
+                                    if value is not None and hasattr(state, key):
+                                        setattr(state, key, value)
+                
+                # Cache the state for potential recovery
+                await cache.set_json(
+                    f"design_chat:{session_id}",
+                    {
+                        "user_id": str(user.id),
+                        "state": state.model_dump()
+                    },
+                    ttl=1800  # 30 minutes
+                )
+                
+                # Send final response
+                response = {
+                    "type": "response",
+                    "suggestion": state.next_suggestion,
+                    "draft": state.current_description,
+                    "is_ready": state.is_ready,
+                    "missing": state.missing_aspects,
+                    "target_name": state.target_name,
+                    "title": state.scenario_title
+                }
+                
+                await websocket.send_json(response)
+                
+            elif message.get("type") == "finalize":
+                # User wants to generate the scenario - let them decide when it's ready
+                await websocket.send_json({
+                    "type": "finalized",
+                    "description": state.current_description or "",
+                    "target_name": state.target_name or "Unbekannt",
+                    "title": state.scenario_title or "Prank Call"
+                })
+                break
+                
+            elif message.get("type") == "ping":
+                # Keep-alive ping
+                await websocket.send_json({"type": "pong"})
+                
+    except WebSocketDisconnect:
+        console_logger.info(f"Design chat disconnected for user {user.id}")
+    except Exception as e:
+        console_logger.error(f"Design chat error: {str(e)}")
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": f"Chat error: {str(e)}"
+            })
+        except:
+            pass
+    finally:
+        # Clean up cache
+        await cache.delete(f"design_chat:{session_id}")
+
+
+@router.post("/session/restore")
+async def restore_chat_session(
+    session_id: str,
+    user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+) -> Dict[str, Any]:
+    """
+    Restore a previous chat session if it exists
+    """
+    cache = CacheService.get_global()
+    
+    cached = await cache.get_json(f"design_chat:{session_id}")
+    if not cached:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    if cached.get("user_id") != str(user.id):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    return {
+        "status": "restored",
+        "state": cached["state"]
+    }

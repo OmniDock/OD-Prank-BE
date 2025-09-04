@@ -90,3 +90,27 @@ class ScenarioState(BaseModel):
         """Pydantic configuration"""
         arbitrary_types_allowed = True
         use_enum_values = True
+
+
+class DesignChatState(BaseModel):
+    """State for interactive design chat assistant"""
+    # Chat history
+    messages: List[Dict[str, str]] = Field(default_factory=list)
+    
+    # Current refined description
+    current_description: str = ""
+    
+    # Readiness check
+    is_ready: bool = False
+    missing_aspects: List[str] = Field(default_factory=list)
+    
+    # Next AI suggestion
+    next_suggestion: Optional[str] = None
+    
+    # Extracted scenario info
+    target_name: Optional[str] = None
+    scenario_title: Optional[str] = None
+    
+    class Config:
+        """Pydantic configuration"""
+        arbitrary_types_allowed = True
