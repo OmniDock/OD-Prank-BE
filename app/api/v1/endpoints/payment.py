@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from app.core.logging import console_logger
 import stripe
 import dotenv
@@ -10,7 +10,7 @@ STRIPE_RETURN_URL = os.getenv("STRIPE_RETURN_URL")
 
 
 #need to link to customer
-@router.post("/api/create-checkout-session")
+@router.post("/checkout/create-session")
 def create_checkout_session():
     try:
         session = stripe.checkout.Session.create(
@@ -32,8 +32,9 @@ def create_checkout_session():
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/api/checkout-session/{session_id}")
-def get_checkout_session(session_id: str):
-    # Use this on your return page to read status
-    session = stripe.checkout.Session.retrieve(session_id)
-    return {"status": session.get("status"), "subscription": session.get("subscription")}
+
+@router.get('checkout/session-status')
+def session_status(session_id: str):
+  session = stripe.checkout.Session.retrieve(session_id)
+
+  return {"status": session.status, "customer_email": session.customer_details.email}
