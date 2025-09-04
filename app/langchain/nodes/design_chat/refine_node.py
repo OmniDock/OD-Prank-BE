@@ -17,7 +17,7 @@ async def refine_description_node(state: DesignChatState) -> Dict:
     # If no messages, return current state
     if not state.messages:
         return {
-            "clarified_scenario": state.clarified_scenario
+            "scenario": state.scenario
         }
     
     system_prompt = """
