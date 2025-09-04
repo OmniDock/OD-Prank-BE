@@ -86,10 +86,9 @@ async def process_chat(
 ) -> ScenarioProcessResponse:
     """
     Process a summarized chat description for scenario generation
-    
     This endpoint receives a simple string description and processes it
     """
-    console_logger.info(f"scenario_create_request: {scenario_create_request}")
+    console_logger.debug(f"scenario_create_request: {scenario_create_request}")
     try:
         service = ScenarioService(db_session)
         result = await service.process_chat(user=user,scenario_create_request=scenario_create_request)

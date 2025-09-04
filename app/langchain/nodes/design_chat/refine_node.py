@@ -43,12 +43,13 @@ async def refine_description_node(state: DesignChatState) -> Dict:
     """
     
     user_prompt = """
-        Chat so far:
+        Last Chat Messages so far:
         {messages_text}
         
         Current summary (if any): {current_description}
         
-        Write a short, cohesive scenario description (single paragraph) in the user's language.
+        Write a short, cohesive scenario description (single paragraph).
+        If there is already a description, update it with the new information.
     """
     
     # Format recent messages for prompt (include both assistant and user to link Q->A)
