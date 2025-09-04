@@ -21,7 +21,7 @@ class TelnyxHTTPClient:
         self.AUTH_HEADER = {"Authorization": f"Bearer {settings.TELNYX_API_KEY}"}
         self.WEBHOOK_URL = f"{settings.TELNYX_WEBHOOK_BASE_URL}{settings.API_V1_STR}/telnyx/webhook"
         self.FROM_NUMBER = settings.TELNYX_PHONE_NUMBER
-        self.logging_enabled = True 
+        self.logging_enabled = False
         self.logger = console_logger 
         self.TUNNEL_BASE_URL = settings.TUNNEL_URL.replace("https://", "wss://").replace("http://", "ws://")
 
@@ -118,7 +118,6 @@ class TelnyxHTTPClient:
             for item in items:
                 expires_at = item.get("expires_at")
                 if expires_at:
-                    console_logger.info(item)
                     tag_matches = item.get("tag") == unique_username
                     # Fix: Use timezone-aware datetime for comparison
                     expiry_matches = datetime.fromisoformat(item.get("expires_at")) > datetime.now(timezone.utc) + timedelta(minutes=5)
