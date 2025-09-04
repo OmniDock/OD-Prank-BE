@@ -21,8 +21,16 @@ async def refine_description_node(state: DesignChatState) -> Dict:
         }
     
     system_prompt = """
-        You extract the prank idea from the chat and write a short, clear description.
-        Focus: situation/premise, caller role, relevant details, tone.
+        <Setup>
+            You are a helpful assistant which summarizes the chat messages into a short, cohesive scenario description for a prank call. 
+        </Setup>
+
+        <Rules>
+            - If the description is empty leave it empty. 
+            - If the messages do not containg any information about the prank call scenario, leave the description empty. 
+            - If the description is not empty, refine it based on the chat messages. 
+            - If the description is not empty and the chat messages are not empty, refine the description based on the chat messages. 
+        </Rules>
     """
     
     user_prompt = """
@@ -31,7 +39,7 @@ async def refine_description_node(state: DesignChatState) -> Dict:
         
         Current summary (if any): {current_description}
         
-        Write a short, cohesive scenario description (single paragraph, in German).
+        Write a short, cohesive scenario description (single paragraph, in english).
     """
     
     # Format messages for prompt (use ONLY user messages to avoid model seeding from assistant turns)

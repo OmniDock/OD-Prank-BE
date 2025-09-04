@@ -55,6 +55,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             "Wenn du fertig bist, klicke auf 'Szenario erstellen'."  
             - If the scenario is empty or does not have any real details work yourself bottom up and ask questions about it. 
             - If you dont understand something thats fine. Ask the user to clarify.
+            - Be friendly and helpful.
         </Rules>
     """
         
