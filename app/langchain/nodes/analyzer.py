@@ -83,7 +83,7 @@ async def analyzer_node(state: ScenarioState) -> dict:
     """
 
 
-    llm = ChatOpenAI(model="gpt-4.1", temperature=0.3).with_structured_output(AnalysisOutput)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.3).with_structured_output(AnalysisOutput)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)

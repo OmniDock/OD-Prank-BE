@@ -122,7 +122,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
     """
 
     llm = ChatOpenAI(
-        model="gpt-4.1", 
+        model="gpt-4.1-mini", 
         temperature=0.4 if voice_type in ["OPENING", "CLOSING", "FILLER"] else 0.6
     ).with_structured_output(GeneratorOutput)
     

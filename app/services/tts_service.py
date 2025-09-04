@@ -58,7 +58,6 @@ class TTSService:
 
     def _normalize_text(self, text: str) -> str:
         t = text.strip()
-        t = re.sub(r"\s+", " ", t)
         return t
 
 

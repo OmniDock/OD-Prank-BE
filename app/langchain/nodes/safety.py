@@ -95,7 +95,7 @@ async def safety_node(state: ScenarioState) -> dict:
 
     lines_text = "\n".join([f"- {line}" for line in all_lines])
     
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0).with_structured_output(SafetyOutput)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.0).with_structured_output(SafetyOutput)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)

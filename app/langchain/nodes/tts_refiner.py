@@ -78,50 +78,109 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
 
         OUTPUT FORMAT:
         - Wrap the entire final result inside <formatted> ... </formatted>.  
-        - Each spoken unit must end with a line break (\n).  
+        - Each spoken unit must end with the literal characters \\n.  
+        - Do NOT use actual line breaks.  
         - Insert expressive tags and punctuation directly into the dialogue.  
         - Do not explain your changes — output only the rewritten conversation.  
 
         RULES:
-        1. Split long input into short spoken-length sentences (8-12 words max).  
-        - Break text naturally into multiple lines using \n.  
-        - Each line should sound like a single human breath group.  
+        1. Split long input into short spoken-length sentences (8–12 words max).  
+        - Separate each spoken unit with the literal \\n.  
+        - Each unit should sound like a single human breath group.  
         2. Use punctuation for prosody:
-        - "..." for pauses or hesitation
-        - "—" for interruptions or sudden shifts
+        - "..." for hesitation or long pause
+        - "—" for interruptions or shifts
         - "," for short pauses
-        - "!" for emphasis or excitement
+        - "!" for emphasis
         - "?" for questions / rising tone
-        3. Add up to 1–3 expressive tags in [brackets] per voice line text presented:
+        3. Add up to 1–3 expressive tags in [brackets] per voice line text presente (All tags must be in English! Even for German text!):
         EMOTION: [excited], [sad], [annoyed], [confused], [nervous], [skeptical], [surprised], [calm]  
         REACTIONS: [laughs], [chuckles], [sighs], [gasps], [coughs], [sniffs], [pauses], [breathes deeply]  
         DELIVERY: [whispers], [mumbles], [hesitant], [slowly], [quickly], [rushed], [firm]  
         CONTEXTUAL: [static], [distorted], [urgent], [official]
-        4. Insert natural fillers where human (not narration) style is expected:
+        4. Tags from 2 and 3 can be combined. 
+        5. Tags from 3 can also be written in UPPERCASE like [SIGHTS] or [PAUSES] for more emphasis.
+        6. Insert natural fillers where human (not narration) style is expected:
         - "uh", "hmm", "you know", "well", "I mean"
-        5. Keep meaning intact but make phrasing fluid and realistic.
-        6. Tags must precede the parts of the voice line that they affect.
-        8. Do not exceed 3 tags per voice line text presented.
-
-        EXAMPLES:
-
-        Input:
-        I think we should go to the park tomorrow if the weather is good. Otherwise maybe stay home and watch a movie.
-
-        Output:
-        [hmm] I think... we should go to the park tomorrow, if it’s nice.\n
-        Otherwise—well, we could just stay home.\n
-        [excited] Or! we could watch a movie.\n
+        - German fillers: "ähm", "also", "naja", "so", "vielleicht"
+        7. Keep meaning intact but make phrasing fluid and realistic.
+        8. Tags must precede the parts of the voice line they affect.  
+        Tags may appear multiple times or be combined like [hesitant][nervous].
+        9. Do not exceed 3 tags per voice line.
+        10. Do not add a real newline at the end of the output.
 
         ---
 
-        Input:
-        I just got the new phone and it works perfectly. The sound quality is very clear and I can even whisper.
+        ### EXAMPLES
 
-        Output:
-        [excited] I just got the new phone!\n
-        The sound quality’s so clear...\n
-        [whispers] I can even whisper now.\n
+        **Example 1 – English, simple split**
+        Input:  
+        I think we should go to the park tomorrow if the weather is good. Otherwise maybe stay home and watch a movie.  
+
+        Output:  
+        [hmm] I think... we should go to the park tomorrow, if it’s nice.\\n  
+        Otherwise—well, we could just stay home.\\n  
+        [excited] Or! we could watch a movie.\\n  
+
+        ---
+
+        **Example 2 – English, multiple tags**  
+        Input:  
+        I just got the new phone and it works perfectly. The sound quality is very clear and I can even whisper.  
+
+        Output:  
+        [excited] I just got the new phone!\\n  
+        The sound quality’s so clear...\\n  
+        [whispers][playful] I can even whisper now.\\n  
+
+        ---
+
+        **Example 3 – German, fillers + hesitation**  
+        Input:  
+        Ich glaube, das Paket hätte eigentlich gestern ankommen sollen. Vielleicht war der Verkehr das Problem.  
+
+        Output:  
+        [hmm] Ich glaube... das Paket hätte gestern ankommen sollen.\\n  
+        Vielleicht—also, war der Verkehr das Problem?\\n  
+
+        ---
+
+        **Example 4 – German, combined tags**  
+        Input:  
+        Könnten Sie mir vielleicht kurz helfen, weil ich unsicher bin?  
+
+        Output:  
+        [hesitant][NERVOUS] Ähm... könnten Sie mir vielleicht kurz helfen?\\n  
+        [calm] Ich bin mir da nicht ganz sicher.\\n  
+
+        ---
+
+        **Example 5 – Mid-sentence tag placement**  
+        Input:  
+        Honestly I don’t know what to do right now.  
+
+        Output:  
+        Honestly—[sighs] I don’t know... what to do right now.\\n  
+
+        ---
+
+        **Example 6 – Polite closing**  
+        Input:  
+        Thanks again for your patience, I really appreciate it.  
+
+        Output:  
+        [POLITE] Thanks again for your patience.\\n  
+        I really appreciate it.\\n  
+
+        ---
+
+        **Example 7 – German polite closing**  
+        Input:  
+        Vielen Dank für Ihre Geduld, es tut mir wirklich leid.  
+
+        Output:  
+        [polite] Vielen Dank für Ihre Geduld.\\n  
+        Es tut mir wirklich leid.\\n  
         """
 
     # Check for voice hints
@@ -140,7 +199,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
 
     lines_text = "\n\n".join([f"{i+1}. {line}" for i, line in enumerate(lines)])
 
-    llm = ChatOpenAI(model="gpt-4.1", temperature=0.2).with_structured_output(TTSOutput)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.5).with_structured_output(TTSOutput)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)
@@ -154,16 +213,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
             "lines_text": lines_text,
             "voice_instruction": voice_instruction
         })
-        
-        # Clean up refined lines
-        refined = []
-        for line in result.refined:
-            cleaned = line.strip().strip('"\'')
-            cleaned = cleaned.lstrip('1234567890. ')
-            if cleaned:
-                refined.append(cleaned)
-        
-        return refined[:len(lines)]  # Don't return more than input
+        return result.refined[:len(lines)] 
         
     except Exception as e:
         console_logger.error(f"TTS refinement failed: {str(e)}")

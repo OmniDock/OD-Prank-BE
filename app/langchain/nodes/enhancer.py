@@ -82,7 +82,7 @@ async def enhancer_node(state: ScenarioState) -> dict:
         for i, line in enumerate(lines, 1):
             current_lines_text += f"  {i}. {line}\n"
     
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.3)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)
@@ -143,7 +143,7 @@ async def enhance_single_line(
         Keep the same language ({language}).
     """
     
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.3)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)

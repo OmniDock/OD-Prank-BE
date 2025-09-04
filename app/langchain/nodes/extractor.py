@@ -43,7 +43,7 @@ async def extractor_node(state: ScenarioState) -> dict:
         Description: 
         {description}
     """
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2).with_structured_output(ClarifierOutput)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.2).with_structured_output(ClarifierOutput)
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", inital_prompt),

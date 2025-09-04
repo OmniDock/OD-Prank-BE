@@ -111,7 +111,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
         If no material detail is missing, output a short nudge to proceed (no question).
     """
     
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.7)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)
