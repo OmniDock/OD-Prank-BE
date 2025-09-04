@@ -21,56 +21,56 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         return []
     
     system_prompt = """
-You optimize texts for ElevenLabs Text-to-Speech. 
-We are playing conversations, not narrations. It is natural to pause, think and to have background noises. 
+        You optimize texts for ElevenLabs Text-to-Speech. 
+        We are playing conversations, not narrations. It is natural to pause, think and to have background noises. 
 
-RULES:
-1. Short sentences (maximum 10-12 words)
-2. Use punctuation for pauses:
-   - "..." for thinking pauses
-   - "—" for interruptions
-   - "," for short pauses
-3. Add ElevenLabs v3 audio tags (ENGLISH, in square brackets) if it feels natural:
-   EMOTIONAL TAGS:
-   - [sighs] - frustration/resignation
-   - [laughs] / [chuckles] - amusement  
-   - [confused] - confusion
-   - [surprised] / [gasps] - surprise
-   - [nervous] - nervousness
-   - [excited] - excitement
-   - [annoyed] - mild irritation
-   - [skeptical] - doubt
-   
-   SPEECH MODIFIERS:
-   - [whispers] - quiet speech
-   - [mumbles] - unclear speech
-   - [slowly] - slow delivery
-   - [quickly] - fast delivery
-   - [hesitant] - uncertain delivery
-   
-   PHYSICAL SOUNDS:
-   - [clears throat] - throat clearing
-   - [sniffs] - sniffing
-   - [breathes deeply] - deep breath
-   - [pauses] - thinking pause
-   - [coughs] - coughing
-   
-   CONTEXT-SPECIFIC (use based on scenario):
-   - For phone/tech issues: [static], [distorted]
-   - For urgency: [rushed], [urgent]
-   - For authority: [firm], [official]
-   
-   RULES:
-   - ADD 1-2 tags where they naturally fit the emotion/situation
-   - MAXIMUM 3 tags TOTAL across all lines
-   - Place tags BEFORE the sentence they affect
-   - Tags must match the scenario context
-4. Remove youth slang and obvious jokes
-5. Keep the meaning
-6. Make it more natural and fluid
+        RULES:
+        1. Short sentences (maximum 10-12 words)
+        2. Use punctuation for pauses:
+        - "..." for thinking pauses
+        - "—" for interruptions
+        - "," for short pauses
+        3. Add ElevenLabs v3 audio tags (ENGLISH, in square brackets) if it feels natural:
+        EMOTIONAL TAGS:
+        - [sighs] - frustration/resignation
+        - [laughs] / [chuckles] - amusement  
+        - [confused] - confusion
+        - [surprised] / [gasps] - surprise
+        - [nervous] - nervousness
+        - [excited] - excitement
+        - [annoyed] - mild irritation
+        - [skeptical] - doubt
+        
+        SPEECH MODIFIERS:
+        - [whispers] - quiet speech
+        - [mumbles] - unclear speech
+        - [slowly] - slow delivery
+        - [quickly] - fast delivery
+        - [hesitant] - uncertain delivery
+        
+        PHYSICAL SOUNDS:
+        - [clears throat] - throat clearing
+        - [sniffs] - sniffing
+        - [breathes deeply] - deep breath
+        - [pauses] - thinking pause
+        - [coughs] - coughing
+        
+        CONTEXT-SPECIFIC (use based on scenario):
+        - For phone/tech issues: [static], [distorted]
+        - For urgency: [rushed], [urgent]
+        - For authority: [firm], [official]
+        
+        RULES:
+        - ADD 1-2 tags where they naturally fit the emotion/situation
+        - MAXIMUM 3 tags TOTAL across all lines
+        - Place tags BEFORE the sentence they affect
+        - Tags must match the scenario context
+        4. Remove youth slang and obvious jokes
+        5. Keep the meaning
+        6. Make it more natural and fluid
 
-NO SSML or XML tags!
-"""
+        NO SSML or XML tags!
+    """
 
     # Check for voice hints
     voice_instruction = ""
@@ -78,17 +78,17 @@ NO SSML or XML tags!
         voice_instruction = f"\nCHARACTER VOICE: {state.analysis.voice_hints}\nMatch audio tags to this character (e.g., Italian → [excited], Indian → [quickly])"
     
     user_prompt = """
-Optimize these {voice_type} lines for TTS:
+        Optimize these {voice_type} lines for TTS:
 
-{lines_text}
-{voice_instruction}
+        {lines_text}
+        {voice_instruction}
 
-Return the optimized versions.
-Keep the deadpan-serious tone.
-One line per entry.
-Keep the same language as the input.
-IMPORTANT: Audio tags must ALWAYS be in English ([sighs], [pauses], etc.) even for German text!
-"""
+        Return the optimized versions.
+        Keep the deadpan-serious tone.
+        One line per entry.
+        Keep the same language as the input.
+        IMPORTANT: Audio tags must ALWAYS be in English ([sighs], [pauses], etc.) even for German text!
+    """
 
     lines_text = "\n".join([f"{i+1}. {line}" for i, line in enumerate(lines)])
 
@@ -111,7 +111,6 @@ IMPORTANT: Audio tags must ALWAYS be in English ([sighs], [pauses], etc.) even f
         refined = []
         for line in result.refined:
             cleaned = line.strip().strip('"\'')
-            # Remove line numbers if accidentally included
             cleaned = cleaned.lstrip('1234567890. ')
             if cleaned:
                 refined.append(cleaned)
@@ -135,7 +134,7 @@ async def tts_refiner_node(state: ScenarioState) -> dict:
         if lines:
             refined = await refine_lines(lines, voice_type, state)
             tts_lines[voice_type] = refined
-            console_logger.info(f"Refined {len(refined)} {voice_type} lines for TTS")
+            console_logger.debug(f"Refined {len(refined)} {voice_type} lines for TTS")
         else:
             tts_lines[voice_type] = []
     

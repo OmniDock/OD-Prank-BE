@@ -1,4 +1,4 @@
-from app.langchain import ScenarioProcessor, EnhancementProcessor, SingleLineEnhancer, ScenarioState
+from app.langchain import ScenarioProcessor, SingleLineEnhancer, ScenarioState
 from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, VoiceLineResponse, VoiceLineAudioResponse
 from app.core.auth import AuthUser
 from app.repositories.scenario_repository import ScenarioRepository
@@ -208,14 +208,6 @@ class ScenarioService:
                 "voice_hints": state.analysis.voice_hints
             }
         
-        if state.quality:
-            analysis["quality"] = {
-                "seriousness": state.quality.seriousness,
-                "believability": state.quality.believability,
-                "subtle_emotion": state.quality.subtle_emotion,
-                "notes": state.quality.notes
-            }
-        
         if state.safety:
             analysis["safety"] = {
                 "issues": state.safety.issues,
@@ -231,13 +223,6 @@ class ScenarioService:
         return {
             "was_rewritten": getattr(state, 'was_rewritten', False),
             "clarifications_used": len(getattr(state, 'clarifications', []) or []),
-            "quality_score": (
-                {
-                    "seriousness": state.quality.seriousness if state and state.quality else None,
-                    "believability": state.quality.believability if state and state.quality else None,
-                    "subtle_emotion": state.quality.subtle_emotion if state and state.quality else None
-                } if state and state.quality else None
-            )
         }
     
     def _voice_lines_payload_from_state(self, state: ScenarioState) -> List[dict]:

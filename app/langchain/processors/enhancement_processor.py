@@ -6,7 +6,6 @@ from langgraph.graph import StateGraph, START, END
 from app.langchain.state import ScenarioState
 from app.langchain.nodes.enhancer import enhancer_node, enhance_single_line
 from app.langchain.nodes.tts_refiner import tts_refiner_node
-from app.langchain.nodes.judge import judge_node
 from app.langchain.nodes.safety import safety_node
 from app.core.logging import console_logger
 
@@ -19,7 +18,7 @@ class EnhancementProcessor:
     def __init__(self):
         """Initialize the enhancement processor"""
         self.workflow = self._build_graph()
-        console_logger.info("EnhancementProcessor initialized")
+        console_logger.debug("EnhancementProcessor initialized")
     
     def _build_graph(self) -> StateGraph:
         """
@@ -27,21 +26,19 @@ class EnhancementProcessor:
         
         Flow: Enhance → TTS Refine → Judge → Safety
         """
-        console_logger.info("Building enhancement graph")
+        console_logger.debug("Building enhancement graph")
         
         graph = StateGraph(ScenarioState)
         
         # Add nodes
         graph.add_node("enhance", enhancer_node)
         graph.add_node("tts_refine", tts_refiner_node)
-        graph.add_node("judge", judge_node)
         graph.add_node("safety", safety_node)
         
         # Define flow
         graph.add_edge(START, "enhance")
         graph.add_edge("enhance", "tts_refine")
-        graph.add_edge("tts_refine", "judge")
-        graph.add_edge("judge", "safety")
+        graph.add_edge("tts_refine", "safety")
         graph.add_edge("safety", END)
         
         return graph.compile()
@@ -61,7 +58,7 @@ class EnhancementProcessor:
         Returns:
             Enhanced ScenarioState
         """
-        console_logger.info("Starting scenario enhancement")
+        console_logger.debug("Starting scenario enhancement")
         
         # Add feedback to state
         original_state.user_feedback = user_feedback
@@ -75,7 +72,7 @@ class EnhancementProcessor:
         else:
             result.was_enhanced = True
         
-        console_logger.info("Enhancement complete")
+        console_logger.debug("Enhancement complete")
         return result
     
     async def enhance_voice_lines(
@@ -139,7 +136,7 @@ class SingleLineEnhancer:
         Returns:
             Dict with enhanced_text, is_safe, changes_made
         """
-        console_logger.info(f"Enhancing voice line {voice_line_id}")
+        console_logger.debug(f"Enhancing voice line {voice_line_id}")
         
         # Extract context from analysis
         persona_name = "Agent"

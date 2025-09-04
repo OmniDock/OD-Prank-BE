@@ -68,9 +68,6 @@ def get_type_instructions(voice_type: str) -> str:
 async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
     """Generate lines for a specific voice type"""
     
-    if not state.analysis:
-        console_logger.error("No analysis available for generation")
-        return []
     
     # Check for voice hints from analyzer
     voice_context = ""
@@ -154,7 +151,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
             if cleaned:
                 lines.append(cleaned)
         
-        console_logger.info(f"Generated {len(lines)} {voice_type} lines")
+        console_logger.debug(f"Generated {len(lines)} {voice_type} lines")
         return lines[:state.target_counts.get(voice_type, 2)]
         
     except Exception as e:
@@ -173,10 +170,7 @@ async def generator_node(state: ScenarioState) -> dict:
     for voice_type in ["OPENING", "QUESTION", "RESPONSE", "CLOSING", "FILLER"]:
         lines = await generate_for_type(state, voice_type)
         state.plain_lines[voice_type] = lines
-    
-    total_lines = sum(len(lines) for lines in state.plain_lines.values())
-    console_logger.info(f"Generated {total_lines} total lines")
-    
+        
     return {"plain_lines": state.plain_lines}
 
 

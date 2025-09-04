@@ -19,7 +19,7 @@ class DesignChatProcessor:
     def __init__(self):
         """Initialize the processor and build the graph"""
         self.workflow = self._build_graph()
-        console_logger.info("DesignChatProcessor initialized")
+        console_logger.debug("DesignChatProcessor initialized")
     
     def _build_graph(self) -> StateGraph:
         """
@@ -27,7 +27,7 @@ class DesignChatProcessor:
         
         Flow: Refine → Suggest → End (user decides when to finalize)
         """
-        console_logger.info("Building design chat graph")
+        console_logger.debug("Building design chat graph")
         
         # Create the graph
         graph = StateGraph(DesignChatState)

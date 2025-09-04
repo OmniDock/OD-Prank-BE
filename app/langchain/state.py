@@ -77,7 +77,6 @@ class ScenarioState(BaseModel):
     })
     
     # Quality and safety
-    quality: Optional[QualityResult] = None
     safety: Optional[SafetyResult] = None
     
     # Tracking

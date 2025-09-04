@@ -102,7 +102,7 @@ async def analyzer_node(state: ScenarioState) -> dict:
             cultural_context=result.cultural_context
         )
         
-        console_logger.info(f"Created persona: {analysis.persona_name} from {analysis.company_service}")
+        console_logger.debug(f"Created persona: {analysis.persona_name} from {analysis.company_service}")
         return {"analysis": analysis}
         
     except Exception as e:
