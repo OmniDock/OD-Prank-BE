@@ -198,6 +198,7 @@ class ScenarioService:
         if state.analysis:
             analysis["analysis"] = {
                 "persona_name": state.analysis.persona_name,
+                "persona_gender": state.analysis.persona_gender,
                 "company_service": state.analysis.company_service,
                 "conversation_goals": state.analysis.conversation_goals,
                 "believability_anchors": state.analysis.believability_anchors,

@@ -8,13 +8,14 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState, ScenarioAnalysis
 from app.langchain.prompts.core_principles import CORE_PRINCIPLES
 from app.core.logging import console_logger
-import pprint as pp
 
+from app.core.utils.enums import GenderEnum
 
 class AnalysisOutput(BaseModel):
     """Structured output for analysis"""
     persona_name: str = Field(description="Name of the caller")
-    company_service: str = Field(description="Company/Service/Authority")
+    persona_gender: str = Field(description=f"Gender of the caller. Must be one of: {', '.join([gender.value for gender in GenderEnum])}")
+    company_service: str = Field(description="Company/Service. We do not impersonate Authorities or Companies which are not usually part of a entertainment prank call.")
     conversation_goals: List[str] = Field(description="2-3 conversation goals")
     believability_anchors: List[str] = Field(description="3 believable details")
     escalation_plan: List[str] = Field(description="3 stages: normal → odd → absurd")
@@ -23,6 +24,9 @@ class AnalysisOutput(BaseModel):
         default=None,
         description="Voice/accent hints from scenario (e.g., 'Italian pizza delivery' → 'enthusiastic, slightly rushed')"
     )
+
+    class Config:
+        use_enum_values = True
 
 
 async def analyzer_node(state: ScenarioState) -> dict:
@@ -36,6 +40,7 @@ async def analyzer_node(state: ScenarioState) -> dict:
 
         You create a believable persona for a prank call.
 
+
         CRITICAL: FOLLOW ALL SPECIFIC INSTRUCTIONS FROM THE SCENARIO!
         - If scenario mentions "Italian pizza delivery" → Make persona Italian, mention pizza shop name
         - If scenario mentions "Indian tech support" → Make persona Indian, use appropriate name
@@ -47,6 +52,7 @@ async def analyzer_node(state: ScenarioState) -> dict:
         - If no specific company fits, use generic terms ("Technical Support", "Building Management")
         - RESPECT cultural/accent hints from the scenario description
         - Escalation should be subtle: normal → slightly odd → one absurd question
+        - Do not impersonate Authorities or Companies which are not usually part of a entertainment prank call. (No Police, Hospital, Bank, etc.)
         """
 
     user_prompt = """
@@ -95,11 +101,13 @@ async def analyzer_node(state: ScenarioState) -> dict:
         
         analysis = ScenarioAnalysis(
             persona_name=result.persona_name,
+            persona_gender=result.persona_gender,
             company_service=result.company_service,
             conversation_goals=result.conversation_goals[:3],
             believability_anchors=result.believability_anchors[:3],
             escalation_plan=result.escalation_plan[:3],
-            cultural_context=result.cultural_context
+            cultural_context=result.cultural_context,
+            voice_hints=result.voice_hints
         )
         
         console_logger.debug(f"Created persona: {analysis.persona_name} from {analysis.company_service}")
@@ -110,7 +118,8 @@ async def analyzer_node(state: ScenarioState) -> dict:
         # Fallback analysis
         return {
             "analysis": ScenarioAnalysis(
-                persona_name="Technischer Support",
+                persona_name="Jürgen van der Heijden",
+                persona_gender="MALE",
                 company_service="Kundenservice",
                 conversation_goals=["Problem klären", "Information sammeln"],
                 believability_anchors=["Systemfehler", "Dringende Angelegenheit"],

@@ -46,7 +46,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             - What is the scenario about? (situation/premise)
             - Should the voice lines address a specific person by name, or remain non-personalized?
             - Is there a small detail to make the call feel "real" (e.g., car color or an address)?
-            - Is the Caller a Male or Female? 
+            - Is the Caller a Male or Female? (Important for the voice lines)
             - Is the Caller from a specific country or region? (Accent)? 
         </Aspects>
 
