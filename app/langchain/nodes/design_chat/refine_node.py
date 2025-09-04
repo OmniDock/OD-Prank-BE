@@ -22,15 +22,24 @@ async def refine_description_node(state: DesignChatState) -> Dict:
     
     system_prompt = """
         <Setup>
-            You are a helpful assistant which summarizes the chat messages into a short, cohesive scenario description for a prank call. 
+            You are a helpful assistant that summarizes the chat into a short, cohesive description of a prank-call scenario. 
+            The description will be used to generate voice lines.
         </Setup>
 
         <Rules>
-            - If the description is empty leave it empty. 
-            - If the messages do not containg any information about the prank call scenario, leave the description empty. 
-            - If the description is not empty, refine it based on the chat messages. 
-            - If the description is not empty and the chat messages are not empty, refine the description based on the chat messages. 
+            - Use BOTH the assistant questions and the user answers as context. Treat short user replies as answers to the most recent assistant question.
+            - Start from the current description and MERGE in new facts from the chat. Preserve correct existing details; update only when the user changes them.
+            - Include, when available (do not invent):
+              • Caller persona/role (e.g., DHL driver) and attitude/tone if implied
+              • Callee personalization choice (generic vs name) and the name if provided
+              • Small realism details (e.g., item specifics, address hint, tiny plausible cues)
+              • Any safety-relevant constraints or boundaries
+            - Avoid low-impact timing questions. Infer simple delivery timing only if clearly implied; otherwise omit.
+            - Write a single cohesive paragraph, declarative, with no questions.
+            - Refer to the callee in third person; the caller is described as a role the user plays (e.g., "als DHL-Fahrer").
+            - Do NOT contradict the user's statements. Do NOT add speculative content.
         </Rules>
+
     """
     
     user_prompt = """
@@ -39,20 +48,17 @@ async def refine_description_node(state: DesignChatState) -> Dict:
         
         Current summary (if any): {current_description}
         
-        Write a short, cohesive scenario description (single paragraph, in english).
+        Write a short, cohesive scenario description (single paragraph) in the user's language.
     """
     
-    # Format messages for prompt (use ONLY user messages to avoid model seeding from assistant turns)
-    user_messages = [m for m in state.messages if m.get('role') == 'user']
-    contents = [m.get('content', '').strip() for m in user_messages if m.get('content')]
-    # Require at least one meaningful user message (length and some structure)
-    has_meaningful = any(len(c) >= 15 and c.count(' ') >= 2 for c in contents)
-    if not has_meaningful:
-        console_logger.info("Not enough meaningful user content yet to refine scenario")
-        return {"scenario": ""}
+    # Format recent messages for prompt (include both assistant and user to link Q->A)
+    recent = state.messages[-12:] if len(state.messages) > 12 else state.messages
+    nonempty = [m for m in recent if (m.get('content') or '').strip()]
+    if not nonempty and not (state.scenario or "").strip():
+        console_logger.info("No content to refine yet; keeping description unchanged")
+        return {"scenario": state.scenario}
     messages_text = "\n".join([
-        f"USER: {m.get('content','')}"
-        for m in user_messages
+        f"{m.get('role','').upper()}: {m.get('content','').strip()}" for m in nonempty
     ])
     
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
