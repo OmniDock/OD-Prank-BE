@@ -9,6 +9,7 @@ dotenv.load_dotenv()
 STRIPE_RETURN_URL = os.getenv("STRIPE_RETURN_URL")
 
 
+#need to link to customer
 @router.post("/api/create-checkout-session")
 def create_checkout_session():
     try:
