@@ -8,7 +8,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState
 from app.langchain.prompts.core_principles import (
     CORE_PRINCIPLES, 
-    get_language_guidelines,
     GOOD_EXAMPLES
 )
 from app.langchain.prompts.examples import kleber_generator_example, refugee_camp_generator_example, trash_generator_example
@@ -81,8 +80,6 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
     system_prompt = f"""
         {CORE_PRINCIPLES}
 
-        {get_language_guidelines(getattr(state.scenario_data.language, 'value', 'de'))}
-
         You are {state.analysis.persona_name} from {state.analysis.company_service}.{voice_context}
         Your goals: {', '.join(state.analysis.conversation_goals)}
         Believable details: {', '.join(state.analysis.believability_anchors)}
@@ -143,11 +140,11 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         result = await chain.ainvoke({
             "count": state.target_counts.get(voice_type, 2),
             "voice_type": voice_type,
-            "title": state.scenario_data.title,
-            "description": state.scenario_data.description or "",
-            "target_name": state.scenario_data.target_name,
+            "title": state.title,
+            "description": state.scenario_description or "",
+            "target_name": state.target_name,
             "examples_text": examples_text,
-            "language": getattr(state.scenario_data.language, 'value', str(state.scenario_data.language))
+            "language": state.language
         })
         
         # Clean up lines

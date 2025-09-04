@@ -13,11 +13,6 @@ async def clarifier_node(state: ScenarioState) -> dict:
     """
     console_logger.info("Running clarifier node")
     
-    # Skip if clarification not required or already provided
-    if not state.require_clarification or state.clarifications:
-        console_logger.info("Skipping clarification - not required or already provided")
-        return {"clarifying_questions": state.clarifying_questions}
-    
 
     questions_decision_prompt = """
         You are an expert comdey script writer with 15+ years of experience in creating prank call scenarios.

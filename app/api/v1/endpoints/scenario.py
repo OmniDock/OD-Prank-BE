@@ -80,7 +80,7 @@ async def process_scenario(
     
 @router.post("/process/chat", response_model=ScenarioProcessResponse)
 async def process_chat(
-    description: str = Body(..., embed=True),
+    scenario_create_request: ScenarioCreateRequest = Body(...),
     user: AuthUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
 ) -> ScenarioProcessResponse:
@@ -89,10 +89,10 @@ async def process_chat(
     
     This endpoint receives a simple string description and processes it
     """
-    console_logger.info(f"description: {description}")
+    console_logger.info(f"scenario_create_request: {scenario_create_request}")
     try:
         service = ScenarioService(db_session)
-        result = await service.process_chat(user=user,description=description)
+        result = await service.process_chat(user=user,scenario_create_request=scenario_create_request)
         return ScenarioProcessResponse(**result)
     except HTTPException:
         raise

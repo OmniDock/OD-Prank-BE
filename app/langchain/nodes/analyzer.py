@@ -6,7 +6,7 @@ from typing import List, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState, ScenarioAnalysis
-from app.langchain.prompts.core_principles import CORE_PRINCIPLES, get_language_guidelines
+from app.langchain.prompts.core_principles import CORE_PRINCIPLES
 from app.core.logging import console_logger
 import pprint as pp
 
@@ -32,60 +32,49 @@ async def analyzer_node(state: ScenarioState) -> dict:
     console_logger.info("Running analyzer node")
     
     system_prompt = f"""
-{CORE_PRINCIPLES}
+        {CORE_PRINCIPLES}
 
-{get_language_guidelines(getattr(state.scenario_data.language, 'value', 'de'))}
+        You create a believable persona for a prank call.
 
-You create a believable persona for a prank call.
+        CRITICAL: FOLLOW ALL SPECIFIC INSTRUCTIONS FROM THE SCENARIO!
+        - If scenario mentions "Italian pizza delivery" → Make persona Italian, mention pizza shop name
+        - If scenario mentions "Indian tech support" → Make persona Indian, use appropriate name
+        - If scenario mentions specific characteristics → INCORPORATE THEM
 
-CRITICAL: FOLLOW ALL SPECIFIC INSTRUCTIONS FROM THE SCENARIO!
-- If scenario mentions "Italian pizza delivery" → Make persona Italian, mention pizza shop name
-- If scenario mentions "Indian tech support" → Make persona Indian, use appropriate name
-- If scenario mentions specific characteristics → INCORPORATE THEM
-
-IMPORTANT:
-- Use REAL, known entities (DHL, Telekom, Pizza shops, etc.) 
-- NO made-up company names like "ServicePlus24" UNLESS specified in scenario
-- If no specific company fits, use generic terms ("Technical Support", "Building Management")
-- RESPECT cultural/accent hints from the scenario description
-- Escalation should be subtle: normal → slightly odd → one absurd question
-"""
+        IMPORTANT:
+        - Use REAL, known entities (DHL, Telekom, Pizza shops, etc.) 
+        - NO made-up company names like "ServicePlus24" UNLESS specified in scenario
+        - If no specific company fits, use generic terms ("Technical Support", "Building Management")
+        - RESPECT cultural/accent hints from the scenario description
+        - Escalation should be subtle: normal → slightly odd → one absurd question
+        """
 
     user_prompt = """
-Create a prank call persona for this scenario:
+        Create a prank call persona for this scenario:
 
-Title: {title}
-Description: {description}
-Target Name: {target_name}
-Language: {language}
-{clarifications_text}
+        Title: {title}
+        Target Name: {target_name}
+        Language: {language}
 
-EXTRACT FROM DESCRIPTION:
-- Any nationality/accent mentioned? (e.g., "Italian pizza delivery" → Italian persona)
-- Any specific company mentioned? (e.g., "Pizza Roma" → use that exact name)
-- Any personality traits? (e.g., "nervous", "rushed", "overly friendly")
 
-Provide:
-1. persona_name: Match the nationality if mentioned (e.g., Italian → "Mario", Indian → "Raj")
-2. company_service: Use exact company if mentioned, otherwise realistic entity
-3. conversation_goals: 2-3 specific goals
-4. believability_anchors: 3 realistic details that make it believable
-5. escalation_plan: 3 stages (normal → odd → absurd but deadpan)
-6. cultural_context: Brief cultural context
-7. voice_hints: IF accent/nationality mentioned, note it (e.g., "Italian accent - enthusiastic about pizza")
+        Description: {description}
 
-Return all text in {language} language.
-"""
+        EXTRACT FROM DESCRIPTION:
+        - Any nationality/accent mentioned? (e.g., "Italian pizza delivery" → Italian persona)
+        - Any specific company mentioned? (e.g., "Pizza Roma" → use that exact name)
+        - Any personality traits? (e.g., "nervous", "rushed", "overly friendly")
 
-    # Add clarifications if available
-    clarifications_text = ""
-    if state.clarifications and state.clarifying_questions:
-        clarifications_text = "\CRUCIAL INFORMATION TO USE: Questions with answers about the scenarion and persona that help add detail. :\n"
-        # Pair questions with answers
-        for i, question in enumerate(state.clarifying_questions):
-            if i < len(state.clarifications):
-                answer = state.clarifications[i]
-                clarifications_text += f"- Question: {question}\n  Answer: {answer}\n"
+        Provide:
+        1. persona_name: Match the nationality if mentioned (e.g., Italian → "Mario", Indian → "Raj")
+        2. company_service: Use exact company if mentioned, otherwise realistic entity
+        3. conversation_goals: 2-3 specific goals
+        4. believability_anchors: 3 realistic details that make it believable
+        5. escalation_plan: 3 stages (normal → odd → absurd but deadpan)
+        6. cultural_context: Brief cultural context
+        7. voice_hints: IF accent/nationality mentioned, note it (e.g., "Italian accent - enthusiastic about pizza")
+
+        Return all text in {language} language.
+    """
 
 
     llm = ChatOpenAI(model="gpt-4.1", temperature=0.3).with_structured_output(AnalysisOutput)
@@ -98,11 +87,10 @@ Return all text in {language} language.
     
     try:
         result = await chain.ainvoke({
-            "title": state.scenario_data.title,
-            "description": state.scenario_data.description or "",
-            "target_name": state.scenario_data.target_name,
-            "language": getattr(state.scenario_data.language, 'value', str(state.scenario_data.language)),
-            "clarifications_text": clarifications_text
+            "title": state.title,
+            "description": state.scenario_description,
+            "target_name": state.target_name,
+            "language": state.language,
         })
         
         analysis = ScenarioAnalysis(
@@ -115,7 +103,6 @@ Return all text in {language} language.
         )
         
         console_logger.info(f"Created persona: {analysis.persona_name} from {analysis.company_service}")
-        console_logger.info(f"Analysis: {analysis}")
         return {"analysis": analysis}
         
     except Exception as e:

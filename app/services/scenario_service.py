@@ -28,15 +28,24 @@ class ScenarioService:
 
     async def process_chat(self,
                            user: AuthUser,
-                           session_id: Optional[str],
                            scenario_create_request: ScenarioCreateRequest
                            ) -> Dict[str, Any]:
         
 
-        state = ScenarioState(scenario_data=scenario_create_request, require_clarificatio=False)
+        state = ScenarioState(scenario_description=scenario_create_request.description)
         processor = ScenarioProcessor()
-        result = await processor.process(state)
-        return result 
+
+        result:Dict[str, Any] = await processor.process(state)
+
+        console_logger.info(result)
+
+        state = ScenarioState(**result)
+        created = await self.create_scenario_from_state(user, state)
+
+        return {
+            "status": "complete",
+            "scenario_id": created.scenario.id
+        }
 
 
     async def enhance_voice_lines_with_feedback(self, user: AuthUser, voice_line_ids: List[int], 
@@ -173,19 +182,15 @@ class ScenarioService:
     def _scenario_payload_from_state(self, user: AuthUser, state: ScenarioState) -> dict:
         return {
             "user_id": user.id_str,
-            "title": state.scenario_data.title,
-            "description": state.scenario_data.description,
-            "language": state.scenario_data.language,
-            "target_name": state.scenario_data.target_name,
-            "preferred_voice_id": getattr(state.scenario_data, 'preferred_voice_id', None),
+            "title": state.title,
+            "description": state.scenario_description,
+            "language": state.language,
+            "target_name": state.target_name,
+            "preferred_voice_id": None,
             "scenario_analysis": self._build_scenario_analysis(state),
-            "clarifying_questions": state.clarifying_questions,
-            "clarifications": state.clarifications,
             "was_rewritten": getattr(state, 'was_rewritten', False),
             "is_safe": state.safety.is_safe if state.safety else True,
             "is_not_safe_reason": state.safety.reasoning if state.safety and not state.safety.is_safe else None,
-            "is_public": False,
-            "is_active": False
         }
     
     def _build_scenario_analysis(self, state: ScenarioState) -> Dict[str, Any]:
@@ -375,7 +380,7 @@ class ScenarioService:
     async def _persist_scenario_from_state(self, user: AuthUser, state: ScenarioState) -> Scenario:
         """Persist scenario + voice lines using repository helpers."""
         scenario_data = self._scenario_payload_from_state(user, state)
-        console_logger.info(f"Creating scenario: {scenario_data.get('title')}")
+        
         scenario = await self.repository.create_scenario(scenario_data)
         voice_lines_payload = self._voice_lines_payload_from_state(state)
         if voice_lines_payload:

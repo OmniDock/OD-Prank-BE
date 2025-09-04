@@ -21,15 +21,6 @@ CORE_PRINCIPLES = """
     - Character creates explanations for the absurdity if question
 """
 
-# Language-specific guidelines
-def get_language_guidelines(language: str) -> str:
-    """Get language-specific speech patterns"""
-    if language.lower() in ["de", "german", "deutsch"]:
-        return """
-        """
-    else:
-        return """
-        """
     
 # Concrete examples (not templates!)
 GOOD_EXAMPLES = {

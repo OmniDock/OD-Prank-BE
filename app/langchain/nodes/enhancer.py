@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState
-from app.langchain.prompts.core_principles import CORE_PRINCIPLES, get_language_guidelines, GOOD_EXAMPLES
+from app.langchain.prompts.core_principles import CORE_PRINCIPLES, GOOD_EXAMPLES
 from app.core.logging import console_logger
 
 
@@ -34,8 +34,6 @@ async def enhancer_node(state: ScenarioState) -> dict:
     
     system_prompt = f"""
         {CORE_PRINCIPLES}
-
-        {get_language_guidelines(getattr(state.scenario_data.language, 'value', 'de'))}
 
         You are enhancing existing prank call lines based on user feedback.
 

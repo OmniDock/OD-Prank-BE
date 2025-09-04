@@ -76,7 +76,7 @@ class ScenarioResponse(BaseModel):
     description: Optional[str] = None
     language: LanguageEnum
     preferred_voice_id: Optional[str] = None
-    target_name: str
+    target_name: Optional[str] = None
     scenario_analysis: Optional[Dict[str, Any]] = None
     is_safe: bool
     is_not_safe_reason: Optional[str] = None

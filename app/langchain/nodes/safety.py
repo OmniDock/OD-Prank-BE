@@ -106,9 +106,9 @@ async def safety_node(state: ScenarioState) -> dict:
     try:
         result = await chain.ainvoke({
             "lines_text": lines_text,
-            "title": state.scenario_data.title,
-            "description": state.scenario_data.description or "",
-            "target_name": state.scenario_data.target_name
+            "title": state.title,
+            "description": state.scenario_description,
+            "target_name": state.target_name
         })
         
         safety = SafetyResult(

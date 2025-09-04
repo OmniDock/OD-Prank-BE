@@ -47,24 +47,7 @@ class ScenarioProcessor:
         
         # Define the flow
         graph.add_edge(START, "extractor")
-        
-        # Conditional routing after clarifier
-        def route_after_clarifier(state: ScenarioState) -> str:
-            """Route based on clarification needs"""
-            if state.require_clarification and state.clarifying_questions:
-                console_logger.info("Clarification needed - ending early")
-                return "end"
-            console_logger.info("No clarification needed - continuing")
-            return "analyzer"
-        
-        graph.add_conditional_edges(
-            "extractor",
-            route_after_clarifier,
-            {
-                "analyzer": "analyzer",
-                "end": END
-            }
-        )
+        graph.add_edge("extractor", "analyzer")
         
         # Linear flow from analyzer to judge
         graph.add_edge("analyzer", "generator")
@@ -116,7 +99,6 @@ class ScenarioProcessor:
         Returns:
             Processed state with generated content or clarifying questions
         """
-        console_logger.info(f"Processing scenario: {state.scenario_data.title}")
         try:
             # Run the workflow
             result = await self.workflow.ainvoke(state)
@@ -124,8 +106,6 @@ class ScenarioProcessor:
             # Log completion status
             if result.get("processing_complete"):
                 console_logger.info("Processing completed successfully")
-            elif result.get("clarifying_questions"):
-                console_logger.info(f"Clarification needed: {len(result['clarifying_questions'])} questions")
             else:
                 console_logger.warning("Processing ended without completion")
             

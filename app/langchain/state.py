@@ -36,11 +36,17 @@ class QualityResult(BaseModel):
 
 class ScenarioState(BaseModel):
     """Main state object for the pipeline"""
-    # Input
-    scenario_data: ScenarioCreateRequest
+
+    # User Input From Chat 
+    scenario_description: str
     
+    # Extractor fields 
+    title: Optional[str] = None
+    target_name: Optional[str] = None
+    language: Optional[str] = None
+
+
     # Configuration
-    require_clarification: bool = False
     target_counts: Dict[str, int] = Field(default_factory=lambda: {
         "OPENING": 2,
         "QUESTION": 6,
@@ -49,10 +55,7 @@ class ScenarioState(BaseModel):
         "FILLER": 4
     })
     
-    # Clarification flow
-    clarifying_questions: List[str] = Field(default_factory=list)
-    clarifications: List[str] = Field(default_factory=list)
-    
+
     # Processing results
     analysis: Optional[ScenarioAnalysis] = None
     
