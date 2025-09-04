@@ -10,54 +10,41 @@ from app.core.logging import console_logger
 
 async def refine_description_node(state: DesignChatState) -> Dict:
     """
-    Refines the current description based on chat messages
+    Refines the clarified scenario text based on chat messages
     """
     console_logger.info("Running refine description node")
     
     # If no messages, return current state
     if not state.messages:
         return {
-            "current_description": state.current_description,
-            "target_name": state.target_name,
-            "scenario_title": state.scenario_title
+            "clarified_scenario": state.clarified_scenario
         }
     
     system_prompt = """
-    You are a helpful assistant that extracts and refines prank call scenario descriptions from chat conversations.
-    
-    Your task:
-    1. Analyze the chat messages to understand what the user wants
-    2. Create or update a clear, detailed scenario description
-    3. Extract the target's name if mentioned
-    4. Suggest a catchy title if possible
-    
-    Focus on capturing:
-    - The core prank situation/premise
-    - The caller's character/persona
-    - Any specific details mentioned (objects, companies, etc.)
-    - The intended comedic elements
-    
-    Be concise but comprehensive. Write in German if the user writes in German.
+        You extract the prank idea from the chat and write a short, clear description.
+        Focus: situation/premise, caller role, relevant details, tone.
     """
     
     user_prompt = """
-    Chat messages so far:
-    {messages_text}
-    
-    Current description (if any): {current_description}
-    
-    Please provide:
-    1. A refined scenario description that incorporates all details from the chat
-    2. The target's name (if mentioned)
-    3. A suggested title for the scenario
-    
-    Return the description as a cohesive paragraph, not a list.
+        Chat so far:
+        {messages_text}
+        
+        Current summary (if any): {current_description}
+        
+        Write a short, cohesive scenario description (single paragraph, in German).
     """
     
-    # Format messages for prompt
+    # Format messages for prompt (use ONLY user messages to avoid model seeding from assistant turns)
+    user_messages = [m for m in state.messages if m.get('role') == 'user']
+    contents = [m.get('content', '').strip() for m in user_messages if m.get('content')]
+    # Require at least one meaningful user message (length and some structure)
+    has_meaningful = any(len(c) >= 15 and c.count(' ') >= 2 for c in contents)
+    if not has_meaningful:
+        console_logger.info("Not enough meaningful user content yet to refine scenario")
+        return {"scenario": ""}
     messages_text = "\n".join([
-        f"{msg['role'].upper()}: {msg['content']}" 
-        for msg in state.messages
+        f"USER: {m.get('content','')}"
+        for m in user_messages
     ])
     
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
@@ -71,46 +58,20 @@ async def refine_description_node(state: DesignChatState) -> Dict:
     try:
         result = await chain.ainvoke({
             "messages_text": messages_text,
-            "current_description": state.current_description or "None yet"
+            "current_description": state.scenario or "No description yet"
         })
         
-        content = result.content.strip()
-        
-        # Simple extraction logic (could be improved with structured output)
-        lines = content.split('\n')
-        description = ""
-        target_name = state.target_name
-        scenario_title = state.scenario_title
-        
-        for line in lines:
-            if "target" in line.lower() or "name:" in line.lower():
-                # Try to extract target name
-                if ":" in line:
-                    target_name = line.split(":", 1)[1].strip()
-            elif "title" in line.lower() or "titel" in line.lower():
-                # Try to extract title
-                if ":" in line:
-                    scenario_title = line.split(":", 1)[1].strip()
-            else:
-                # Add to description
-                description += line + " "
-        
-        # If no structured extraction worked, use the whole content as description
-        if not description.strip():
-            description = content
-        
-        console_logger.info(f"Refined description: {description[:100]}...")
-        
+        content = (result.content or "").strip()
+        # Safety: do not invent details; if model returns extremely generic content without user anchors, keep previous
+        if not content:
+            return {"scenario": state.scenario}
+        console_logger.info(f"Refined description: {content[:100]}...")
         return {
-            "current_description": description.strip(),
-            "target_name": target_name,
-            "scenario_title": scenario_title
+            "scenario": content
         }
         
     except Exception as e:
         console_logger.error(f"Refine description failed: {str(e)}")
         return {
-            "current_description": state.current_description,
-            "target_name": state.target_name,
-            "scenario_title": state.scenario_title
+            "scenario": state.scenario
         }

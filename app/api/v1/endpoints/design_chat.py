@@ -63,8 +63,8 @@ async def design_chat_websocket(websocket: WebSocket):
         - {"type": "finalize"}
         
     Outbound:
-        - {"type": "response", "suggestion": "...", "draft": "...", "is_ready": bool, "missing": [...]}
-        - {"type": "finalized", "description": "...", "target_name": "...", "title": "..."}
+        - {"type": "response", "suggestion": "...", "draft": "..."}
+        - {"type": "finalized", "description": "..."}
         - {"type": "error", "message": "..."}
     """
     await websocket.accept()
@@ -83,18 +83,14 @@ async def design_chat_websocket(websocket: WebSocket):
     # Initialize state
     state = DesignChatState()
     
-    # Send initial greeting
-    await websocket.send_json({
-        "type": "response",
-        "suggestion": "Was für einen Prank hast du im Kopf?",
-        "draft": "",
-        "is_ready": False,
-        "missing": [],
-        "target_name": None,
-        "title": None
-    })
-    
     try:
+        # Send initial greeting (guard disconnects)
+        await websocket.send_json({
+            "type": "response",
+            "suggestion": "Wie kann ich dir beim Verfeinern helfen? Beschreibe kurz dein Grundszenario. (Du kannst jederzeit auf 'Szenario erstellen' klicken.)",
+            "draft": ""
+        })
+        console_logger.info(f"WS[{session_id}] sent greeting: suggestion='Wie kann ich dir beim Verfeinern helfen?...' draft_len=0")
         while True:
             # Receive message from client
             data = await websocket.receive_text()
@@ -115,11 +111,12 @@ async def design_chat_websocket(websocket: WebSocket):
                 
                 # Stream the processing for real-time updates
                 partial_suggestion = ""
+                last_suggestion = ""
                 async for event in processor.stream(state):
                     # Check if we have a partial suggestion update
                     if isinstance(event, dict):
                         for node_name, node_data in event.items():
-                            if node_name == "suggest" and "next_suggestion" in node_data:
+                            if node_name == "suggest" and isinstance(node_data, dict) and "next_suggestion" in node_data:
                                 # Send partial suggestion as it's being generated
                                 suggestion_chunk = node_data.get("next_suggestion", "")
                                 if suggestion_chunk and suggestion_chunk != partial_suggestion:
@@ -129,6 +126,7 @@ async def design_chat_websocket(websocket: WebSocket):
                                         "node": node_name
                                     })
                                     partial_suggestion = suggestion_chunk
+                                    last_suggestion = suggestion_chunk
                             
                             # Update state with node results
                             if isinstance(node_data, dict):
@@ -147,25 +145,35 @@ async def design_chat_websocket(websocket: WebSocket):
                 )
                 
                 # Send final response
+                # Ensure we always send a non-empty suggestion
+                suggestion_out = last_suggestion or partial_suggestion
+                if not suggestion_out:
+                    suggestion_out = (
+                        "Alles klar! Was fehlt dir noch? (Wenn du fertig bist, klicke auf 'Szenario erstellen'.)"
+                        if getattr(state, "scenario", "") else
+                        "Was für einen Prank hast du im Kopf? (Wenn du fertig bist, klicke auf 'Szenario erstellen'.)"
+                    )
                 response = {
                     "type": "response",
-                    "suggestion": state.next_suggestion,
-                    "draft": state.current_description,
-                    "is_ready": state.is_ready,
-                    "missing": state.missing_aspects,
-                    "target_name": state.target_name,
-                    "title": state.scenario_title
+                    "suggestion": suggestion_out,
+                    "draft": getattr(state, "scenario", "")
                 }
                 
                 await websocket.send_json(response)
+                console_logger.info(f"WS[{session_id}] sent response: suggestion='{response['suggestion'][:80]}...' draft_len={len(response.get('draft') or '')}")
+                
+                # Append assistant turn to backend message history
+                if response.get("suggestion"):
+                    state.messages.append({
+                        "role": "assistant",
+                        "content": response["suggestion"]
+                    })
                 
             elif message.get("type") == "finalize":
                 # User wants to generate the scenario - let them decide when it's ready
                 await websocket.send_json({
                     "type": "finalized",
-                    "description": state.current_description or "",
-                    "target_name": state.target_name or "Unbekannt",
-                    "title": state.scenario_title or "Prank Call"
+                    "description": getattr(state, "scenario", "") or ""
                 })
                 break
                 

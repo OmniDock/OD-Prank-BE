@@ -97,19 +97,11 @@ class DesignChatState(BaseModel):
     # Chat history
     messages: List[Dict[str, str]] = Field(default_factory=list)
     
-    # Current refined description
-    current_description: str = ""
-    
-    # Readiness check
-    is_ready: bool = False
-    missing_aspects: List[str] = Field(default_factory=list)
-    
-    # Next AI suggestion
+    # Clarified scenario text built during the chat
+    scenario: str = ""
+
+    # Next suggestion
     next_suggestion: Optional[str] = None
-    
-    # Extracted scenario info
-    target_name: Optional[str] = None
-    scenario_title: Optional[str] = None
     
     class Config:
         """Pydantic configuration"""

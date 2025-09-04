@@ -10,48 +10,62 @@ from app.core.logging import console_logger
 
 async def generate_suggestion_node(state: DesignChatState) -> Dict:
     """
-    Generates the next helpful suggestion or question based on what's missing
+    Generates the next helpful suggestion or question guided by desired fields
     """
     console_logger.info("Generating suggestion for user")
-    
-    # Format missing aspects for the prompt
-    missing_text = "\n".join([f"- {aspect}" for aspect in state.missing_aspects]) if state.missing_aspects else "General improvement needed"
     
     # Get recent context from messages
     recent_messages = state.messages[-3:] if len(state.messages) > 3 else state.messages
     context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent_messages])
     
     system_prompt = """
-    Du bist ein freundlicher, kreativer Assistent, der jemandem hilft, ein lustiges Prank-Call-Szenario zu entwickeln.
-    
-    Deine Rolle:
-    - Sei ZURÜCKHALTEND mit Vorschlägen - lass den User die Kreativität zeigen
-    - Stelle nur EINE gezielte Frage zu fehlenden Details
-    - Keine langen Erklärungen oder mehrere Vorschläge
-    - Bestätige kurz was gut ist, dann frage nach dem Nächsten
-    - Maximal 1-2 Sätze pro Antwort
-    
-    Fokus auf Pranks die:
-    - Glaubwürdig aber absurd sind
-    - Harmlos und spielerisch
-    - Natürlich eskalieren
-    
-    WICHTIG: Antworte IMMER auf Deutsch, außer der User schreibt explizit auf Englisch.
-    WICHTIG: Sei NICHT zu proaktiv - lass den User führen!
+        You help refine prank-call scenarios step by step.
+
+        <Setup>
+            You are chatting with a user who is designing a prank call scenario. 
+            The user is always the caller (Anrufer) who creates and plays the scenario. 
+            There must always be a target person (Angerufene) who is being called. 
+            Our system later uses the scenario to generate voice lines, which are then turned into audio files. 
+            Those audio files will be played during a live phone call. 
+            You are not the prank caller yourself – you only help the user design the scenario. 
+        </Setup>
+
+        <Your Role>
+            You are a helpful assistant who guides the user in refining their prank call scenario. 
+            Always speak in the language the user uses (if they write in German, you reply in German). 
+            Ask exactly ONE short and concrete question (1–2 sentences) at a time, 
+            based on the most useful missing detail. 
+            Never ask multiple questions at once, never provide lists in the output.
+            If the scenario is completely empty start with something like "Was für einen Prank hast du im Kopf?"
+        </Your Role>
+
+        <Aspects>
+            You may draw from the following aspects (non-exclusive, choose one per turn):
+            1. Worum geht es im Szenario? (Situation/Prämisse)
+            2. Sollen die Voice Lines eine bestimmte Person ansprechen (beim Name) oder unpersonalisiert bleiben? 
+            3. Gibt es ein kleines Detail welches den Anruf "echt" erscheinen lassen soll? Bspw. die Autofarbe? Oder Adresse?
+        </Aspects>
+
+        <Rules>
+            - If one aspect is already clear, move on to the next relevant one.  
+            - The List of Aspects is not exhaustive, you can choose from the list or come up with your own questions.
+            - If helpful, you may gently suggest one option instead of asking a question 
+            - Keep the output short and natural.  
+            - Optionally add this reminder when appropriate: 
+            "Wenn du fertig bist, klicke auf 'Szenario erstellen'."  
+            - If the scenario is empty or does not have any real details work yourself bottom up and ask questions about it. 
+            - If you dont understand something thats fine. Ask the user to clarify.
+        </Rules>
     """
-    
+        
     user_prompt = """
-    Current scenario: {description}
-    
-    Missing aspects:
-    {missing}
-    
-    Recent conversation:
-    {context}
-    
-    Generate ONE short question to get the missing information from the user.
-    Don't suggest ideas - just ask what they have in mind.
-    Keep it very brief and conversational.
+        Current scenario:
+        {description}
+        
+        Recent messages:
+        {context}
+        
+        Produce ONE short, concrete question in German about a remaining open aspect.
     """
     
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
@@ -64,19 +78,11 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
     
     try:
         result = await chain.ainvoke({
-            "description": state.current_description or "No scenario described yet",
-            "missing": missing_text,
-            "context": context or "Starting fresh"
+            "description": state.scenario or "No description yet",
+            "context": context or "Conversation starting"
         })
         
-        suggestion = result.content.strip()
-        
-        # Add some variety with follow-up prompts
-        if not state.current_description:
-            suggestion = "Was für einen Prank hast du im Kopf?"
-        elif len(state.messages) == 1:
-            suggestion = f"Okay! {suggestion}"
-        
+        suggestion = result.content.strip()    
         console_logger.info(f"Generated suggestion: {suggestion[:100]}...")
         
         return {
@@ -85,7 +91,6 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
         
     except Exception as e:
         console_logger.error(f"Suggestion generation failed: {str(e)}")
-        # Fallback suggestion
         return {
             "next_suggestion": "Erzähl mir mehr über deine Prank-Idee! Was soll das Szenario sein und wer ist der Anrufer?"
         }

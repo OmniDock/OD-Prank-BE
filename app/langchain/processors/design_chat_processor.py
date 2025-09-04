@@ -1,12 +1,10 @@
 """
 Design Chat Processor - Interactive scenario design assistant
 """
-from typing import Optional, Dict, Any
 from langgraph.graph import StateGraph, START, END
 from app.langchain.state import DesignChatState
 from app.langchain.nodes.design_chat import (
     refine_description_node,
-    check_readiness_node,
     generate_suggestion_node
 )
 from app.core.logging import console_logger
@@ -15,7 +13,7 @@ from app.core.logging import console_logger
 class DesignChatProcessor:
     """
     Interactive chat processor for scenario design.
-    Helps users iteratively refine their prank ideas until ready for generation.
+    Helps users iteratively refine their prank ideas.
     """
     
     def __init__(self):
@@ -27,7 +25,7 @@ class DesignChatProcessor:
         """
         Build the design chat graph
         
-        Flow: Refine → Check Readiness → (Suggest if not ready | End if ready)
+        Flow: Refine → Suggest → End (user decides when to finalize)
         """
         console_logger.info("Building design chat graph")
         
@@ -36,32 +34,11 @@ class DesignChatProcessor:
         
         # Add nodes
         graph.add_node("refine", refine_description_node)
-        graph.add_node("check", check_readiness_node)
         graph.add_node("suggest", generate_suggestion_node)
         
-        # Define the flow
+        # Simple linear flow
         graph.add_edge(START, "refine")
-        graph.add_edge("refine", "check")
-        
-        # Conditional routing after readiness check
-        def route_after_check(state: DesignChatState) -> str:
-            """Route based on readiness"""
-            if state.is_ready:
-                console_logger.info("Scenario ready - ending chat flow")
-                return "end"
-            console_logger.info("Scenario needs more detail - generating suggestion")
-            return "suggest"
-        
-        graph.add_conditional_edges(
-            "check",
-            route_after_check,
-            {
-                "suggest": "suggest",
-                "end": END
-            }
-        )
-        
-        # Suggestion leads to end (wait for next user input)
+        graph.add_edge("refine", "suggest")
         graph.add_edge("suggest", END)
         
         return graph.compile()
@@ -81,7 +58,8 @@ class DesignChatProcessor:
         try:
             # Run the graph
             result = await self.workflow.ainvoke(state.model_dump())
-            
+            console_logger.info(f"Design chat processing result: {result}")
+
             # Convert result to DesignChatState
             if isinstance(result, dict):
                 # Merge with existing state to preserve fields
@@ -90,11 +68,11 @@ class DesignChatProcessor:
                         setattr(state, key, value)
                 return state
             
+            
             return result
             
         except Exception as e:
             console_logger.error(f"Design chat processing failed: {str(e)}")
-            # Return state with error suggestion
             state.next_suggestion = "Entschuldigung, es gab einen Fehler. Bitte versuche es nochmal oder beschreibe deine Idee anders."
             return state
     
