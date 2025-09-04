@@ -17,7 +17,7 @@ class VoiceLineRepository:
 
     async def add_voice_lines(self, scenario_id: int, voice_lines_data: List[dict]) -> List[VoiceLine]:
         """Add voice lines to a scenario"""
-        console_logger.info(f"Adding {len(voice_lines_data)} voice lines to scenario {scenario_id}")
+        console_logger.debug(f"Adding {len(voice_lines_data)} voice lines to scenario {scenario_id}")
 
         voice_lines: List[VoiceLine] = []
         for index, voice_line_data in enumerate(voice_lines_data):
@@ -34,7 +34,7 @@ class VoiceLineRepository:
         for voice_line in voice_lines:
             await self.db_session.refresh(voice_line)
 
-        console_logger.info(f"Added {len(voice_lines)} voice lines")
+        console_logger.debug(f"Added {len(voice_lines)} voice lines")
         return voice_lines
 
     async def get_voice_line_by_id_with_user_check(self, voice_line_id: int, user_id: str | UUID) -> Optional[VoiceLine]:
@@ -42,7 +42,7 @@ class VoiceLineRepository:
         if isinstance(user_id, str):
             user_id = UUID(user_id)
 
-        console_logger.info(f"Getting voice line {voice_line_id} for user {user_id}")
+        console_logger.debug(f"Getting voice line {voice_line_id} for user {user_id}")
 
         query = (
             select(VoiceLine)
@@ -58,7 +58,7 @@ class VoiceLineRepository:
         if isinstance(user_id, str):
             user_id = UUID(user_id)
 
-        console_logger.info(f"Getting voice lines {voice_line_ids} for user {user_id}")
+        console_logger.debug(f"Getting voice lines {voice_line_ids} for user {user_id}")
 
         query = (
             select(VoiceLine)
@@ -69,12 +69,12 @@ class VoiceLineRepository:
         )
         result = await self.db_session.execute(query)
         voice_lines = result.scalars().all()
-        console_logger.info(f"Found {len(voice_lines)} voice lines out of {len(voice_line_ids)} requested")
+        console_logger.debug(f"Found {len(voice_lines)} voice lines out of {len(voice_line_ids)} requested")
         return voice_lines
 
     async def get_voice_lines_by_scenario_id(self, scenario_id: int) -> List[VoiceLine]:
         """Get all voice lines for a scenario (assumes scenario access already verified)"""
-        console_logger.info(f"Getting voice lines for scenario {scenario_id}")
+        console_logger.debug(f"Getting voice lines for scenario {scenario_id}")
 
         query = (
             select(VoiceLine)
@@ -83,7 +83,7 @@ class VoiceLineRepository:
         )
         result = await self.db_session.execute(query)
         voice_lines = result.scalars().all()
-        console_logger.info(f"Found {len(voice_lines)} voice lines for scenario {scenario_id}")
+        console_logger.debug(f"Found {len(voice_lines)} voice lines for scenario {scenario_id}")
         return voice_lines
 
     async def update_voice_line_storage(self, voice_line_id: int, signed_url: str, storage_path: str, user_id: str | UUID) -> Optional[VoiceLine]:
@@ -91,7 +91,7 @@ class VoiceLineRepository:
         if isinstance(user_id, str):
             user_id = UUID(user_id)
 
-        console_logger.info(f"Updating storage for voice line {voice_line_id} for user {user_id}")
+        console_logger.debug(f"Updating storage for voice line {voice_line_id} for user {user_id}")
 
         # First, get the voice line with RLS check
         query = (
@@ -109,7 +109,7 @@ class VoiceLineRepository:
             # Kept for API compatibility if needed later.
             await self.db_session.flush()
             await self.db_session.refresh(voice_line)
-            console_logger.info(f"Updated storage for voice line {voice_line_id}")
+            console_logger.debug(f"Updated storage for voice line {voice_line_id}")
             return voice_line
         else:
             console_logger.warning(f"Voice line {voice_line_id} not found or access denied for user {user_id}")

@@ -37,8 +37,6 @@ class ScenarioService:
 
         result:Dict[str, Any] = await processor.process(state)
 
-        console_logger.info(result)
-
         state = ScenarioState(**result)
         created = await self.create_scenario_from_state(user, state)
 
