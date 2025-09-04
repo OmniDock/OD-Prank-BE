@@ -186,7 +186,7 @@ class AudioGenerationStatusResponse(BaseModel):
     generated_count: int
     pending_count: int
     is_complete: bool
-    can_activate: bool  # True if is_safe and all audios generated
+    can_activate: bool  
 
 @router.patch("/{scenario_id}/active", response_model=ScenarioResponse)
 async def set_scenario_active(

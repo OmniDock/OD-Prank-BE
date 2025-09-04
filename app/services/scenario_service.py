@@ -29,142 +29,15 @@ class ScenarioService:
     async def process_chat(self,
                            user: AuthUser,
                            session_id: Optional[str],
-                           description: str
+                           scenario_create_request: ScenarioCreateRequest
                            ) -> Dict[str, Any]:
         
 
-        if not description and not session_id:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail="Either 'message' or 'session_id' must be provided")
-      
-        state = ScenarioState(scenario_data=ScenarioCreateRequest(description=description), require_clarificatio=False)
+        state = ScenarioState(scenario_data=scenario_create_request, require_clarificatio=False)
         processor = ScenarioProcessor()
         result = await processor.process(state)
         return result 
-    
-        # cache = await CacheService.get_global()
-        # cached_session = None
-        # try:
-        #     cached = await cache.get_json(session_id, prefix="scenario:clarify")
-        #     if cached:
-        #         cached_session = cached
-        # except Exception:
-        #     pass
-        
 
-        # # Continuation path if cached
-        # if session_id and cached_session:
-        #     console_logger.info(f"Continuing session {session_id}")
-        #     if cached_session.get("user_id") != user.id_str:
-        #         from fastapi import HTTPException
-        #         raise HTTPException(status_code=403, detail="Not authorized")
-
-        #     stored_state = cached_session["state"]
-        #     state = ScenarioState(**stored_state) if isinstance(stored_state, dict) else stored_state
-   
-        # else:
-        #     # New session path
-        #     if not description:
-        #         from fastapi import HTTPException
-        #         raise HTTPException(status_code=400, detail="Scenario is required for new sessions")
-        #     console_logger.info("Creating new session")
-        #     state = ScenarioState(scenario_data=ScenarioCreateRequest(description=description), require_clarificatio=False)
-
-        #  # Needs clarification → store session and return questions
-        # if getattr(state, "require_clarification", False) and getattr(state, "clarifying_questions", None):
-        #     import uuid
-        #     new_session_id = str(uuid.uuid4())
-        #     await cache.set_json(new_session_id, {
-        #         "state": state.model_dump() if hasattr(state, "model_dump") else state,
-        #         "user_id": user.id_str
-        #     }, ttl=900, prefix="scenario:clarify")
-
-        #     return {
-        #         "status": "needs_clarification",
-        #         "session_id": new_session_id,
-        #         "clarifying_questions": state.clarifying_questions
-        #     }
-
-    async def process_with_clarification_flow(
-        self,
-        user: AuthUser,
-        scenario_data: Optional[ScenarioCreateRequest],
-        session_id: Optional[str],
-        clarifying_questions: Optional[List[str]],
-        clarifications: Optional[List[str]]
-    ) -> Dict[str, Any]:
-        """
-        Orchestrate two-step process: new request → potential clarifications → scenario creation.
-
-        Returns a dict compatible with ScenarioProcessResponse.
-        """
-        if not scenario_data and not session_id:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail="Either 'scenario' or 'session_id' must be provided")
-
-        cache = await CacheService.get_global()
-        cached_session = None
-        try:
-            cached = await cache.get_json(session_id, prefix="scenario:clarify")
-            if cached:
-                cached_session = cached
-        except Exception:
-            pass
-
-        # Import here to avoid circular dependency
-        processor = ScenarioProcessor()
-
-        # Continuation path
-        if session_id and cached_session:
-            console_logger.info(f"Continuing session {session_id}")
-            if cached_session.get("user_id") != user.id_str:
-                from fastapi import HTTPException
-                raise HTTPException(status_code=403, detail="Not authorized")
-
-            stored_state = cached_session["state"]
-            state = ScenarioState(**stored_state) if isinstance(stored_state, dict) else stored_state
-            if clarifying_questions:
-                state.clarifying_questions = clarifying_questions
-            if clarifications:
-                state.clarifications = clarifications
-                state.require_clarification = False
-        else:
-            # New session path
-            if not scenario_data:
-                from fastapi import HTTPException
-                raise HTTPException(status_code=400, detail="Scenario is required for new sessions")
-            console_logger.info("Creating new session")
-            state = ScenarioState(scenario_data=scenario_data, require_clarification=True)
-
-        # Process scenario via LangChain graph
-        result = await processor.process(state)
-        state = ScenarioState(**result) if isinstance(result, dict) else result
-
-
-        # Needs clarification → store session and return questions
-        if getattr(state, "require_clarification", False) and getattr(state, "clarifying_questions", None):
-            import uuid
-            new_session_id = str(uuid.uuid4())
-            await cache.set_json(new_session_id, {
-                "state": state.model_dump() if hasattr(state, "model_dump") else state,
-                "user_id": user.id_str
-            }, ttl=900, prefix="scenario:clarify")
-
-            return {
-                "status": "needs_clarification",
-                "session_id": new_session_id,
-                "clarifying_questions": state.clarifying_questions
-            }
-
-        # Otherwise, create the scenario
-        created = await self.create_scenario_from_state(user, state)
-        # Clean up old session if present
-        if session_id and cached_session:
-            await cache.delete(session_id, prefix="scenario:clarify")
-        return {
-            "status": "complete",
-            "scenario_id": created.scenario.id
-        }
 
     async def enhance_voice_lines_with_feedback(self, user: AuthUser, voice_line_ids: List[int], 
                                               user_feedback: str) -> dict:
