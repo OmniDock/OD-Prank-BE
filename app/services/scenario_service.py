@@ -25,6 +25,66 @@ class ScenarioService:
 
     # ====== LangChain Invocations ======
 
+
+    async def process_chat(self,
+                           user: AuthUser,
+                           session_id: Optional[str],
+                           description: str
+                           ) -> Dict[str, Any]:
+        
+
+        if not description and not session_id:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Either 'message' or 'session_id' must be provided")
+      
+        state = ScenarioState(scenario_data=ScenarioCreateRequest(description=description), require_clarificatio=False)
+        processor = ScenarioProcessor()
+        result = await processor.process(state)
+        return result 
+    
+        # cache = await CacheService.get_global()
+        # cached_session = None
+        # try:
+        #     cached = await cache.get_json(session_id, prefix="scenario:clarify")
+        #     if cached:
+        #         cached_session = cached
+        # except Exception:
+        #     pass
+        
+
+        # # Continuation path if cached
+        # if session_id and cached_session:
+        #     console_logger.info(f"Continuing session {session_id}")
+        #     if cached_session.get("user_id") != user.id_str:
+        #         from fastapi import HTTPException
+        #         raise HTTPException(status_code=403, detail="Not authorized")
+
+        #     stored_state = cached_session["state"]
+        #     state = ScenarioState(**stored_state) if isinstance(stored_state, dict) else stored_state
+   
+        # else:
+        #     # New session path
+        #     if not description:
+        #         from fastapi import HTTPException
+        #         raise HTTPException(status_code=400, detail="Scenario is required for new sessions")
+        #     console_logger.info("Creating new session")
+        #     state = ScenarioState(scenario_data=ScenarioCreateRequest(description=description), require_clarificatio=False)
+
+        #  # Needs clarification → store session and return questions
+        # if getattr(state, "require_clarification", False) and getattr(state, "clarifying_questions", None):
+        #     import uuid
+        #     new_session_id = str(uuid.uuid4())
+        #     await cache.set_json(new_session_id, {
+        #         "state": state.model_dump() if hasattr(state, "model_dump") else state,
+        #         "user_id": user.id_str
+        #     }, ttl=900, prefix="scenario:clarify")
+
+        #     return {
+        #         "status": "needs_clarification",
+        #         "session_id": new_session_id,
+        #         "clarifying_questions": state.clarifying_questions
+        #     }
+
     async def process_with_clarification_flow(
         self,
         user: AuthUser,

@@ -78,6 +78,28 @@ async def process_scenario(
         console_logger.error(f"Processing failed: {str(e)}")
         return ScenarioProcessResponse(status="error", error=str(e))
     
+@router.post("/process/chat", response_model=ScenarioProcessResponse)
+async def process_chat(
+    description: str = Body(..., embed=True),
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> ScenarioProcessResponse:
+    """
+    Process a summarized chat description for scenario generation
+    
+    This endpoint receives a simple string description and processes it
+    """
+    console_logger.info(f"description: {description}")
+    try:
+        service = ScenarioService(db_session)
+        result = await service.process_chat(user=user,description=description)
+        return ScenarioProcessResponse(**result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        console_logger.error(f"Processing failed: {str(e)}")
+        return ScenarioProcessResponse(status="error", error=str(e))
+    
 
 
 @router.post("/voice-lines/enhance", response_model=VoiceLineEnhancementResponse)

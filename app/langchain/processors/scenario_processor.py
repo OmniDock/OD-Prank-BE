@@ -4,7 +4,8 @@ Main processor for LangChain v2 scenario generation
 from typing import Optional, List
 from langgraph.graph import StateGraph, START, END
 from app.langchain.state import ScenarioState
-from app.langchain.nodes.clarifier import clarifier_node
+from app.langchain.nodes.extractor import extractor_node
+# from app.langchain.nodes.clarifier import clarifier_node
 from app.langchain.nodes.analyzer import analyzer_node
 from app.langchain.nodes.generator import generator_node
 from app.langchain.nodes.tts_refiner import tts_refiner_node
@@ -36,7 +37,7 @@ class ScenarioProcessor:
         graph = StateGraph(ScenarioState)
         
         # Add all nodes
-        graph.add_node("clarifier", clarifier_node)
+        graph.add_node("extractor", extractor_node)
         graph.add_node("analyzer", analyzer_node)
         graph.add_node("generator", generator_node)
         graph.add_node("tts_refiner", tts_refiner_node)
@@ -45,7 +46,7 @@ class ScenarioProcessor:
         graph.add_node("safety", safety_node)
         
         # Define the flow
-        graph.add_edge(START, "clarifier")
+        graph.add_edge(START, "extractor")
         
         # Conditional routing after clarifier
         def route_after_clarifier(state: ScenarioState) -> str:
@@ -57,7 +58,7 @@ class ScenarioProcessor:
             return "analyzer"
         
         graph.add_conditional_edges(
-            "clarifier",
+            "extractor",
             route_after_clarifier,
             {
                 "analyzer": "analyzer",

@@ -40,7 +40,7 @@ class ScenarioState(BaseModel):
     scenario_data: ScenarioCreateRequest
     
     # Configuration
-    require_clarification: bool = True
+    require_clarification: bool = False
     target_counts: Dict[str, int] = Field(default_factory=lambda: {
         "OPENING": 2,
         "QUESTION": 6,
