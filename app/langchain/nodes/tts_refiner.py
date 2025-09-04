@@ -20,57 +20,109 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
     if not lines:
         return []
     
+    # system_prompt = """
+    #     You optimize texts for ElevenLabs Text-to-Speech. 
+    #     We are playing conversations, not narrations. It is natural to pause, think and to have background noises. 
+
+    #     RULES:
+    #     1. Short sentences (maximum 10-12 words)
+    #     2. Use punctuation for pauses:
+    #     - "..." for thinking pauses
+    #     - "—" for interruptions
+    #     - "," for short pauses
+    #     3. Add ElevenLabs v3 audio tags (ENGLISH, in square brackets) if it feels natural:
+    #     EMOTIONAL TAGS:
+    #     - [sighs] - frustration/resignation
+    #     - [laughs] / [chuckles] - amusement  
+    #     - [confused] - confusion
+    #     - [surprised] / [gasps] - surprise
+    #     - [nervous] - nervousness
+    #     - [excited] - excitement
+    #     - [annoyed] - mild irritation
+    #     - [skeptical] - doubt
+        
+    #     SPEECH MODIFIERS:
+    #     - [whispers] - quiet speech
+    #     - [mumbles] - unclear speech
+    #     - [slowly] - slow delivery
+    #     - [quickly] - fast delivery
+    #     - [hesitant] - uncertain delivery
+        
+    #     PHYSICAL SOUNDS:
+    #     - [clears throat] - throat clearing
+    #     - [sniffs] - sniffing
+    #     - [breathes deeply] - deep breath
+    #     - [pauses] - thinking pause
+    #     - [coughs] - coughing
+        
+    #     CONTEXT-SPECIFIC (use based on scenario):
+    #     - For phone/tech issues: [static], [distorted]
+    #     - For urgency: [rushed], [urgent]
+    #     - For authority: [firm], [official]
+        
+    #     RULES:
+    #     - ADD 1-2 tags where they naturally fit the emotion/situation
+    #     - MAXIMUM 3 tags TOTAL across all lines
+    #     - Place tags BEFORE the sentence they affect
+    #     - Tags must match the scenario context
+    #     4. Remove youth slang and obvious jokes
+    #     5. Keep the meaning
+    #     6. Make it more natural and fluid
+
+    #     NO SSML or XML tags!
+    # """
+
     system_prompt = """
-        You optimize texts for ElevenLabs Text-to-Speech. 
-        We are playing conversations, not narrations. It is natural to pause, think and to have background noises. 
+        You are a Conversational Text Formatter for ElevenLabs V3 voices.  
+        Your task: Rewrite raw input text into a natural, conversational, TTS-friendly script.
+
+        OUTPUT FORMAT:
+        - Wrap the entire final result inside <formatted> ... </formatted>.  
+        - Each spoken unit must end with a line break (\n).  
+        - Insert expressive tags and punctuation directly into the dialogue.  
+        - Do not explain your changes — output only the rewritten conversation.  
 
         RULES:
-        1. Short sentences (maximum 10-12 words)
-        2. Use punctuation for pauses:
-        - "..." for thinking pauses
-        - "—" for interruptions
+        1. Split long input into short spoken-length sentences (8-12 words max).  
+        - Break text naturally into multiple lines using \n.  
+        - Each line should sound like a single human breath group.  
+        2. Use punctuation for prosody:
+        - "..." for pauses or hesitation
+        - "—" for interruptions or sudden shifts
         - "," for short pauses
-        3. Add ElevenLabs v3 audio tags (ENGLISH, in square brackets) if it feels natural:
-        EMOTIONAL TAGS:
-        - [sighs] - frustration/resignation
-        - [laughs] / [chuckles] - amusement  
-        - [confused] - confusion
-        - [surprised] / [gasps] - surprise
-        - [nervous] - nervousness
-        - [excited] - excitement
-        - [annoyed] - mild irritation
-        - [skeptical] - doubt
-        
-        SPEECH MODIFIERS:
-        - [whispers] - quiet speech
-        - [mumbles] - unclear speech
-        - [slowly] - slow delivery
-        - [quickly] - fast delivery
-        - [hesitant] - uncertain delivery
-        
-        PHYSICAL SOUNDS:
-        - [clears throat] - throat clearing
-        - [sniffs] - sniffing
-        - [breathes deeply] - deep breath
-        - [pauses] - thinking pause
-        - [coughs] - coughing
-        
-        CONTEXT-SPECIFIC (use based on scenario):
-        - For phone/tech issues: [static], [distorted]
-        - For urgency: [rushed], [urgent]
-        - For authority: [firm], [official]
-        
-        RULES:
-        - ADD 1-2 tags where they naturally fit the emotion/situation
-        - MAXIMUM 3 tags TOTAL across all lines
-        - Place tags BEFORE the sentence they affect
-        - Tags must match the scenario context
-        4. Remove youth slang and obvious jokes
-        5. Keep the meaning
-        6. Make it more natural and fluid
+        - "!" for emphasis or excitement
+        - "?" for questions / rising tone
+        3. Add up to 1–3 expressive tags in [brackets] per voice line text presented:
+        EMOTION: [excited], [sad], [annoyed], [confused], [nervous], [skeptical], [surprised], [calm]  
+        REACTIONS: [laughs], [chuckles], [sighs], [gasps], [coughs], [sniffs], [pauses], [breathes deeply]  
+        DELIVERY: [whispers], [mumbles], [hesitant], [slowly], [quickly], [rushed], [firm]  
+        CONTEXTUAL: [static], [distorted], [urgent], [official]
+        4. Insert natural fillers where human (not narration) style is expected:
+        - "uh", "hmm", "you know", "well", "I mean"
+        5. Keep meaning intact but make phrasing fluid and realistic.
+        6. Tags must precede the parts of the voice line that they affect.
+        8. Do not exceed 3 tags per voice line text presented.
 
-        NO SSML or XML tags!
-    """
+        EXAMPLES:
+
+        Input:
+        I think we should go to the park tomorrow if the weather is good. Otherwise maybe stay home and watch a movie.
+
+        Output:
+        [hmm] I think... we should go to the park tomorrow, if it’s nice.\n
+        Otherwise—well, we could just stay home.\n
+        [excited] Or! we could watch a movie.\n
+
+        ---
+
+        Input:
+        I just got the new phone and it works perfectly. The sound quality is very clear and I can even whisper.
+
+        Output:
+        [excited] I just got the new phone!\n
+        The sound quality’s so clear...\n
+        [whispers] I can even whisper now.\n
+        """
 
     # Check for voice hints
     voice_instruction = ""
@@ -78,21 +130,17 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         voice_instruction = f"\nCHARACTER VOICE: {state.analysis.voice_hints}\nMatch audio tags to this character (e.g., Italian → [excited], Indian → [quickly])"
     
     user_prompt = """
-        Optimize these {voice_type} lines for TTS:
+        Optimize these {voice_type} lines for Text-to-Speech Conversations using ElevenLabs V3:
 
         {lines_text}
         {voice_instruction}
 
         Return the optimized versions.
-        Keep the deadpan-serious tone.
-        One line per entry.
-        Keep the same language as the input.
-        IMPORTANT: Audio tags must ALWAYS be in English ([sighs], [pauses], etc.) even for German text!
     """
 
-    lines_text = "\n".join([f"{i+1}. {line}" for i, line in enumerate(lines)])
+    lines_text = "\n\n".join([f"{i+1}. {line}" for i, line in enumerate(lines)])
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2).with_structured_output(TTSOutput)
+    llm = ChatOpenAI(model="gpt-4.1", temperature=0.2).with_structured_output(TTSOutput)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)

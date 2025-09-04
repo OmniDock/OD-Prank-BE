@@ -25,7 +25,7 @@ class TTSService:
 
     # Process-wide concurrency gate for ElevenLabs TTS (simple in-process queue)
     # Tune via ELEVENLABS_MAX_CONCURRENCY env var; defaults to 2 (e.g., Free plan)
-    _MAX_CONCURRENCY = int(os.getenv("ELEVENLABS_MAX_CONCURRENCY", "10"))
+    _MAX_CONCURRENCY = int(os.getenv("ELEVENLABS_MAX_CONCURRENCY", "2"))
     _SEM = asyncio.Semaphore(_MAX_CONCURRENCY)
 
     def __init__(self):
@@ -49,11 +49,11 @@ class TTSService:
     def default_voice_settings(self) -> Dict:
         """Optimierte Einstellungen für ElevenLabs v3 mit Audio-Tags und Akzenten"""
         return {
-            "stability": 1,  # Reduziert für mehr Expressivität mit Audio-Tags
+            "stability": 0.5,  # Reduziert für mehr Expressivität mit Audio-Tags
             "use_speaker_boost": True,
             "similarity_boost": 1,  # Erhöht für bessere Charakterkonsistenz
-            "style": 1,  # Erhöht für natürlichere Emotionen und Akzente
-            "speed": 1,  # Minimal langsamer für bessere Tag-Verarbeitung
+            "style": 1.4,  # Erhöht für natürlichere Emotionen und Akzente
+            "speed": 1.2,  # Minimal langsamer für bessere Tag-Verarbeitung
         }
 
     def _normalize_text(self, text: str) -> str:
@@ -128,6 +128,7 @@ class TTSService:
             base_delay = 1.0  # seconds
             async with self._SEM:
                 for attempt in range(1, max_attempts + 1):
+                    console_logger.info(f"Attempt {attempt} of {max_attempts} to generate audio")
                     try:
                         audio_bytes = await asyncio.to_thread(_convert_sync)
                         console_logger.debug("Audio generation successful")
@@ -140,10 +141,31 @@ class TTSService:
                             or "system_busy" in msg
                             or "rate limit" in msg
                         )
-                        if is_rate_limited and attempt < max_attempts:
+                        # Treat common transient/server issues as retryable
+                        transient_tokens = [
+                            "upstream connect error",
+                            "disconnect/reset",
+                            "connection termination",
+                            "connection reset",
+                            "reset reason",
+                            "econnreset",
+                            "temporarily unavailable",
+                            "timeout",
+                            "timed out",
+                            "bad gateway",
+                            "service unavailable",
+                            "gateway timeout",
+                            "server error",
+                            "connect error",
+                        ]
+                        is_5xx = bool(re.search(r"\b5\d{2}\b", msg)) or any(code in msg for code in [" 502", " 503", " 504"]) 
+                        is_transient = is_rate_limited or is_5xx or any(t in msg for t in transient_tokens)
+
+                        if is_transient and attempt < max_attempts:
                             delay = min(30.0, base_delay * (2 ** (attempt - 1))) + random.random() * 0.25
+                            reason = "rate-limited/busy" if is_rate_limited else "transient 5xx/network issue"
                             console_logger.warning(
-                                f"ElevenLabs rate-limited/busy (attempt {attempt}/{max_attempts}); retrying in {delay:.2f}s"
+                                f"ElevenLabs {reason} (attempt {attempt}/{max_attempts}); retrying in {delay:.2f}s"
                             )
                             await asyncio.sleep(delay)
                             continue
@@ -151,6 +173,9 @@ class TTSService:
                         console_logger.error(f"Failed text: {text[:100]}...")
                         console_logger.error(f"Voice ID: {selected_voice_id}, Model: {model.value}")
                         raise
+
+                console_logger.info(f"Attempt {attempt} of {max_attempts} to generate audio")
+
 
         except Exception:
             # Already logged above; re-raise to caller
@@ -191,7 +216,39 @@ class TTSService:
                     }
                 )
 
-            response = await asyncio.to_thread(_upload_sync)
+            # Retry public storage upload on transient network/server errors
+            max_attempts = 6
+            base_delay = 0.5
+            response = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    response = await asyncio.to_thread(_upload_sync)
+                    break
+                except Exception as e:
+                    msg = str(e).lower()
+                    transient_tokens = [
+                        "timeout",
+                        "timed out",
+                        "read operation timed out",
+                        "connection reset",
+                        "econnreset",
+                        "upstream connect error",
+                        "bad gateway",
+                        "service unavailable",
+                        "gateway timeout",
+                        "temporarily unavailable",
+                        "connect error",
+                    ]
+                    is_5xx = bool(re.search(r"\b5\d{2}\b", msg)) or any(code in msg for code in [" 502", " 503", " 504"]) 
+                    is_transient = is_5xx or any(t in msg for t in transient_tokens)
+                    if is_transient and attempt < max_attempts:
+                        delay = min(10.0, base_delay * (2 ** (attempt - 1))) + random.random() * 0.25
+                        console_logger.warning(
+                            f"Supabase storage upload transient failure (attempt {attempt}/{max_attempts}); retrying in {delay:.2f}s"
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                    raise
             
             # Modern Supabase client doesn't have .error attribute
             # Instead, check if upload was successful by examining the response
@@ -243,16 +300,44 @@ class TTSService:
                     expires_in=expires_in
                 )
 
-            signed_url_response = await asyncio.to_thread(_signed_url_sync)
-            
-            # Handle different response formats
-            if hasattr(signed_url_response, 'data') and signed_url_response.data:
-                return signed_url_response.data.get('signedURL')
-            elif isinstance(signed_url_response, dict):
-                return signed_url_response.get('signedURL')
-            else:
-                return signed_url_response
-                
+            max_attempts = 6
+            base_delay = 0.5
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    signed_url_response = await asyncio.to_thread(_signed_url_sync)
+                    # Handle different response formats
+                    if hasattr(signed_url_response, 'data') and signed_url_response.data:
+                        return signed_url_response.data.get('signedURL')
+                    elif isinstance(signed_url_response, dict):
+                        return signed_url_response.get('signedURL')
+                    else:
+                        return signed_url_response
+                except Exception as e:
+                    msg = str(e).lower()
+                    transient_tokens = [
+                        "timeout",
+                        "timed out",
+                        "read operation timed out",
+                        "connection reset",
+                        "econnreset",
+                        "upstream connect error",
+                        "bad gateway",
+                        "service unavailable",
+                        "gateway timeout",
+                        "temporarily unavailable",
+                        "connect error",
+                    ]
+                    is_5xx = bool(re.search(r"\b5\d{2}\b", msg)) or any(code in msg for code in [" 502", " 503", " 504"]) 
+                    is_transient = is_5xx or any(t in msg for t in transient_tokens)
+                    if is_transient and attempt < max_attempts:
+                        delay = min(10.0, base_delay * (2 ** (attempt - 1))) + random.random() * 0.25
+                        console_logger.warning(
+                            f"Signed URL generation transient failure (attempt {attempt}/{max_attempts}); retrying in {delay:.2f}s"
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                    console_logger.error(f"Error getting audio URL: {str(e)}")
+                    return None
         except Exception as e:
             console_logger.error(f"Error getting audio URL: {str(e)}")
             return None
@@ -289,7 +374,40 @@ class TTSService:
                     .create_signed_urls(missing, expires_in)
                 )
 
-            response = await asyncio.to_thread(_batch_sign_sync)
+            # Retry on transient failures
+            max_attempts = 5
+            base_delay = 0.5
+            response = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    response = await asyncio.to_thread(_batch_sign_sync)
+                    break
+                except Exception as e:
+                    msg = str(e).lower()
+                    transient_tokens = [
+                        "timeout",
+                        "timed out",
+                        "read operation timed out",
+                        "connection reset",
+                        "econnreset",
+                        "upstream connect error",
+                        "bad gateway",
+                        "service unavailable",
+                        "gateway timeout",
+                        "temporarily unavailable",
+                        "connect error",
+                    ]
+                    is_5xx = bool(re.search(r"\b5\d{2}\b", msg)) or any(code in msg for code in [" 502", " 503", " 504"]) 
+                    is_transient = is_5xx or any(t in msg for t in transient_tokens)
+                    if is_transient and attempt < max_attempts:
+                        delay = min(10.0, base_delay * (2 ** (attempt - 1))) + random.random() * 0.25
+                        console_logger.warning(
+                            f"Batch signed URL generation transient failure (attempt {attempt}/{max_attempts}); retrying in {delay:.2f}s"
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                    console_logger.error(f"Batch signed URL generation failed: {str(e)}")
+                    break
             # Normalize response to a list of item dicts
             if hasattr(response, "data"):
                 items = response.data
