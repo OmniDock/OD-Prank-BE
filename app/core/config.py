@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     TELNYX_SIP_USERNAME: str = Field(default="")  # SIP username for WebRTC (optional)
     TELNYX_SIP_PASSWORD: str = Field(default="")  # SIP password for WebRTC (optional)
 
+    # Stripe
+    STRIPE_SECRET_KEY: str = Field(default="")
+    STRIPE_PUBLISHABLE_KEY: str = Field(default="")
+    STRIPE_RETURN_URL: str = Field(default="")
+    STRIPE_WEEKLY_PRODUCT_ID: str = Field(default="")
+    STRIPE_WEEKLY_PRICE_ID: str = Field(default="")
+    STRIPE_WEBHOOK_SECRET: str = Field(default="")
 
     # CORS
     BACKEND_CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8080")
