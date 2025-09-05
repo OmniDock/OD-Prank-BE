@@ -51,7 +51,6 @@ def _build_async_db_url_and_args(url: str):
     connect_args = {
         "statement_cache_size": 0,             # legacy key
         "prepared_statement_cache_size": 0,    # newer key
-        "prepare_threshold": 0,                # disable server-side prepared stmts
     }
 
     # Map sslmode to asyncpg 'ssl' (optional; your DB may enforce TLS anyway)
