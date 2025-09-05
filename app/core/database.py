@@ -90,8 +90,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.pool import NullPool
 from app.core.config import settings
 
-DATABASE_URL = settings.DATABASE_URL.replace("postgres://", "postgresql+asyncpg://")
-
+DATABASE_URL = (
+    settings.DATABASE_URL
+    .replace("postgresql://", "postgresql+asyncpg://")
+    .replace("postgres://", "postgresql+asyncpg://")
+)
 engine = create_async_engine(
     DATABASE_URL,
     connect_args={"prepared_statement_cache_size": 0},
