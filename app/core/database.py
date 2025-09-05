@@ -99,8 +99,11 @@ DATABASE_URL = (
 
 engine = create_async_engine(
     DATABASE_URL,
-    connect_args={"prepared_statement_cache_size": 0},
-    poolclass=NullPool,                      
+    connect_args={
+        "statement_cache_size": 0,             # for backward compat
+        "prepared_statement_cache_size": 0,    # for asyncpg >=0.27
+    },
+    poolclass=NullPool,  # required with PgBouncer
     echo=False,
 )
 
