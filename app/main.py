@@ -8,8 +8,7 @@ from app.core.utils.voices_catalog import get_voices_catalog
 from app.core.middleware import RequestLoggingMiddleware, ErrorHandlingMiddleware
 from app.services.cache_service import CacheService 
 
-from starlette.middleware.trustedhost import TrustedHostMiddleware
-from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,7 +35,6 @@ app = FastAPI(
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(ErrorHandlingMiddleware)
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 app.add_middleware(
     CORSMiddleware,
