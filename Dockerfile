@@ -21,4 +21,4 @@ COPY . .
 EXPOSE 8000
 
 # Migrate then serve; bind to Railway's dynamic port
-CMD ["sh", "-c", "uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
