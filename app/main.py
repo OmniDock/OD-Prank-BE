@@ -9,7 +9,6 @@ from app.core.middleware import RequestLoggingMiddleware, ErrorHandlingMiddlewar
 from app.services.cache_service import CacheService 
 
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
