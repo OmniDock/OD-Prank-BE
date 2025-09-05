@@ -88,13 +88,14 @@
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import NullPool
+from app.core.config import settings
 
 DATABASE_URL = settings.DATABASE_URL.replace("postgres://", "postgresql+asyncpg://")
 
 engine = create_async_engine(
     DATABASE_URL,
-    connect_args={"statement_cache_size": 0},  # ✅ guaranteed asyncpg arg
-    poolclass=NullPool,                        # ✅ let PgBouncer handle pooling
+    connect_args={"prepared_statement_cache_size": 0},
+    poolclass=NullPool,                      
     echo=False,
 )
 
