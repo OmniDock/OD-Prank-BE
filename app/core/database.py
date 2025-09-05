@@ -71,6 +71,7 @@ engine = create_async_engine(
     future=True,
     connect_args=connect_args,
     poolclass=NullPool,
+    execution_options={"compiled_cache": None},
 )
 
 async_session_maker = async_sessionmaker(
