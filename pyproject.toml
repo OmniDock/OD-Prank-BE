@@ -28,4 +28,5 @@ dependencies = [
     "telnyx>=2.1.6",
     "uvicorn>=0.35.0",
     "phonenumbers>=8.13.48",
+    "gunicorn>=23.0.0",
 ]
