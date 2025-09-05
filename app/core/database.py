@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from typing import AsyncGenerator
 from app.core.config import settings
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+from sqlalchemy.pool import NullPool
 
 def _build_async_db_url_and_args(url: str):
     split = urlsplit(url)
@@ -53,12 +54,12 @@ def _build_async_db_url_and_args(url: str):
         "prepared_statement_cache_size": 0,    # newer key
     }
 
-    # Map sslmode to asyncpg 'ssl' (optional; your DB may enforce TLS anyway)
-    if sslmode:
-        if sslmode.lower() in ("disable", "0", "false"):
-            connect_args["ssl"] = False
-        else:
-            connect_args["ssl"] = True
+    # # Map sslmode to asyncpg 'ssl' (optional; your DB may enforce TLS anyway)
+    # if sslmode:
+    #     if sslmode.lower() in ("disable", "0", "false"):
+    #         connect_args["ssl"] = False
+    #     else:
+    #         connect_args["ssl"] = True
 
     return clean_url, connect_args
 
@@ -69,10 +70,7 @@ engine = create_async_engine(
     echo=False,
     future=True,
     connect_args=connect_args,
-    pool_size=5,
-    max_overflow=0,      # avoid bursts through PgBouncer
-    pool_timeout=30,
-    pool_recycle=1800,
+    poolclass=NullPool,
 )
 
 async_session_maker = async_sessionmaker(
