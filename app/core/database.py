@@ -95,6 +95,8 @@ DATABASE_URL = (
     .replace("postgresql://", "postgresql+asyncpg://")
     .replace("postgres://", "postgresql+asyncpg://")
 )
+
+
 engine = create_async_engine(
     DATABASE_URL,
     connect_args={"prepared_statement_cache_size": 0},
