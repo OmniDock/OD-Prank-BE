@@ -89,6 +89,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import NullPool
 from app.core.config import settings
+from uuid import uuid4
 
 DATABASE_URL = (
     settings.DATABASE_URL
@@ -99,12 +100,13 @@ DATABASE_URL = (
 
 engine = create_async_engine(
     DATABASE_URL,
+    poolclass=NullPool,
     connect_args={
-        "statement_cache_size": 0,             # for backward compat
-        "prepared_statement_cache_size": 0,    # for asyncpg >=0.27
-    },
-    poolclass=NullPool,  # required with PgBouncer
-    echo=False,
+        "statement_cache_size": 0,
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+        # optional: server_settings for Supabase
+        "server_settings": {"jit": "off", "statement_timeout": "60000"}
+    }
 )
 
 async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
