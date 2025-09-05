@@ -20,6 +20,11 @@ import random
 from app.services.cache_service import CacheService
 
 
+TTS_ATTEMPT_TIMEOUT = int(os.getenv("TTS_ATTEMPT_TIMEOUT", "20"))
+TTS_OVERALL_TIMEOUT = int(os.getenv("TTS_OVERALL_TIMEOUT", "120"))
+SUPABASE_TIMEOUT = int(os.getenv("SUPABASE_TIMEOUT", "20"))
+
+
 class TTSService: 
     """Unified TTS generation and storage service with user-dependent private storage"""
 
@@ -123,15 +128,30 @@ class TTSService:
                 return b"".join(generator)
 
             # Exponential backoff on rate limiting; queue via process-wide semaphore
-            max_attempts = 15
+            max_attempts = 6
             base_delay = 1.0  # seconds
+            deadline = asyncio.get_running_loop().time() + TTS_OVERALL_TIMEOUT
             async with self._SEM:
                 for attempt in range(1, max_attempts + 1):
-                    console_logger.info(f"Attempt {attempt} of {max_attempts} to generate audio")
+                    remaining = deadline - asyncio.get_running_loop().time()
+                    if remaining <= 0:
+                        raise asyncio.TimeoutError("TTS overall deadline exceeded")
+                    attempt_timeout = min(TTS_ATTEMPT_TIMEOUT, max(0.1, remaining))
+                    console_logger.info(f"Attempt {attempt}/{max_attempts} (timeout {attempt_timeout}s) to generate audio")
                     try:
-                        audio_bytes = await asyncio.to_thread(_convert_sync)
+                        audio_bytes = await asyncio.wait_for(asyncio.to_thread(_convert_sync), timeout=attempt_timeout)
                         console_logger.debug("Audio generation successful")
                         return audio_bytes
+                    except asyncio.TimeoutError:
+                        if attempt < max_attempts:
+                            delay = min(10.0, base_delay * (2 ** (attempt - 1)))
+                            console_logger.warning(
+                                f"ElevenLabs attempt {attempt} timed out after {attempt_timeout}s; retrying in {delay:.2f}s"
+                            )
+                            await asyncio.sleep(delay)
+                            continue
+                        console_logger.error("ElevenLabs TTS timed out on final attempt")
+                        raise
                     except Exception as e:
                         msg = str(e).lower()
                         is_rate_limited = (
@@ -161,7 +181,7 @@ class TTSService:
                         is_transient = is_rate_limited or is_5xx or any(t in msg for t in transient_tokens)
 
                         if is_transient and attempt < max_attempts:
-                            delay = min(30.0, base_delay * (2 ** (attempt - 1))) + random.random() * 0.25
+                            delay = min(10.0, base_delay * (2 ** (attempt - 1)))
                             reason = "rate-limited/busy" if is_rate_limited else "transient 5xx/network issue"
                             console_logger.warning(
                                 f"ElevenLabs {reason} (attempt {attempt}/{max_attempts}); retrying in {delay:.2f}s"
@@ -172,8 +192,6 @@ class TTSService:
                         console_logger.error(f"Failed text: {text[:100]}...")
                         console_logger.error(f"Voice ID: {selected_voice_id}, Model: {model.value}")
                         raise
-
-                console_logger.info(f"Attempt {attempt} of {max_attempts} to generate audio")
 
 
         except Exception:
@@ -221,7 +239,7 @@ class TTSService:
             response = None
             for attempt in range(1, max_attempts + 1):
                 try:
-                    response = await asyncio.to_thread(_upload_sync)
+                    response = await asyncio.wait_for(asyncio.to_thread(_upload_sync), timeout=SUPABASE_TIMEOUT)
                     break
                 except Exception as e:
                     msg = str(e).lower()
@@ -260,7 +278,7 @@ class TTSService:
                     expires_in=3600  # 1 hour
                 )
 
-            signed_url_response = await asyncio.to_thread(_signed_url_sync)
+            signed_url_response = await asyncio.wait_for(asyncio.to_thread(_signed_url_sync), timeout=SUPABASE_TIMEOUT)
             
             # Extract signed URL from response
             if hasattr(signed_url_response, 'data') and signed_url_response.data:
@@ -303,7 +321,7 @@ class TTSService:
             base_delay = 0.5
             for attempt in range(1, max_attempts + 1):
                 try:
-                    signed_url_response = await asyncio.to_thread(_signed_url_sync)
+                    signed_url_response = await asyncio.wait_for(asyncio.to_thread(_signed_url_sync), timeout=SUPABASE_TIMEOUT)
                     # Handle different response formats
                     if hasattr(signed_url_response, 'data') and signed_url_response.data:
                         return signed_url_response.data.get('signedURL')
@@ -379,7 +397,7 @@ class TTSService:
             response = None
             for attempt in range(1, max_attempts + 1):
                 try:
-                    response = await asyncio.to_thread(_batch_sign_sync)
+                    response = await asyncio.wait_for(asyncio.to_thread(_batch_sign_sync), timeout=SUPABASE_TIMEOUT)
                     break
                 except Exception as e:
                     msg = str(e).lower()
@@ -443,8 +461,12 @@ class TTSService:
         try:
             console_logger.debug(f"Generating and storing audio for voice line {voice_line_id} (user: {user_id})")
             
-            # Step 1: Generate audio with voice selection
-            audio_data = await self.generate_audio(text, voice_id, model, voice_settings)
+            # Step 1: Generate audio with voice selection (overall guard)
+            overall_timeout = max(10, TTS_OVERALL_TIMEOUT + 15)
+            audio_data = await asyncio.wait_for(
+                self.generate_audio(text, voice_id, model, voice_settings),
+                timeout=overall_timeout
+            )
             wav_bytes = self._pcm16_to_wav(audio_data)
             
             # Step 2: Store audio with user-dependent path
