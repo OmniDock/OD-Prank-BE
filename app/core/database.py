@@ -104,8 +104,6 @@ engine = create_async_engine(
     connect_args={
         "statement_cache_size": 0,
         "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
-        # optional: server_settings for Supabase
-        "server_settings": {"jit": "off", "statement_timeout": "60000"}
     }
 )
 
