@@ -48,10 +48,8 @@ async def lifespan_session():
     async with async_session_maker() as session:  # type: AsyncSession
         try:
             yield session
-            # If no exception: commit
             await session.commit()
         except Exception:
-            # Rollback on error
             await session.rollback()
             raise
         finally:
