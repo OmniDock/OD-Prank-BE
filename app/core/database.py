@@ -2,6 +2,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.pool import NullPool
 from app.core.config import settings
 from contextlib import asynccontextmanager
+import uuid 
+
 
 DATABASE_URL = (
     settings.DATABASE_URL
@@ -9,16 +11,35 @@ DATABASE_URL = (
     .replace("postgres://", "postgresql+asyncpg://")
 )
 
-engine = create_async_engine(
-    DATABASE_URL,
-    poolclass=NullPool,
+# engine = create_async_engine(
+#     DATABASE_URL,
+#     poolclass=NullPool,
+#     connect_args={
+#         "statement_cache_size": 0,
+#     },
+#     execution_options={"compiled_cache": None},
+# )
+
+self._engine = create_async_engine(
+    url=DATABASE_URL,
+
+    pool_recycle=3600,
+    pool_pre_ping=True,
+
+    expire_on_commit=False,
     connect_args={
+        "prepare_threshold": None,
         "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4()}__",
     },
-    execution_options={"compiled_cache": None},
 )
 
 async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+
+
 
 
 @asynccontextmanager
