@@ -13,7 +13,6 @@ engine = create_async_engine(
     DATABASE_URL,
     poolclass=NullPool,
     connect_args={
-        "prepared_statement_cache_size": 0,
         "statement_cache_size": 0,
     },
     execution_options={"compiled_cache": None},
