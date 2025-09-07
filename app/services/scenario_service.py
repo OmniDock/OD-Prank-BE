@@ -308,12 +308,16 @@ class ScenarioService:
         
         if not scenario:
             raise ValueError(f"Scenario {scenario_id} not found")
+        # End read transaction early to free PgBouncer connection
+        await self.db_session.rollback()
         return await self._to_scenario_response(scenario, include_audio=True)
     
 
     async def get_user_scenarios(self, user: AuthUser, limit: int = 50, offset: int = 0, only_active: bool = True) -> List[ScenarioResponse]:
         """Get all scenarios for a user"""
         scenarios = await self.repository.get_user_scenarios(user.id_str, limit, offset, only_active)
+        # End read transaction early to free PgBouncer connection
+        await self.db_session.rollback()
         responses: List[ScenarioResponse] = []
         for s in scenarios:
             responses.append(await self._to_scenario_response(s, include_audio=False))
@@ -440,6 +444,8 @@ class ScenarioService:
         
         is_complete = generated_count == total_voice_lines
         can_activate = scenario.is_safe and is_complete
+        # End read transaction early to free PgBouncer connection
+        await self.db_session.rollback()
         
         return {
             "total_voice_lines": total_voice_lines,
