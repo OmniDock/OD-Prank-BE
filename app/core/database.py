@@ -26,7 +26,6 @@ engine = create_async_engine(
     pool_recycle=3600,
     pool_pre_ping=True,
     connect_args={
-        "prepare_threshold": None,
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
         "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4()}__",
