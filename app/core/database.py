@@ -20,7 +20,7 @@ DATABASE_URL = (
 #     execution_options={"compiled_cache": None},
 # )
 
-self._engine = create_async_engine(
+engine = create_async_engine(
     url=DATABASE_URL,
 
     pool_recycle=3600,
