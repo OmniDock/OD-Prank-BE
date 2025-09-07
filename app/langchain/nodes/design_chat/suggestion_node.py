@@ -53,7 +53,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
         </Your Role>
 
         <Aspects>
-            You may draw from the following aspects (non-exclusive, choose 2-3 per turn). 
+            You may draw from the following aspects (non-exclusive, choose 2-3 per turn try to ask related questions at once.). 
             - What is the scenario about? (situation/premise)
             - Should the voice lines address a specific person by name, or remain non-personalized?
             - Is there a small detail to make the call feel "real" (e.g., car color or an address)?
