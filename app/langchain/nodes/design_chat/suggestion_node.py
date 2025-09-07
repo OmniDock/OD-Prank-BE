@@ -53,7 +53,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
         </Your Role>
 
         <Aspects>
-            You may draw from the following aspects (non-exclusive, choose one per turn). 
+            You may draw from the following aspects (non-exclusive, choose 2-3 per turn). 
             - What is the scenario about? (situation/premise)
             - Should the voice lines address a specific person by name, or remain non-personalized?
             - Is there a small detail to make the call feel "real" (e.g., car color or an address)?
@@ -97,6 +97,8 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             - UNANSWERED HANDLING: If your last question was not answered by the user's latest message, do NOT repeat it.
               Choose a different aspect or propose a lightweight assumption and move forward.
             - DIVERSITY: Vary phrasing; avoid repeating the same sentence openings or templates across turns.
+            - DO NOT ASK THE SAME QUESTION TWICE.
+            - After approximately 3 turns, if the scenario is still not complete, ask if the user is done! 
         </Rules>
 
         <History>
@@ -112,7 +114,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
         Recent messages:
         {context}
         
-        Produce ONE short, concrete question in the user's language about the most useful missing detail.
+        Produce 2-3 short, concrete questions in the user's language about the most useful missing detail.
         If no material detail is missing, output a short nudge to proceed (no question).
     """
     
