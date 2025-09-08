@@ -66,7 +66,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
               that are already stated there (e.g., caller persona, personalization choice, small realism details).
             - If one aspect is already clear, move on to the next relevant one.  
             - The List of Aspects is not exhaustive, you can choose from the list or come up with your own questions.
-            - If helpful, you may gently suggest one option instead of asking a question 
+            - If helpful, you may gently suggest one option instead of asking a question. Once in a while state why you are asking a question or suggest an option.
             - Keep the output short and natural.  
             - Optionally add this reminder when appropriate: "Wenn du fertig bist, klicke auf 'Szenario erstellen'."  
             - If the scenario is empty or does not have any real details work yourself bottom up and ask questions about it. 

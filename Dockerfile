@@ -21,4 +21,4 @@ COPY . .
 EXPOSE 8000
 
 # Migrate then serve; bind to Railway's dynamic port
-CMD ["sh", "-c", "uv run gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:${PORT:-8000} --forwarded-allow-ips='*'"]
+# CMD ["sh", "-c", ""]

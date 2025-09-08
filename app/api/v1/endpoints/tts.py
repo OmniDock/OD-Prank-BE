@@ -12,7 +12,8 @@ from app.schemas.tts import SingleTTSRequest, RegenerateTTSRequest, TTSResult, V
 from sqlalchemy import select
 from app.models.voice_line_audio import VoiceLineAudio
 from app.core.logging import console_logger
-from app.services.voice_line_service import VoiceLineService, background_generate_and_store_audio
+from app.services.voice_line_service import VoiceLineService
+from app.celery.tasks.tts import generate_voice_line_task
 import asyncio
 from datetime import datetime, timezone
 import re
@@ -71,9 +72,13 @@ async def generate_single_voice_line(
                 error_message="Audio generation already in progress",
             )
 
-        # Schedule background job for newly created PENDING
+        # Schedule Celery job for newly created PENDING
         payload = prepared["background_payload"]
-        background_tasks.add_task(background_generate_and_store_audio, **payload)
+        job_payload = {
+            **payload,
+            "model": payload["model"].value,  # enum -> string for Celery JSON payload
+        }
+        generate_voice_line_task.delay(job_payload)
         return TTSResult(
             voice_line_id=request.voice_line_id,
             success=True,
@@ -175,7 +180,8 @@ async def generate_scenario_voice_lines(
         svc = VoiceLineService(db_session)
         results, payloads = await svc.request_tts_for_scenario(user, request.scenario_id, request.voice_id)
         for payload in payloads:
-            background_tasks.add_task(background_generate_and_store_audio, **payload)
+            job_payload = {**payload, "model": payload["model"].value}
+            generate_voice_line_task.delay(job_payload)
 
         successful_count = sum(1 for r in results if r.get("success"))
         failed_count = len(results) - successful_count
@@ -232,7 +238,8 @@ async def regenerate_voice_line_audio(
             )
 
         payload = prepared["background_payload"]
-        background_tasks.add_task(background_generate_and_store_audio, **payload)
+        job_payload = {**payload, "model": payload["model"].value}
+        generate_voice_line_task.delay(job_payload)
         return TTSResult(
             voice_line_id=request.voice_line_id,
             success=True,
