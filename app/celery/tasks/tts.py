@@ -16,7 +16,7 @@ from supabase import Client, create_client
 from app.celery.config import celery_app
 from app.core.config import settings
 from app.core.logging import console_logger
-from app.core.database import async_session_maker
+from app.core.database import get_session_maker
 from app.core.utils.enums import ElevenLabsModelEnum, VoiceLineAudioStatusEnum
 from app.models.voice_line_audio import VoiceLineAudio
 from sqlalchemy import select
@@ -151,7 +151,7 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
         content_hash: str = payload["content_hash"]
         voice_settings = payload.get("voice_settings") or {}
 
-        async with async_session_maker() as db_session:
+        async with get_session_maker()() as db_session:
             console_logger.info(f"[Celery] TTS start vl={voice_line_id}")
             pcm = await _generate_tts_bytes(text, voice_id, model, voice_settings)
             wav_bytes = _pcm16_to_wav(pcm)
@@ -180,7 +180,7 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
             raise self.retry(exc=e, countdown=countdown, max_retries=max_retries)
 
         async def _mark_failed() -> None:
-            async with async_session_maker() as db_session:
+            async with get_session_maker()() as db_session:
                 await _mark_asset(
                     db_session,
                     voice_line_id=int(payload.get("voice_line_id", 0)),

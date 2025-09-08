@@ -74,7 +74,7 @@ async def design_chat_websocket(websocket: WebSocket):
     if not user:
         return
     
-    console_logger.info(f"Design chat started for user {user.id}")
+    console_logger.debug(f"Design chat started for user {user.id}")
     
     processor = DesignChatProcessor()
     cache = await CacheService.get_global()
@@ -87,7 +87,7 @@ async def design_chat_websocket(websocket: WebSocket):
         persisted_state = await cache.get_json(f"design_chat:user:{user.id_str}")
         if isinstance(persisted_state, dict):
             state = DesignChatState(**persisted_state)
-            console_logger.info(f"WS[{session_id}] restored persisted design chat state for user {user.id}")
+            console_logger.debug(f"WS[{session_id}] restored persisted design chat state for user {user.id}")
     except Exception as _e:
         # Non-fatal: continue with fresh state
         console_logger.debug(f"WS[{session_id}] no persisted state or failed to load: {_e}")
@@ -100,9 +100,9 @@ async def design_chat_websocket(websocket: WebSocket):
                 "suggestion": "Wie kann ich dir beim Verfeinern helfen? Beschreibe deine Prank-Idee. \n Du kannst jederzeit auf 'Szenario erstellen' klicken um es zu generieren.",
                 "draft": ""
             })
-            console_logger.info(f"WS[{session_id}] sent greeting: suggestion='Wie kann ich dir beim Verfeinern helfen?...' draft_len=0")
+            console_logger.debug(f"WS[{session_id}] sent greeting: suggestion='Wie kann ich dir beim Verfeinern helfen?...' draft_len=0")
         else:
-            console_logger.info(f"WS[{session_id}] restored chat exists; skipping greeting (messages={len(state.messages)})")
+            console_logger.debug(f"WS[{session_id}] restored chat exists; skipping greeting (messages={len(state.messages)})")
         while True:
             # Receive message from client
             data = await websocket.receive_text()
@@ -172,7 +172,7 @@ async def design_chat_websocket(websocket: WebSocket):
                 }
                 
                 await websocket.send_json(response)
-                console_logger.info(f"WS[{session_id}] sent response: suggestion='{response['suggestion'][:80]}...' draft_len={len(response.get('draft') or '')}")
+                console_logger.debug(f"WS[{session_id}] sent response: suggestion='{response['suggestion'][:80]}...' draft_len={len(response.get('draft') or '')}")
                 
                 # Append assistant turn to backend message history
                 if response.get("suggestion"):
@@ -218,7 +218,7 @@ async def design_chat_websocket(websocket: WebSocket):
                 await websocket.send_json({"type": "pong"})
                 
     except WebSocketDisconnect:
-        console_logger.info(f"Design chat disconnected for user {user.id}")
+        console_logger.debug(f"Design chat disconnected for user {user.id}")
     except Exception as e:
         console_logger.error(f"Design chat error: {str(e)}")
         try:

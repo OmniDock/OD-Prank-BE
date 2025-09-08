@@ -2,8 +2,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.pool import NullPool
 from app.core.config import settings
 from contextlib import asynccontextmanager
-import uuid 
-
+import uuid
+import os
 
 DATABASE_URL = (
     settings.DATABASE_URL
@@ -11,33 +11,30 @@ DATABASE_URL = (
     .replace("postgres://", "postgresql+asyncpg://")
 )
 
-# engine = create_async_engine(
-#     DATABASE_URL,
-#     poolclass=NullPool,
-#     connect_args={
-#         "statement_cache_size": 0,
-#     },
-#     execution_options={"compiled_cache": None},
-# )
+_ENGINE = None
+_ENGINE_PID = None
+_SESSION_MAKER = None
 
-engine = create_async_engine(
-    url=DATABASE_URL,
+# Für Transaction Pooler (Port 6543) wären spezielle connect_args nötig (statement_cache_size=0),
+# für Session Pooler/Direct Connection aber nicht!
+def get_engine():
+    global _ENGINE, _ENGINE_PID
+    pid = os.getpid()
+    if _ENGINE is None or _ENGINE_PID != pid:
+        _ENGINE = create_async_engine(
+            DATABASE_URL,
+            poolclass=NullPool,  # oder: pool_size=5, max_overflow=0 für kleine Pools
+        )
+        _ENGINE_PID = pid
+    return _ENGINE
 
-    pool_recycle=3600,
-    pool_pre_ping=True,
-    connect_args={
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4()}__",
-    },
-)
-
-async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-
-
-
-
+def get_session_maker():
+    global _SESSION_MAKER, _ENGINE_PID
+    pid = os.getpid()
+    if _SESSION_MAKER is None or _ENGINE_PID != pid:
+        engine = get_engine()
+        _SESSION_MAKER = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    return _SESSION_MAKER
 
 @asynccontextmanager
 async def lifespan_session():
@@ -45,7 +42,7 @@ async def lifespan_session():
     Provides a session for a request.
     Ensures commit/rollback happens properly, which is crucial for PgBouncer transaction pooling.
     """
-    async with async_session_maker() as session:  # type: AsyncSession
+    async with get_session_maker()() as session:  # type: AsyncSession
         try:
             yield session
             await session.commit()

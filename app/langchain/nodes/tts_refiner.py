@@ -237,13 +237,6 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         9. Do not exceed combing 3 tags back to back. You can use more per voice line if fitting.
         10. Do not add a real newline at the end of the output.
 
-
-
-
-
-
-        
-
 '''
     # Check for voice hints
     voice_instruction = ""
