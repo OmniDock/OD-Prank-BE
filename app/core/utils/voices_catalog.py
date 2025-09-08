@@ -155,10 +155,16 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     }
 ]
 
+DEFAULT_SETTINGS = {
+    "stability": 0.0,
+    "use_speaker_boost": False,
+    "similarity_boost": 1.3,
+    "style": 1.8,
+    "speed": 1.2,
+}
 
 def get_voices_catalog() -> List[Dict[str, Any]]:
     return VOICES_CATALOG
-
 
 def get_voice_id(language: LanguageEnum, gender: GenderEnum) -> str:
     """Get the default voice ID for a language and gender combination"""

@@ -8,7 +8,7 @@ import uuid
 from typing import Optional, Tuple, Dict, List
 from datetime import datetime, timezone
 from app.core.utils.enums import ElevenLabsModelEnum, ElevenLabsVoiceIdEnum, LanguageEnum, GenderEnum
-from app.core.utils.voices_catalog import get_voice_id
+from app.core.utils.voices_catalog import get_voice_id, DEFAULT_SETTINGS
 import hashlib
 import json
 import re
@@ -53,13 +53,7 @@ class TTSService:
 
     def default_voice_settings(self) -> Dict:
         """Optimierte Einstellungen für ElevenLabs v3 mit Audio-Tags und Akzenten"""
-        return {
-            "stability": 0.5,  # Reduziert für mehr Expressivität mit Audio-Tags
-            "use_speaker_boost": True,
-            "similarity_boost": 1,  # Erhöht für bessere Charakterkonsistenz
-            "style": 1.4,  # Erhöht für natürlichere Emotionen und Akzente
-            "speed": 1.2,  # Minimal langsamer für bessere Tag-Verarbeitung
-        }
+        return DEFAULT_SETTINGS
 
     def _normalize_text(self, text: str) -> str:
         t = text.strip()
