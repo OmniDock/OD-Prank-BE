@@ -34,7 +34,6 @@ async def analyzer_node(state: ScenarioState) -> dict:
     Analyze scenario and create persona with conversation plan
     """
     console_logger.info("Running analyzer node")
-    
     system_prompt = f"""
         {CORE_PRINCIPLES}
 
@@ -98,7 +97,7 @@ async def analyzer_node(state: ScenarioState) -> dict:
             "target_name": state.target_name,
             "language": state.language,
         })
-        
+        print('result', result)
         analysis = ScenarioAnalysis(
             persona_name=result.persona_name,
             persona_gender=result.persona_gender,

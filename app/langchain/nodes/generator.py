@@ -42,7 +42,8 @@ def get_type_instructions(voice_type: str) -> str:
         """,
         "RESPONSE": """
             RESPONSE - Reactions to objections:
-            - React to objections/questions
+            - React to objections/questions the target is likely to give
+            - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
             - Stay in character
             - Blame problems on system/protocol
             - Get slightly annoyed at too many questions
@@ -58,7 +59,7 @@ def get_type_instructions(voice_type: str) -> str:
         "FILLER": """
             FILLER - Natural pauses and fillers:
             - Use natural pauses with "..." or fillers
-            - Include a from 'yes', 'no' and 'right' or 'okay' that fits the character and the situation
+            - MUST include a form of 'yes' and 'no' 
             - No repetition - each filler different
         """
     }
@@ -87,7 +88,6 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         IMPORTANT RULES:
         - No obvious jokes
         - Maximum ONE absurd detail 
-        - Use natural pauses with "..." or fillers sparingly
         - ALWAYS stay in character
         - NO REPETITION - each line must be unique
         - Avoid excessive name usage 
