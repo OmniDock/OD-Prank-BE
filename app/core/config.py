@@ -67,24 +67,23 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str = Field(default="")
     STRIPE_RETURN_URL: str = Field(default="")
     STRIPE_WEEKLY_PRODUCT_ID: str = Field(default="")
-    STRIPE_WEEKLY_PRICE_ID: str = Field(default="")
     STRIPE_WEBHOOK_SECRET: str = Field(default="")
+    STRIPE_WEEKLY_PRICE_ID: str = Field(default="")
+    STRIPE_MONTHLY_PRICE_ID: str = Field(default="")
+    STRIPE_YEARLY_PRICE_ID: str = Field(default="")
 
     # CORS
     BACKEND_CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8080")
-
     
     @property
     def cors_origins(self) -> List[str]:
         """Parse CORS origins from comma-separated string."""
         return [origin.strip() for origin in self.BACKEND_CORS_ORIGINS.split(",")]
-
-
+    
     model_config = ConfigDict(
         env_file=".env.local",
         env_file_encoding="utf-8",
         case_sensitive=True
     )
-
 
 settings = Settings()
