@@ -230,12 +230,96 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         - German fille exampless: "ähm", "also", "naja", "so"
         - English fillers examples: "you know", "well", "I mean..."
 
-        7. Keep meaning intact but add tags punctuation and fillers that fits the sentiment of the voice line in context of the scenario to make the phrasing fluid and realistic.
-        8. Tags MUST precede the parts of the voice line they affect. Different Tags may appear at multiple spots in the voice line or be combined like [hesitant][nervous].
-        9. Do not exceed combing 3 tags back to back. You can use more per voice line if fitting.
-        10. Do not add a real newline at the end of the output.
+        7. Change words to abbreviations used in natural human speech. If it allows for using a fitting abbreviation change the words or word order slightly.
+        Germna examples:
+        - 'es geht to "s'geht"
+        - 'So ein' to 'so'n'
+        - 'Ich gehe dann jetzt mal' to "ich geh' dann jetzt ma'"
+        English examples:
+        - don't know to 'dunno'
+        - 'did it' to 'dunnit'
+        - 'you know' to 'ya kno''
 
+        8. Keep meaning intact but add tags punctuation and fillers that fits the sentiment of the voice line in context of the scenario to make the phrasing fluid and realistic.
+        9. Tags MUST precede the parts of the voice line they affect. Different Tags may appear at multiple spots in the voice line or be combined like [hesitant][nervous].
+        10. Do not exceed combing 3 tags back to back. You can use more per voice line if fitting.
+        11. Do not add a real newline at the end of the output.
+
+        Single Voice Line Examples:
+        Example 1.
+            Input:
+            Persona Gender: FEMALE
+            Ziele: Das Ziel davon überzeugen, dass es seit Tagen störenden Lärm gibt und es persönlich dafür verantwortlich ist.
+            Gesprächsverlauf: Einstieg mit direkter Beschwerde → Hinweis, dass es schon mehrere Nächte anhält → Erwartung, dass das Ziel eine Lösung anbietet.
+            Kultureller Kontext: Deutsche Nachbarschaftsetikette, passiv-aggressiver Ton.
+            Voice Line: Ich höre seit drei Nächten dieses Klopfen aus Ihrer Wohnung.
+
+            Output:
+            [annoyed][firm]Also... ich höre seit drei Nächten so'n... -Klopfen-... aus Ihrer Wohnung! [slightly dramatic]Und zwar jede Nacht, ja?
+
+        Example 2.
+            Input:
+            Persona Gender: MALE
+            Ziele: Das Ziel überreden, dass sein Parkplatz für ein Opernkonzert genutzt wird.
+            Gesprächsverlauf: Freundlich fragen ob Parkplatz frei ist → Fragen ob dort das Opernkonzert stattfinden kann → Darauf bestehen wie wichtig das Konzert ist.
+            Kultureller Kontext: Deutsche Bürokratie mit pseudo-offiziellem Ton.
+            Voice Line: Wir brauchen Ihren Parkplatz für ein spontanes Opernkonzert.
+
+            Output:
+            [official][calm]Herr Müller... wir brauchn... äh... Ihren Parkplatz... [pause][excited]für ein spontanes -Opernkonzert-! [laughs]Ja, Oper auf der Straße, mhm.
+
+        Example 3.
+            Input:
+            Persona Gender: MALE
+            Ziele: Das Ziel verunsichern, indem man behauptet, intime oder peinliche Objekte im Müll gefunden zu haben.
+            Gesprächsverlauf: Einstieg mit beiläufigem Hinweis auf verstreuten Müll → Aufzählen unauffälliger Dokumente → Steigerung zu peinlichem Fundstück.
+            Kultureller Kontext: Klatschender Nachbar-Stereotyp.
+            Voice Line: Ich habe ein Heft gefunden, da steht Private Treffen drin.
+
+            Output:
+            [chuckles][teasing]Äh... also, ich hab da so ein Heft gefunden... [mock-surprised]-Private Treffen- steht da drin! [laughs]Ja, war das vielleicht... von Ihnen, hm?
+
+        Example 4.
+            Input:
+            Persona Gender: FEMALE
+            Ziele: Das Ziel über anstehende Klimaklebung vor seiner Straße informieren und zum supported und mitmachen überreden.
+            Gesprächsverlauf: Einstieg mit scheinbar harmloser Frage → Direkter Vorwurf der Klimaleugnung → Zuspitzen durch Empörung.
+            Kultureller Kontext: Satirischer Öko-Aktivisten-Ton.
+            Voice Line: Glauben Sie etwa nicht an das Klima?
+
+            Output:
+            [skeptical][serious]Moment mal... glauben Sie etwa — nicht — an das -Klima-??? [pause][slightly mocking]Das wär ja spannend...
+
+        Example 5.
+            Input:
+            Persona Gender: FEMALE
+            Ziele: Das Ziel davon überzeugen, dass es völlig normal ist, dass das Yoga-Studio überfüllt ist, und dass es deshalb bei der „Sonderklasse“ mitmachen sollte.
+            Gesprächsverlauf: Freundlich einleiten → Hinweis auf ungewöhnliche Überbelegung → anbieten, dass das Ziel selbst Teil der absurden Lösung wird → darauf bestehen, dass es nötig und völlig normal ist.
+            Kultureller Kontext: Deutscher Wellness-/Yoga-Szene-Ton, leicht übertrieben enthusiastisch.
+            Voice Line: Hallo, hier ist Sandra vom Yoga-Studio! Unsere morgige Sonderklasse ist leider doch völlig ausgebucht.
+
+            Output:
+            [cheerful][slightly apologetic]Hallo... hier ist Sandra vom Yoga-Studio! [pause][excited]Unsere morgige Sonderklasse ist leider doch -völlig- ausgebucht [laughs][slightly pleading] Aber keine Sorge, wir haben da noch eine ganz spezielle Lösung für Sie!
+
+        Example 6.
+            Input:
+            Persona Gender: FEMALE
+            Ziele: Den Prank so beenden, dass das Ziel sich trotz Absurdität höflich verabschiedet fühlt.
+            Gesprächsverlauf: Dankbarkeit ausdrücken → Übertriebene Freundlichkeit zeigen → Mit herzlichem Ton beenden.
+            Kultureller Kontext: Deutscher höflicher Abschied, leicht übertrieben.
+            Voice Line: Ich bedanke mich ganz herzlich und wünsche Ihnen einen wundervollen Abend.
+
+            Output:
+            [calm][warm]Also... ich bedanke mich ganz -herzlich-. [gentle laugh]Und wünsche Ihnen... einen wundervollen Abend, ja?
+
+        Analyze the lines in the context of the scenario description and the other lines to find which emotions, emphasis, pauses and prosody make the most sense to convey natural authentic human speech 
+        for the given character in the given context of the scenario and that particular voice line. Add the as many relevent tags, word changes, filler words and punctuation, as needed.
+        IMPORTANT:
+        - At the very least one tag and one change from rule number 2 that is not a '?' or '!' and one change from number 6 for EVERY voice line.
+        - Use as much changes and tags as needed to make the voice line sound as natural and realistic for the given scenarion as possible.
+        - Use the changes from number 7 often unless the tone or wording is strict, formal or is directly emphasized.
 '''
+
     # Check for voice hints
     voice_instruction = ""
     if state.analysis and hasattr(state.analysis, 'voice_hints') and state.analysis.voice_hints:

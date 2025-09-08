@@ -158,7 +158,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
 DEFAULT_SETTINGS = {
     "stability": 0.0,
     "use_speaker_boost": False,
-    "similarity_boost": 0.85,
+    "similarity_boost": 0.5,
     "style": 1.6,
     "speed": 1.2,
 }
