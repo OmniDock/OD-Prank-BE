@@ -87,7 +87,7 @@ async def design_chat_websocket(websocket: WebSocket):
         # Send initial greeting (guard disconnects)
         await websocket.send_json({
             "type": "response",
-            "suggestion": "Wie kann ich dir beim Verfeinern helfen? Beschreibe kurz dein Grundszenario. (Du kannst jederzeit auf 'Szenario erstellen' klicken.)",
+            "suggestion": "Wie kann ich dir beim Verfeinern helfen? Beschreibe deine Prank-Idee. \n Du kannst jederzeit auf 'Szenario erstellen' klicken um es zu generieren.",
             "draft": ""
         })
         console_logger.info(f"WS[{session_id}] sent greeting: suggestion='Wie kann ich dir beim Verfeinern helfen?...' draft_len=0")
