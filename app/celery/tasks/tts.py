@@ -128,7 +128,7 @@ async def _mark_asset(db_session, voice_line_id: int, content_hash: str, status:
         await db_session.commit()
 
 
-@celery_app.task(name="tts.generate_voice_line", bind=True, rate_limit="5/m", soft_time_limit=180)
+@celery_app.task(name="tts.generate_voice_line", bind=True, rate_limit="10/m", soft_time_limit=180)
 def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
     """Generate TTS WAV and store it, then mark the PENDING asset READY/FAILED.
 
