@@ -67,13 +67,16 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8080")
 
     #Stripe 
-    STRIPE_SECRET_KEY: str = Field(default="")
-    STRIPE_PUBLISHABLE_KEY: str = Field(default="")
-    STRIPE_RETURN_URL: str = Field(default="")
-    STRIPE_WEEKLY_PRODUCT_ID: str = Field(default="")
-    STRIPE_WEEKLY_PRICE_ID: str = Field(default="")
-    STRIPE_WEBHOOK_SECRET: str = Field(default="")
-    
+    # STRIPE_SECRET_KEY: str = Field(default="")
+    # STRIPE_PUBLISHABLE_KEY: str = Field(default="")
+    # STRIPE_RETURN_URL: str = Field(default="")
+    # STRIPE_WEEKLY_PRODUCT_ID: str = Field(default="")
+    # STRIPE_WEBHOOK_SECRET: str = Field(default="")
+    # #Stripe Pricing IDs 
+    # STRIPE_WEEKLY_PRICE_ID: str = Field(default="")
+    # STRIPE_MONTHLY_PRICE_ID: str = Field(default="")
+    # STRIPE_YEARLY_PRICE_ID: str = Field(default="")
+
     @property
     def cors_origins(self) -> List[str]:
         """Parse CORS origins from comma-separated string."""

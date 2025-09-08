@@ -22,10 +22,10 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.MARTIN.value,
         "name": "Martin",
-        "description": "Older german voice with slight austrianaccent",
+        "description": "Older, serious sounding german voice with slight austrian accent",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
-        "intro": "Guten Tag... Martin meine Wenigkeit. Eigentlich steh ich, ja... über so' nem -Schabernack-, aber ich lass mich mal' drauf ein. Wird bestimmt was'."
+        "intro": "[serious][mock-official] Servus Martin mein Name, ... [pause][smirks in voice]zuständig fürs gemeinsame Blödsinn machen."
     },
     {
         "id": ElevenLabsVoiceIdEnum.TIMO.value,
@@ -33,7 +33,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Young, deep and relaxed german voice",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
-        "intro": "[calm] Hi hier ist Timo! [slightly excited]Lass dich von meiner gechillten Stimme nicht täuschen, zusammen werden wir... die Leute -ziemlich- hops nehmen [chuckles].",
+        "intro": "[chill] Was geht? Timo hier! [quicker] Lass dich von der gechillten Stimme nicht täuschen... [slightly excited] wir nehmen heute ein paar Leute richtig hops, hast' Bock?",
     },
     {
         "id": ElevenLabsVoiceIdEnum.SIMON.value,
