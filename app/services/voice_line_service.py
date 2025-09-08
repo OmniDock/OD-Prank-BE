@@ -155,6 +155,8 @@ class VoiceLineService:
             )
             latest_by_vl = {r.voice_line_id: r for r in latest_rows_result.scalars().all()}
 
+            # Avoid rolling back here to prevent expiring loaded ORM objects during serialization
+
             signed_cache: Dict[str, str] = {}
             for vlid in sorted(voice_line_ids):
                 audio = latest_by_vl.get(vlid)
@@ -390,6 +392,7 @@ class VoiceLineService:
                 return {"status": "PENDING"}
             raise ValueError("No audio file found for this voice line")
 
+        # Avoid rolling back here before generating signed URL to prevent attribute expiration
         signed_url = await self.tts_service.get_audio_url(asset.storage_path, expires_in)
         if not signed_url:
             raise RuntimeError("Failed to generate audio URL")

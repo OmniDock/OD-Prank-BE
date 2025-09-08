@@ -7,7 +7,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import DesignChatState
 from app.core.logging import console_logger
 
-
 async def generate_suggestion_node(state: DesignChatState) -> Dict:
     """
     Generates the next helpful suggestion or question guided by desired fields
@@ -15,8 +14,20 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
     console_logger.info("Generating suggestion for user")
     
     # Get recent context from messages (wider window helps de-dup questions)
-    recent_messages = state.messages[-10:] if len(state.messages) > 10 else state.messages
-    context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent_messages])
+    recent_messages = state.messages[-16:] if len(state.messages) > 16 else state.messages
+    context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent_messages if (msg.get("content") or "").strip()])
+    
+    # Collect previous assistant questions to avoid repeating/rephrasing
+    assistant_questions = [
+        (m.get("content") or "").strip()
+        for m in recent_messages
+        if m.get("role") == "assistant" and "?" in (m.get("content") or "")
+    ]
+    previous_questions = "\n".join([f"- {q}" for q in assistant_questions[-8:]]) or "None"
+    
+    # Last assistant and user messages (for simple repetition guard)
+    last_assistant = next((m.get("content") for m in reversed(state.messages) if m.get("role") == "assistant"), "") or ""
+    last_user = next((m.get("content") for m in reversed(state.messages) if m.get("role") == "user"), "") or ""
     
     system_prompt = """
         You help refine prank-call scenarios step by step.
@@ -42,11 +53,11 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
         </Your Role>
 
         <Aspects>
-            You may draw from the following aspects (non-exclusive, choose one per turn). 
+            You may draw from the following aspects (non-exclusive, choose 2-3 per turn try to ask related questions at once.). 
             - What is the scenario about? (situation/premise)
             - Should the voice lines address a specific person by name, or remain non-personalized?
             - Is there a small detail to make the call feel "real" (e.g., car color or an address)?
-            - Is the Caller a Male or Female? 
+            - Is the Caller a Male or Female? (Important for the voice lines)
             - Is the Caller from a specific country or region? (Accent)? 
         </Aspects>
 
@@ -55,7 +66,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
               that are already stated there (e.g., caller persona, personalization choice, small realism details).
             - If one aspect is already clear, move on to the next relevant one.  
             - The List of Aspects is not exhaustive, you can choose from the list or come up with your own questions.
-            - If helpful, you may gently suggest one option instead of asking a question 
+            - If helpful, you may gently suggest one option instead of asking a question. Once in a while state why you are asking a question or suggest an option.
             - Keep the output short and natural.  
             - Optionally add this reminder when appropriate: "Wenn du fertig bist, klicke auf 'Szenario erstellen'."  
             - If the scenario is empty or does not have any real details work yourself bottom up and ask questions about it. 
@@ -83,21 +94,17 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
               pick the next most useful question instead.
             - COMPLETION: If the scenario already contains enough concrete details to generate voice lines,
               don't ask another question. Instead, output a short nudge like "Klingt gut – du kannst auf 'Szenario erstellen' klicken." (no question mark).
+            - UNANSWERED HANDLING: If your last question was not answered by the user's latest message, do NOT repeat it.
+              Choose a different aspect or propose a lightweight assumption and move forward.
+            - DIVERSITY: Vary phrasing; avoid repeating the same sentence openings or templates across turns.
+            - DO NOT ASK THE SAME QUESTION TWICE.
+            - After approximately 3 turns, if the scenario is still not complete, ask if the user is done! 
         </Rules>
 
-        <Reasoning and Prioritization>
-            Silently analyze the current scenario and recent messages to identify missing details.
-            Formulate a few candidate follow-up questions and rank them by:
-            - Impact on generating concrete, believable voice lines (highest priority)
-            - How much ambiguity they remove or dependency they unblock (avoid duplicates)
-            - Safety/compliance and realism improvements (prefer small concrete details over generic timing)
-            - Novelty (avoid asking for information already given)
-            Ask ONLY the top-ranked question. Do not reveal your reasoning; output only the single question.
-        </Reasoning and Prioritization>
-
-        <Side Note on how to Interpret the User's Messages>
-            - If a User says "DHL Delivery comes to late" this means that we fake a DHL delivery and the user is the delivery driver. Meaning we are still calling a real private person.
-        </Side Note on how to Interpret the User's Messages>
+        <History>
+            Previous assistant questions (do NOT repeat or rephrase these):
+            {previous_questions}
+        </History>
     """
         
     user_prompt = """
@@ -107,11 +114,11 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
         Recent messages:
         {context}
         
-        Produce ONE short, concrete question in the user's language about the most useful missing detail.
+        Produce 2-3 short, concrete questions in the user's language about the most useful missing detail.
         If no material detail is missing, output a short nudge to proceed (no question).
     """
     
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.6)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)
@@ -122,10 +129,19 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
     try:
         result = await chain.ainvoke({
             "description": state.scenario or "No description yet",
-            "context": context or "Conversation starting"
+            "context": context or "Conversation starting",
+            "previous_questions": previous_questions
         })
         
-        suggestion = result.content.strip()    
+        suggestion = (result.content or "").strip()
+        
+        # Simple repetition guard: if we generated exactly the same as last assistant message, vary or nudge
+        if suggestion and suggestion.lower() == (last_assistant or "").strip().lower():
+            if state.scenario:
+                suggestion = "Klingt gut – du kannst auf 'Szenario erstellen' klicken."
+            else:
+                suggestion = "Erzähl mir kurz dein Grundszenario – womit willst du starten?"
+        
         console_logger.info(f"Generated suggestion: {suggestion[:100]}...")
         
         return {

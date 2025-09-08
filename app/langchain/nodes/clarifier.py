@@ -103,7 +103,7 @@ async def clarifier_node(state: ScenarioState) -> dict:
     # except Exception as e:
     #     console_logger.error(f"Clarifier failed: {str(e)}")
     #     return {"clarifying_questions": []}
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.2)
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", questions_prompt),

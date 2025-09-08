@@ -17,7 +17,7 @@ async def refine_description_node(state: DesignChatState) -> Dict:
     # If no messages, return current state
     if not state.messages:
         return {
-            "clarified_scenario": state.clarified_scenario
+            "scenario": state.scenario
         }
     
     system_prompt = """
@@ -63,7 +63,7 @@ async def refine_description_node(state: DesignChatState) -> Dict:
         f"{m.get('role','').upper()}: {m.get('content','').strip()}" for m in nonempty
     ])
     
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.3)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("user", user_prompt)

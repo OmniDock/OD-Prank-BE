@@ -100,6 +100,10 @@ class TelnyxSessionService:
         session = await self.get_conference_session(conference_name)
         await cache.delete(conference_name, prefix="telnyx:session")
         
+        if not session:
+            console_logger.info(f"No session found for conference {conference_name}")
+            return
+        
         # Clean up WebSockets
         webrtc_ccid = session.webrtc_call_control_id
         outbound_ccid = session.outbound_call_control_id

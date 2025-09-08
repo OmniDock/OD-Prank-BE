@@ -72,10 +72,8 @@ class Settings(BaseSettings):
 
     # CORS
     BACKEND_CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8080")
+
     
-
-
-
     @property
     def cors_origins(self) -> List[str]:
         """Parse CORS origins from comma-separated string."""

@@ -11,6 +11,7 @@ from app.services.telnyx.client import TelnyxHTTPClient
 from app.services.telnyx.sessions import TelnyxSessionService, CallSession 
 from app.services.audio_preload_service import AudioPreloadService 
 from app.services.tts_service import TTSService
+from app.services.cache_service import CacheService
 
 
 class TelnyxHandler: 
@@ -101,7 +102,6 @@ class TelnyxHandler:
                 # Inbound Calls from Browsers need to be answered and joined to the conference. 
                 custom_headers = { (h.get("name") or "").lower(): (h.get("value") or "") for h in (payload.get("custom_headers") or []) }
                 conference_name = custom_headers.get("x-conference-name")
-                console_logger.debug(f"Conference name: {conference_name}")
                 if conference_name:
 
                     session = await self._session_service.get_conference_session(conference_name)
@@ -142,6 +142,35 @@ class TelnyxHandler:
                 await self._client.hangup_call(inbound_ccid)
 
             await self._session_service.remove_conference_session(conference_name)
+            # Clear PSTN joined flag on hangup
+            try:
+                cache = await CacheService.get_global()
+                await cache.delete(f"conf:{conference_name}:pstn_joined")
+            except Exception:
+                pass
+
+        elif event_type in ("conference.participant.joined", "conference.participant.left", "conference.participant.removed"):
+            # Track PSTN leg presence for UI status
+            conference_name = event.get("data", {}).get("payload", {}).get("conference_name")
+            if not conference_name:
+                # Fallback via ccid mapping
+                conference_name = await self._session_service.get_conference_name_by_ccid(call_control_id)
+            if not conference_name:
+                return
+            session = await self._session_service.get_conference_session(conference_name)
+            if not session:
+                return
+            is_pstn_leg = session.outbound_call_control_id and session.outbound_call_control_id == call_control_id
+            if not is_pstn_leg:
+                return
+            try:
+                cache = await CacheService.get_global()
+                if event_type == "conference.participant.joined":
+                    await cache.set(f"conf:{conference_name}:pstn_joined", "1", ttl=3600)
+                else:
+                    await cache.delete(f"conf:{conference_name}:pstn_joined")
+            except Exception:
+                pass
 
 
 

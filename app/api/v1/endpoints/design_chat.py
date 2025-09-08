@@ -74,7 +74,7 @@ async def design_chat_websocket(websocket: WebSocket):
     if not user:
         return
     
-    console_logger.info(f"Design chat started for user {user.id}")
+    console_logger.debug(f"Design chat started for user {user.id}")
     
     processor = DesignChatProcessor()
     cache = await CacheService.get_global()
@@ -82,15 +82,27 @@ async def design_chat_websocket(websocket: WebSocket):
     
     # Initialize state
     state = DesignChatState()
+    # Load per-user persisted state if available
+    try:
+        persisted_state = await cache.get_json(f"design_chat:user:{user.id_str}")
+        if isinstance(persisted_state, dict):
+            state = DesignChatState(**persisted_state)
+            console_logger.debug(f"WS[{session_id}] restored persisted design chat state for user {user.id}")
+    except Exception as _e:
+        # Non-fatal: continue with fresh state
+        console_logger.debug(f"WS[{session_id}] no persisted state or failed to load: {_e}")
     
     try:
-        # Send initial greeting (guard disconnects)
-        await websocket.send_json({
-            "type": "response",
-            "suggestion": "Wie kann ich dir beim Verfeinern helfen? Beschreibe kurz dein Grundszenario. (Du kannst jederzeit auf 'Szenario erstellen' klicken.)",
-            "draft": ""
-        })
-        console_logger.info(f"WS[{session_id}] sent greeting: suggestion='Wie kann ich dir beim Verfeinern helfen?...' draft_len=0")
+        # Send initial greeting only if there is no existing chat history
+        if not getattr(state, "messages", []):
+            await websocket.send_json({
+                "type": "response",
+                "suggestion": "Wie kann ich dir beim Verfeinern helfen? Beschreibe deine Prank-Idee. \n Du kannst jederzeit auf 'Szenario erstellen' klicken um es zu generieren.",
+                "draft": ""
+            })
+            console_logger.debug(f"WS[{session_id}] sent greeting: suggestion='Wie kann ich dir beim Verfeinern helfen?...' draft_len=0")
+        else:
+            console_logger.debug(f"WS[{session_id}] restored chat exists; skipping greeting (messages={len(state.messages)})")
         while True:
             # Receive message from client
             data = await websocket.receive_text()
@@ -160,7 +172,7 @@ async def design_chat_websocket(websocket: WebSocket):
                 }
                 
                 await websocket.send_json(response)
-                console_logger.info(f"WS[{session_id}] sent response: suggestion='{response['suggestion'][:80]}...' draft_len={len(response.get('draft') or '')}")
+                console_logger.debug(f"WS[{session_id}] sent response: suggestion='{response['suggestion'][:80]}...' draft_len={len(response.get('draft') or '')}")
                 
                 # Append assistant turn to backend message history
                 if response.get("suggestion"):
@@ -169,20 +181,44 @@ async def design_chat_websocket(websocket: WebSocket):
                         "content": response["suggestion"]
                     })
                 
+                # Persist per-user chat state (ephemeral)
+                try:
+                    await cache.set_json(
+                        f"design_chat:user:{user.id_str}",
+                        state.model_dump(),
+                        ttl=3600
+                    )
+                except Exception as _e:
+                    console_logger.debug(f"WS[{session_id}] failed to persist state for user {user.id}: {_e}")
+                
             elif message.get("type") == "finalize":
                 # User wants to generate the scenario - let them decide when it's ready
                 await websocket.send_json({
                     "type": "finalized",
                     "description": getattr(state, "scenario", "") or ""
                 })
+                # Clear per-user persisted state on finalize
+                try:
+                    await cache.delete(f"design_chat:user:{user.id_str}")
+                except Exception:
+                    pass
                 break
+                
+            elif message.get("type") == "reset":
+                # Explicit reset from user
+                state = DesignChatState()
+                try:
+                    await cache.delete(f"design_chat:user:{user.id_str}")
+                except Exception:
+                    pass
+                await websocket.send_json({"type": "reset", "status": "cleared"})
                 
             elif message.get("type") == "ping":
                 # Keep-alive ping
                 await websocket.send_json({"type": "pong"})
                 
     except WebSocketDisconnect:
-        console_logger.info(f"Design chat disconnected for user {user.id}")
+        console_logger.debug(f"Design chat disconnected for user {user.id}")
     except Exception as e:
         console_logger.error(f"Design chat error: {str(e)}")
         try:
@@ -206,7 +242,7 @@ async def restore_chat_session(
     """
     Restore a previous chat session if it exists
     """
-    cache = CacheService.get_global()
+    cache = await CacheService.get_global()
     
     cached = await cache.get_json(f"design_chat:{session_id}")
     if not cached:
@@ -219,3 +255,21 @@ async def restore_chat_session(
         "status": "restored",
         "state": cached["state"]
     }
+
+
+@router.get("/history")
+async def get_user_design_chat_history(
+    user: AuthUser = Depends(get_current_user)
+) -> Dict[str, Any]:
+    cache = await CacheService.get_global()
+    state = await cache.get_json(f"design_chat:user:{user.id_str}")
+    return {"state": state or DesignChatState().model_dump()}
+
+
+@router.delete("/history")
+async def clear_user_design_chat_history(
+    user: AuthUser = Depends(get_current_user)
+) -> Dict[str, str]:
+    cache = await CacheService.get_global()
+    await cache.delete(f"design_chat:user:{user.id_str}")
+    return {"status": "cleared"}

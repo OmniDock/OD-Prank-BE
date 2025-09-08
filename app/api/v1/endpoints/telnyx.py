@@ -6,6 +6,7 @@ from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
 from app.core.logging import console_logger
 from app.services.telnyx.handler import telnyx_handler
+from app.services.cache_service import CacheService
 
 
 router = APIRouter(tags=["telnyx"])
@@ -137,3 +138,23 @@ async def hangup_call(
 # ################################################################################
 # END CONTROL ENDPOINTS FOR ACTIVE CALLS
 # ################################################################################
+
+
+# ################################################################################
+# CALL STATUS ENDPOINT
+# ################################################################################
+
+class CallStatusResponse(BaseModel):
+    pstn_joined: bool
+
+@router.get("/call/status", response_model=CallStatusResponse)
+async def call_status(
+    conference_name: str,
+    user: AuthUser = Depends(get_current_user),
+):
+    try:
+        cache = await CacheService.get_global()
+        val = await cache.get(f"conf:{conference_name}:pstn_joined")
+        return CallStatusResponse(pstn_joined=bool(val))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

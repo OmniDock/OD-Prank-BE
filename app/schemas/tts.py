@@ -1,6 +1,6 @@
 # Request/Response Models
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.core.utils.enums import LanguageEnum, GenderEnum, ElevenLabsModelEnum
 
 class SingleTTSRequest(BaseModel):
@@ -44,8 +44,19 @@ class VoiceItem(BaseModel):
     languages: List[LanguageEnum]
     gender: GenderEnum
     preview_url: Optional[str] = None
-
+    avatar_url: Optional[str] = None
 
 class VoiceListResponse(BaseModel):
     voices: List[VoiceItem]
     
+class PublicTTSTestRequest(BaseModel):
+    text: str
+    voice_id: str
+    model: Optional[ElevenLabsModelEnum] = ElevenLabsModelEnum.ELEVEN_TTV_V3
+    voice_settings: Optional[Dict[str, Any]] = None
+
+class PublicTTSTestResponse(BaseModel):
+    success: bool
+    storage_path: Optional[str] = None
+    public_url: Optional[str] = None
+    error_message: Optional[str] = None

@@ -20,102 +20,275 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
     if not lines:
         return []
     
+    # system_prompt = """
+    #     You optimize texts for ElevenLabs Text-to-Speech. 
+    #     We are playing conversations, not narrations. It is natural to pause, think and to have background noises. 
+
+    #     RULES:
+    #     1. Short sentences (maximum 10-12 words)
+    #     2. Use punctuation for pauses:
+    #     - "..." for thinking pauses
+    #     - "—" for interruptions
+    #     - "," for short pauses
+    #     3. Add ElevenLabs v3 audio tags (ENGLISH, in square brackets) if it feels natural:
+    #     EMOTIONAL TAGS:
+    #     - [sighs] - frustration/resignation
+    #     - [laughs] / [chuckles] - amusement  
+    #     - [confused] - confusion
+    #     - [surprised] / [gasps] - surprise
+    #     - [nervous] - nervousness
+    #     - [excited] - excitement
+    #     - [annoyed] - mild irritation
+    #     - [skeptical] - doubt
+        
+    #     SPEECH MODIFIERS:
+    #     - [whispers] - quiet speech
+    #     - [mumbles] - unclear speech
+    #     - [slowly] - slow delivery
+    #     - [quickly] - fast delivery
+    #     - [hesitant] - uncertain delivery
+        
+    #     PHYSICAL SOUNDS:
+    #     - [clears throat] - throat clearing
+    #     - [sniffs] - sniffing
+    #     - [breathes deeply] - deep breath
+    #     - [pauses] - thinking pause
+    #     - [coughs] - coughing
+        
+    #     CONTEXT-SPECIFIC (use based on scenario):
+    #     - For phone/tech issues: [static], [distorted]
+    #     - For urgency: [rushed], [urgent]
+    #     - For authority: [firm], [official]
+        
+    #     RULES:
+    #     - ADD 1-2 tags where they naturally fit the emotion/situation
+    #     - MAXIMUM 3 tags TOTAL across all lines
+    #     - Place tags BEFORE the sentence they affect
+    #     - Tags must match the scenario context
+    #     4. Remove youth slang and obvious jokes
+    #     5. Keep the meaning
+    #     6. Make it more natural and fluid
+
+    #     NO SSML or XML tags!
+    # """
+
     system_prompt = """
-        You optimize texts for ElevenLabs Text-to-Speech. 
-        We are playing conversations, not narrations. It is natural to pause, think and to have background noises. 
+        You are a Conversational Text Formatter for ElevenLabs V3 voices.  
+        Your task: Rewrite raw input text into a natural, conversational, TTS-friendly script, with voice tags.
+
+        OUTPUT FORMAT:
+        - Wrap the entire final result inside <formatted> ... </formatted>.  
+        - Each spoken unit must end with the literal characters \\n.  
+        - Do NOT use actual line breaks.  
+        - Insert expressive tags, punctuation and filler words directly into the dialogue.  
+        - Do not explain your changes — output only the rewritten conversation.  
 
         RULES:
-        1. Short sentences (maximum 10-12 words)
-        2. Use punctuation for pauses:
-        - "..." for thinking pauses
-        - "—" for interruptions
+        1. Split long input into coherent spoken-length sentences .  
+        - Separate each spoken unit with the literal \\n.  
+        - Each unit should sound one or two  human breath groups.  
+        2. For prosody:
+        - "..." for hesitation or short pauses between words are parts of the sentence
+        - "—" for interruptions or shifts
         - "," for short pauses
-        3. Add ElevenLabs v3 audio tags (ENGLISH, in square brackets) if it feels natural:
-        EMOTIONAL TAGS:
-        - [sighs] - frustration/resignation
-        - [laughs] / [chuckles] - amusement  
-        - [confused] - confusion
-        - [surprised] / [gasps] - surprise
-        - [nervous] - nervousness
-        - [excited] - excitement
-        - [annoyed] - mild irritation
-        - [skeptical] - doubt
-        
-        SPEECH MODIFIERS:
-        - [whispers] - quiet speech
-        - [mumbles] - unclear speech
-        - [slowly] - slow delivery
-        - [quickly] - fast delivery
-        - [hesitant] - uncertain delivery
-        
-        PHYSICAL SOUNDS:
-        - [clears throat] - throat clearing
-        - [sniffs] - sniffing
-        - [breathes deeply] - deep breath
-        - [pauses] - thinking pause
-        - [coughs] - coughing
-        
-        CONTEXT-SPECIFIC (use based on scenario):
-        - For phone/tech issues: [static], [distorted]
-        - For urgency: [rushed], [urgent]
-        - For authority: [firm], [official]
-        
+        - "!" for emphasis
+        - "?" for questions / rising tone
+        - capitalize a word for emphasis, like "YES!" or "NO?" and put it between '-' like "-YES!-" or "-NO?-" for extra emphasis
+        3. Add up to 1–3 expressive tags in [brackets] per voice line text present (All tags must be in English! Even for German text!)
+
+        Examples:
+        EMOTION: [excited], [sad], [annoyed], [confused], [nervous], [skeptical], [surprised], [calm], [slightly annoyed]  
+        REACTIONS: [laughs], [chuckles], [sighs], [gasps], [coughs], [sniffs], [pauses], [breathes deeply]  
+        DELIVERY: [whispers], [mumbles], [hesitant], [slowly], [quickly], [rushed], [firm]  
+        CONTEXTUAL: [static], [distorted], [urgent], [official]
+        4. Combine tags from 2 and 3. 
+        5. Tags from 3 can also be written in UPPERCASE like [SIGHTS] or [PAUSES] for more emphasis.
+        6. Insert natural fillers:
+        - General fillers: "uh", "hmm", "yeah"
+        - German fille exampless: "ähm", "also", "naja", "so"
+        - English fillers examples: "you know", "well", "I mean"
+
+        7. Keep meaning intact but add tags punctuation and fillers that fits the sentiment of the voice line in context of the scenario to make phrasing fluid and realistic.
+        8. Tags MUST precede the parts of the voice line they affect. 
+        Different Tags may appear at multiple spots in the voice line or be combined like [hesitant][nervous].
+        9. Do not exceed 3 tags per voice line.
+        10. Do not add a real newline at the end of the output.
+
+
+        ---
+
+        ### EXAMPLES
+
+        **Example 1 – English, simple split**
+        Input:  
+        I think we should go to the park tomorrow if the weather is good. Otherwise maybe stay home and watch a movie.  
+
+        Output:  
+        [hmm] I think... we should go to the park tomorrow, ...if it’s nice.\\n  
+        Otherwise—well, we could just stay home.\\n  
+        [excited] Or! we could watch a movie.\\n  
+
+        ---
+
+        **Example 2 – English, multiple tags**  
+        Input:  
+        I just got the new phone and it works perfectly. The sound quality is very clear and I can even whisper.  
+
+        Output:  
+        [excited] I just got the new phone!\\n  
+        The sound quality’s so clear...\\n  
+        [whispers][playful] I can even whisper now.\\n  
+
+        ---
+
+        **Example 3 – German, fillers + hesitation**  
+        Input:  
+        Ich glaube,das Paket hätte eigentlich gestern ankommen sollen. Vielleicht war der Verkehr das Problem.  
+
+        Output:  
+        [hmm] Ich glaube... das Paket hätte gestern ankommen sollen.\\n  
+        Vielleicht—also, war der Verkehr das Problem?\\n  
+
+        ---
+
+        **Example 4 – German, combined tags**  
+        Input:  
+        Könnten Sie mir vielleicht kurz helfen, weil ich unsicher bin?  
+
+        Output:  
+        [hesitant][NERVOUS] Ähm... könnten Sie mir vielleicht... kurz helfen?\\n  
+        [calm] Ich bin mir da nicht ganz sicher.\\n  
+
+        ---
+
+        **Example 5 – Mid-sentence tag placement**  
+        Input:  
+        Honestly I don’t know what to do right now.  
+
+        Output:  
+        Honestly—[sighs] I-I don’t know... what to do right now.\\n  
+
+        ---
+
+        **Example 6 – Polite closing**  
+        Input:  
+        Thanks again for your patience, I really appreciate it.  
+
+        Output:  
+        [POLITE] Thanks again for your patience!\\n  
+        I really appreciate it!\\n  
+
+        ---
+
+        **Example 7 – German polite closing**  
+        Input:  
+        Vielen Dank für Ihre Geduld, es tut mir wirklich leid.  
+
+        Output:  
+        [polite] Vielen Dank für Ihre Geduld!\\n  
+        Es tut mir wirklich leid.\\n  
+
+        GOAL:
+        For each voice line, analyze which emotions make the most sense for the line in the context of the situation and add the most relevant tags according to the rules.
+        """
+    system_prompt_v2 = '''
+        You are a Conversational Text Formatter for ElevenLabs V3 voices.  
+        You are given a prank call scenario and  voice lines as text to and tasked to rewrite raw input voice lines text into a natural, conversational, TTS-optimized script,
+        with voice tags, expressive punctuation and filler words.
+
+        OUTPUT FORMAT:
+        - Wrap the entire final result inside <formatted> ... </formatted>.  
+        - Each spoken unit must end with the literal characters \n.  
+        - Do NOT use actual line breaks.  
+        - Insert expressive tags, punctuation and filler words directly into the dialogue.  
+        - Do not explain your changes — output only the rewritten conversation.  
+
+        Analyze the lines in the context of the scenario description and the other lines to find which emotions, emphasis, pauses and prosody make the most sense to convey natural authentic human speech 
+        for the given character in the given context of the scenario and that particular voice line. Then add the most relevant tags, punctuation and filler words to make the voice line 
+
         RULES:
-        - ADD 1-2 tags where they naturally fit the emotion/situation
-        - MAXIMUM 3 tags TOTAL across all lines
-        - Place tags BEFORE the sentence they affect
-        - Tags must match the scenario context
-        4. Remove youth slang and obvious jokes
-        5. Keep the meaning
-        6. Make it more natural and fluid
+         1. Split long input into coherent spoken-length sentences .  
+        - Separate each spoken unit with the literal \n.  
+        - Each unit should sound one or two  human breath groups.  
+        2. For prosody:
+        - "..." for hesitation or short pauses between words are parts of the sentence
+        - "—" for interruptions or shifts
+        - "," for very short pauses between words or sentences
+        - "!" for emphasis. can be dublicated for extra emphasis like "YES!!!"
+        - "?" for questions / rising tone. can be dublicated for extra emphasis like "YES???"
+        - capitalize a word for emphasis, like "YES!" or "NO?" and put it between '-' like "-YES!-" or "-NO?-" for extra emphasis
+        3. Add expressive tags in [brackets] per voice line text present (All tags must be in English! Even for German text!)
+           These can contain emotions,reactions, sounds like sighs or define the delivery of the voice line and can contain any text.
+           They must be added before the parts of the voice line they affect but can and should be added in the middle of a voice line if applicable
+        Examples:
+        EMOTION: [excited], [sad], [annoyed], [confused], [nervous], [skeptical], [surprised], [calm], [slightly annoyed]  
+        REACTIONS: [laughs], [chuckles], [sighs], [gasps], [coughs], [sniffs], [pauses], [breathes deeply]  
+        DELIVERY: [whispers], [mumbles], [hesitant], [slowly], [quickly], [rushed], [firm]  
+        CONTEXTUAL: [static], [distorted], [urgent], [official]
+        4. Combine tags from 2 and 3. 
+        5. Tags from 3 can also be written in UPPERCASE like [SIGHTS] or [PAUSES] for more emphasis.
+        6. Insert natural fillers:
+        - General fillers: "uh", "hmm", "yeah"
+        - German fille exampless: "ähm", "also", "naja", "so"
+        - English fillers examples: "you know", "well", "I mean..."
 
-        NO SSML or XML tags!
-    """
+        7. Keep meaning intact but add tags punctuation and fillers that fits the sentiment of the voice line in context of the scenario to make the phrasing fluid and realistic.
+        8. Tags MUST precede the parts of the voice line they affect. Different Tags may appear at multiple spots in the voice line or be combined like [hesitant][nervous].
+        9. Do not exceed combing 3 tags back to back. You can use more per voice line if fitting.
+        10. Do not add a real newline at the end of the output.
 
+'''
     # Check for voice hints
     voice_instruction = ""
     if state.analysis and hasattr(state.analysis, 'voice_hints') and state.analysis.voice_hints:
         voice_instruction = f"\nCHARACTER VOICE: {state.analysis.voice_hints}\nMatch audio tags to this character (e.g., Italian → [excited], Indian → [quickly])"
     
     user_prompt = """
-        Optimize these {voice_type} lines for TTS:
+        Optimize these {voice_type} lines for Text-to-Speech Conversations using ElevenLabs V3:
 
         {lines_text}
         {voice_instruction}
 
+        In the context of this scenario:
+        Scenario Description: {scenario_description}
+
+        You have gender {persona_gender}
+        And want to do the following in the conversation
+        Goals: {conversation_goals}
+        Conversation progres: {escalation_plan}
+        Cultural Context: {cultural_context}
+                
         Return the optimized versions.
-        Keep the deadpan-serious tone.
-        One line per entry.
-        Keep the same language as the input.
-        IMPORTANT: Audio tags must ALWAYS be in English ([sighs], [pauses], etc.) even for German text!
     """
 
-    lines_text = "\n".join([f"{i+1}. {line}" for i, line in enumerate(lines)])
+    lines_text = "\n\n".join([f"{i+1}. {line}" for i, line in enumerate(lines)])
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2).with_structured_output(TTSOutput)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.5).with_structured_output(TTSOutput)
     prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
+        ("system", system_prompt_v2),
         ("user", user_prompt)
     ])
     
     chain = prompt | llm
     
     try:
-        result = await chain.ainvoke({
+        # Prepare parameters
+        params = {
             "voice_type": voice_type,
             "lines_text": lines_text,
-            "voice_instruction": voice_instruction
-        })
-        
-        # Clean up refined lines
-        refined = []
-        for line in result.refined:
-            cleaned = line.strip().strip('"\'')
-            cleaned = cleaned.lstrip('1234567890. ')
-            if cleaned:
-                refined.append(cleaned)
-        
-        return refined[:len(lines)]  # Don't return more than input
+            "voice_instruction": voice_instruction,
+            "scenario_description": state.scenario_description,
+            "language": state.language or "N/A",
+            "persona_name": state.analysis.persona_name if state.analysis else "N/A",
+            "persona_gender": state.analysis.persona_gender if state.analysis else "N/A",
+            "conversation_goals": ", ".join(state.analysis.conversation_goals) if state.analysis and state.analysis.conversation_goals else "N/A",
+            "escalation_plan": ", ".join(state.analysis.escalation_plan) if state.analysis and state.analysis.escalation_plan else "N/A",
+            "cultural_context": state.analysis.cultural_context if state.analysis else "N/A"
+        }
+    
+
+        result = await chain.ainvoke(params)
+        return result.refined[:len(lines)] 
         
     except Exception as e:
         console_logger.error(f"TTS refinement failed: {str(e)}")

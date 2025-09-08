@@ -3,6 +3,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# TLS certs for outbound HTTPS/SSL (Supabase Postgres, Supabase REST, etc.)
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
 # Install uv
 RUN pip install uv
 
@@ -17,5 +20,5 @@ COPY . .
 
 EXPOSE 8000
 
-# Default command (can be overridden by docker-compose)
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Migrate then serve; bind to Railway's dynamic port
+# CMD ["sh", "-c", ""]

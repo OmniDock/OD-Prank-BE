@@ -9,6 +9,7 @@ from app.schemas.scenario import ScenarioCreateRequest
 class ScenarioAnalysis(BaseModel):
     """Analysis result from analyzer node"""
     persona_name: str
+    persona_gender: str
     company_service: str
     conversation_goals: List[str]
     believability_anchors: List[str]

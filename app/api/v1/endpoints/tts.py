@@ -8,11 +8,15 @@ from app.repositories.voice_line_repository import VoiceLineRepository
 from app.core.utils.enums import VoiceLineAudioStatusEnum
 from app.core.config import settings
 from app.core.utils.voices_catalog import get_voices_catalog, PREVIEW_VERSION
-from app.schemas.tts import SingleTTSRequest, RegenerateTTSRequest, TTSResult, VoiceListResponse, ScenarioTTSRequest, TTSResponse
+from app.schemas.tts import SingleTTSRequest, RegenerateTTSRequest, TTSResult, VoiceListResponse, ScenarioTTSRequest, TTSResponse, PublicTTSTestRequest, PublicTTSTestResponse
 from sqlalchemy import select
 from app.models.voice_line_audio import VoiceLineAudio
 from app.core.logging import console_logger
-from app.services.voice_line_service import VoiceLineService, background_generate_and_store_audio
+from app.services.voice_line_service import VoiceLineService
+from app.celery.tasks.tts import generate_voice_line_task
+import asyncio
+from datetime import datetime, timezone
+import re
 
 router = APIRouter(tags=["tts"])
 
@@ -22,6 +26,7 @@ router = APIRouter(tags=["tts"])
 async def get_available_voices():
     """Get flat list of curated voices with enums for language and gender"""
     base_public = f"{settings.SUPABASE_URL}/storage/v1/object/public/voice-lines/public/voice-previews/{PREVIEW_VERSION}"
+    avatar_base_public = f"{settings.SUPABASE_URL}/storage/v1/object/public/avatars/ai/"
     catalog = get_voices_catalog()
     voices = []
     for v in catalog:
@@ -31,6 +36,7 @@ async def get_available_voices():
             "description": v.get("description"),
             "languages": v.get("languages", []),
             "gender": v.get("gender"),
+            "avatar_url": f"{avatar_base_public}/{v.get('avatar_url')}" if v.get("avatar_url") else None,
             "preview_url": f"{base_public}/{v['id']}.wav",
         })
 
@@ -68,9 +74,13 @@ async def generate_single_voice_line(
                 error_message="Audio generation already in progress",
             )
 
-        # Schedule background job for newly created PENDING
+        # Schedule Celery job for newly created PENDING
         payload = prepared["background_payload"]
-        background_tasks.add_task(background_generate_and_store_audio, **payload)
+        job_payload = {
+            **payload,
+            "model": payload["model"].value,  # enum -> string for Celery JSON payload
+        }
+        generate_voice_line_task.delay(job_payload)
         return TTSResult(
             voice_line_id=request.voice_line_id,
             success=True,
@@ -86,6 +96,80 @@ async def generate_single_voice_line(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
 
+@router.post("/generate/public-test", response_model=PublicTTSTestResponse)
+async def generate_public_test_audio(
+    request: PublicTTSTestRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Generate ad-hoc TTS from text and upload WAV to public/testing/{timestamp}.wav"""
+    try:
+        tts = TTSService()
+        # Generate PCM audio
+        pcm = await tts.generate_audio(
+            text=request.text,
+            voice_id=request.voice_id,
+            model=request.model,
+            voice_settings=request.voice_settings,
+        )
+        # Convert to WAV
+        wav_bytes = tts._pcm16_to_wav(pcm)
+
+        # Build storage path
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        storage_path = f"public/testing/{ts}.wav"
+
+        # Upload to Supabase public path
+        def _upload_sync():
+            return tts.storage_client.storage.from_(tts.bucket_name).upload(
+                path=storage_path,
+                file=wav_bytes,
+                file_options={
+                    "content-type": "audio/wav",
+                    "cache-control": "3600",
+                    "upsert": "false",
+                },
+            )
+
+        # Retry on transient network/server errors
+        max_attempts = 6
+        base_delay = 0.5
+        for attempt in range(1, max_attempts + 1):
+            try:
+                _ = await asyncio.to_thread(_upload_sync)
+                break
+            except Exception as e:
+                msg = str(e).lower()
+                transient_tokens = [
+                    "timeout",
+                    "timed out",
+                    "read operation timed out",
+                    "connection reset",
+                    "econnreset",
+                    "upstream connect error",
+                    "bad gateway",
+                    "service unavailable",
+                    "gateway timeout",
+                    "temporarily unavailable",
+                    "connect error",
+                ]
+                is_5xx = bool(re.search(r"\b5\d{2}\b", msg)) or any(code in msg for code in [" 502", " 503", " 504"]) 
+                is_transient = is_5xx or any(t in msg for t in transient_tokens)
+                if is_transient and attempt < max_attempts:
+                    delay = min(10.0, base_delay * (2 ** (attempt - 1)))
+                    console_logger.warning(
+                        f"Public TTS upload transient failure (attempt {attempt}/{max_attempts}); retrying in {delay:.2f}s"
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                raise
+
+        public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{tts.bucket_name}/{storage_path}"
+        return PublicTTSTestResponse(success=True, storage_path=storage_path, public_url=public_url)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"TTS public upload failed: {str(e)}")
+
 @router.post("/generate/scenario", response_model=TTSResponse)
 async def generate_scenario_voice_lines(
     request: ScenarioTTSRequest,
@@ -98,7 +182,8 @@ async def generate_scenario_voice_lines(
         svc = VoiceLineService(db_session)
         results, payloads = await svc.request_tts_for_scenario(user, request.scenario_id, request.voice_id)
         for payload in payloads:
-            background_tasks.add_task(background_generate_and_store_audio, **payload)
+            job_payload = {**payload, "model": payload["model"].value}
+            generate_voice_line_task.delay(job_payload)
 
         successful_count = sum(1 for r in results if r.get("success"))
         failed_count = len(results) - successful_count
@@ -155,7 +240,8 @@ async def regenerate_voice_line_audio(
             )
 
         payload = prepared["background_payload"]
-        background_tasks.add_task(background_generate_and_store_audio, **payload)
+        job_payload = {**payload, "model": payload["model"].value}
+        generate_voice_line_task.delay(job_payload)
         return TTSResult(
             voice_line_id=request.voice_line_id,
             success=True,

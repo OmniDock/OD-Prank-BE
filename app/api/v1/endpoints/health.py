@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
-from app.core.database import async_session_maker
+from app.core.database import get_session_maker
 from app.core.config import settings
 import httpx
 import asyncio
@@ -24,7 +24,7 @@ async def detailed_health():
     
     # Check database connectivity
     try:
-        async with async_session_maker() as session:
+        async with get_session_maker()() as session:
             result = await session.execute(text("SELECT 1"))
             result.fetchone()
             health_status["services"]["database"] = {
