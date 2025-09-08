@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     # CORS
     BACKEND_CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8080")
 
+    #Stripe 
+    STRIPE_SECRET_KEY: str = Field(default="")
+    STRIPE_PUBLISHABLE_KEY: str = Field(default="")
+    STRIPE_RETURN_URL: str = Field(default="")
+    STRIPE_WEEKLY_PRODUCT_ID: str = Field(default="")
+    STRIPE_WEEKLY_PRICE_ID: str = Field(default="")
+    STRIPE_WEBHOOK_SECRET: str = Field(default="")
     
     @property
     def cors_origins(self) -> List[str]:
