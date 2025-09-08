@@ -31,4 +31,5 @@ dependencies = [
     "phonenumbers>=8.13.48",
     "gunicorn>=23.0.0",
     "uvicorn-worker>=0.3.0",
+    "stripe>=12.5.1",
 ]
