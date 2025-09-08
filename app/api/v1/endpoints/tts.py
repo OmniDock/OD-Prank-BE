@@ -26,6 +26,7 @@ router = APIRouter(tags=["tts"])
 async def get_available_voices():
     """Get flat list of curated voices with enums for language and gender"""
     base_public = f"{settings.SUPABASE_URL}/storage/v1/object/public/voice-lines/public/voice-previews/{PREVIEW_VERSION}"
+    avatar_base_public = f"{settings.SUPABASE_URL}/storage/v1/object/public/avatars/ai/"
     catalog = get_voices_catalog()
     voices = []
     for v in catalog:
@@ -35,6 +36,7 @@ async def get_available_voices():
             "description": v.get("description"),
             "languages": v.get("languages", []),
             "gender": v.get("gender"),
+            "avatar_url": f"{avatar_base_public}/{v.get('avatar_url')}" if v.get("avatar_url") else None,
             "preview_url": f"{base_public}/{v['id']}.wav",
         })
 

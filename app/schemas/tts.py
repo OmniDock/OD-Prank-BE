@@ -44,7 +44,7 @@ class VoiceItem(BaseModel):
     languages: List[LanguageEnum]
     gender: GenderEnum
     preview_url: Optional[str] = None
-
+    avatar_url: Optional[str] = None
 
 class VoiceListResponse(BaseModel):
     voices: List[VoiceItem]
