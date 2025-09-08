@@ -22,9 +22,9 @@ def run():
     # Defaults for local dev
     env = os.environ.copy()
     env.setdefault("REDIS_URL", "redis://localhost:6379")
-    env.setdefault("ELEVENLABS_MAX_CONCURRENCY", "5")
+    env.setdefault("ELEVENLABS_MAX_CONCURRENCY", "10")
 
-    concurrency = env.get("CELERY_CONCURRENCY", "5")
+    concurrency = env.get("CELERY_CONCURRENCY", "10")
 
     # Use uv to run celery so it uses the project's virtual env from pyproject
     cmd = [

@@ -14,7 +14,39 @@ from elevenlabs.client import ElevenLabs
 from supabase import Client, create_client
 
 from app.celery.config import celery_app
-from app.core.config import settings
+from app.core.config import from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.pool import NullPool
+import os
+import uuid
+
+DATABASE_URL = (
+    settings.DATABASE_URL
+    .replace("postgresql://", "postgresql+asyncpg://")
+    .replace("postgres://", "postgresql+asyncpg://")
+)
+
+_ENGINE = None
+_ENGINE_PID = None
+_SESSION_MAKER = None
+
+def get_engine():
+    global _ENGINE, _ENGINE_PID
+    pid = os.getpid()
+    if _ENGINE is None or _ENGINE_PID != pid:
+        _ENGINE = create_async_engine(
+            DATABASE_URL,
+            poolclass=NullPool,  # oder: pool_size=5, max_overflow=0 für kleine Pools
+        )
+        _ENGINE_PID = pid
+    return _ENGINE
+
+def get_session_maker():
+    global _SESSION_MAKER, _ENGINE_PID
+    pid = os.getpid()
+    if _SESSION_MAKER is None or _ENGINE_PID != pid:
+        engine = get_engine()
+        _SESSION_MAKER = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    return _SESSION_MAKER
 from app.core.logging import console_logger
 from app.core.database import get_session_maker
 from app.core.utils.enums import ElevenLabsModelEnum, VoiceLineAudioStatusEnum
@@ -103,7 +135,8 @@ async def _upload_wav_to_supabase(wav_bytes: bytes, path: str) -> None:
 async def _mark_asset(db_session, voice_line_id: int, content_hash: str, status: VoiceLineAudioStatusEnum,
                       storage_path: Optional[str] = None, error: Optional[str] = None,
                       voice_id: Optional[str] = None, model: Optional[ElevenLabsModelEnum] = None,
-                      voice_settings: Optional[Dict[str, Any]] = None, text: Optional[str] = None) -> None:
+                      voice_settings: Optional[Dict[str, Any]] = None, text: Optional[str] = None,
+                      duration_ms: Optional[int] = None) -> None:
     r = await db_session.execute(
         select(VoiceLineAudio).where(
             VoiceLineAudio.voice_line_id == voice_line_id,
@@ -125,6 +158,8 @@ async def _mark_asset(db_session, voice_line_id: int, content_hash: str, status:
         if text is not None:
             pending.text_hash = compute_text_hash(text)
             pending.settings_hash = compute_settings_hash(voice_id or pending.voice_id, model or pending.model_id, voice_settings)
+        if duration_ms is not None:
+            pending.duration_ms = duration_ms
         await db_session.commit()
 
 
@@ -157,6 +192,16 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
             wav_bytes = _pcm16_to_wav(pcm)
             storage_path = _private_storage_path(user_id, voice_line_id)
             await _upload_wav_to_supabase(wav_bytes, storage_path)
+
+            # Calculate duration_ms from wav_bytes
+            import wave
+            import contextlib
+            import io
+            with contextlib.closing(wave.open(io.BytesIO(wav_bytes), 'rb')) as wf:
+                frames = wf.getnframes()
+                rate = wf.getframerate()
+                duration_ms = int((frames / float(rate)) * 1000)
+
             await _mark_asset(
                 db_session,
                 voice_line_id=voice_line_id,
@@ -167,8 +212,9 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
                 model=model,
                 voice_settings=voice_settings,
                 text=text,
+                duration_ms=duration_ms,
             )
-            console_logger.info(f"[Celery] TTS ready vl={voice_line_id}")
+            console_logger.info(f"[Celery] TTS ready vl={voice_line_id}, duration_ms={duration_ms}")
 
     try:
         asyncio.run(_run_once())
