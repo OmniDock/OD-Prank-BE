@@ -22,16 +22,18 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.MARTIN.value,
         "name": "Martin",
-        "description": "older german voice with slight austrianaccent",
+        "description": "Older german voice with slight austrianaccent",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
+        "intro": "Guten Tag... Martin meine Wenigkeit. Eigentlich steh ich, ja... über so' nem -Schabernack-, aber ich lass mich mal' drauf ein. Wird bestimmt was'."
     },
     {
         "id": ElevenLabsVoiceIdEnum.TIMO.value,
         "name": "Timo",
-        "description": "-",
+        "description": "Young, deep and relaxed german voice",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
+        "intro": "[calm] Hi hier ist Timo! [slightly excited]Lass dich von meiner gechillten Stimme nicht täuschen, zusammen werden wir... die Leute -ziemlich- hops nehmen [chuckles].",
     },
     {
         "id": ElevenLabsVoiceIdEnum.SIMON.value,
