@@ -28,7 +28,7 @@ import io
 # Preload background noise into memory at startup
 background_noise_pcm = None
 
-async def preload_background_noise_from_supabase(storage_path="office-background.wav"):
+async def preload_background_noise_from_supabase(storage_path="office.wav"):
     global background_noise_pcm
     try:
         console_logger.info(f"Preloading background noise from Supabase: {storage_path} length:")
