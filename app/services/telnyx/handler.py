@@ -224,7 +224,7 @@ class TelnyxHandler:
         self.logger.info(f"Telnyx webhook event: {event_type} with call_control_id {call_control_id}")
 
         if not call_control_id:
-            console_logger.warning("Webhook without call_control_id; ignoring.")
+            console_logger.warning(f"Webhook without call_control_id; ignoring. {event}")
             return
 
         if event_type == "call.initiated":
@@ -254,7 +254,7 @@ class TelnyxHandler:
                     await self._session_service.add_ccid_to_conference(conference_name, call_control_id)
                     await self._client.answer_with_retry(call_control_id)
                     await self._client.join_conference_by_name(call_control_id, conference_name, mute=True)
-                    await self._client.media_stream_start(call_control_id)
+                    await self._client.start_media_stream(call_control_id)
 
                 else:
                     self.logger.warning(f"(call.initiated) (outgoing) No conference name found in custom headers")
@@ -270,15 +270,6 @@ class TelnyxHandler:
                 self.logger.warning(f"(call.answered) No call control id found for call")
                 return
             pass
-
-        # elif event_type == "conference.participant.joined":
-        #     if call_control_id:
-        #         console_logger.warning(f"(conference.participant.joined) Starting media stream for call control id {call_control_id}")
-        #         await self._client.start_media_stream(call_control_id)
-        #     else:
-        #         self.logger.warning(f"(conference.participant.joined) No call control id found for call")
-        #         return
-        #     pass
 
         elif event_type == "call.hangup":
             conference_name = await self._session_service.get_conference_name_by_ccid(call_control_id)
@@ -323,6 +314,7 @@ class TelnyxHandler:
             try:
                 cache = await CacheService.get_global()
                 if event_type == "conference.participant.joined":
+                    await self._client.start_media_stream(call_control_id)
                     await cache.set(f"conf:{conference_name}:pstn_joined", "1", ttl=3600)
                 else:
                     await cache.delete(f"conf:{conference_name}:pstn_joined")
