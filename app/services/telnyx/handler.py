@@ -262,23 +262,23 @@ class TelnyxHandler:
             else:
                 return 
 
-        elif event_type == "call.answered":
-            if call_control_id:
-                console_logger.warning(f"(call.answered) Starting media stream for call control id {call_control_id}")
-                await self._client.start_media_stream(call_control_id)
-            else:
-                self.logger.warning(f"(call.answered) No call control id found for call")
-                return
-            pass
-
-        # elif event_type == "conference.participant.joined":
+        # elif event_type == "call.answered":
         #     if call_control_id:
-        #         console_logger.warning(f"(conference.participant.joined) Starting media stream for call control id {call_control_id}")
+        #         console_logger.warning(f"(call.answered) Starting media stream for call control id {call_control_id}")
         #         await self._client.start_media_stream(call_control_id)
         #     else:
-        #         self.logger.warning(f"(conference.participant.joined) No call control id found for call")
+        #         self.logger.warning(f"(call.answered) No call control id found for call")
         #         return
         #     pass
+
+        elif event_type == "conference.participant.joined":
+            if call_control_id:
+                console_logger.warning(f"(conference.participant.joined) Starting media stream for call control id {call_control_id}")
+                await self._client.start_media_stream(call_control_id)
+            else:
+                self.logger.warning(f"(conference.participant.joined) No call control id found for call")
+                return
+            pass
 
         elif event_type == "call.hangup":
             conference_name = await self._session_service.get_conference_name_by_ccid(call_control_id)
