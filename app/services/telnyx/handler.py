@@ -180,6 +180,7 @@ class TelnyxHandler:
                     await self._session_service.add_ccid_to_conference(conference_name, call_control_id)
                     await self._client.answer_with_retry(call_control_id)
                     await self._client.join_conference_by_name(call_control_id, conference_name, mute=True)
+                    await self._client.media_stream_start(call_control_id)
 
                 else:
                     self.logger.warning(f"(call.initiated) (outgoing) No conference name found in custom headers")
@@ -188,7 +189,7 @@ class TelnyxHandler:
                 return 
 
         elif event_type == "call.answered":
-            pass
+            await self._client.media_stream_start(call_control_id)
 
         elif event_type == "call.hangup":
             conference_name = await self._session_service.get_conference_name_by_ccid(call_control_id)
