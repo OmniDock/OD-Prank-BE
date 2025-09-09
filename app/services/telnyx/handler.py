@@ -190,7 +190,7 @@ class TelnyxHandler:
 
         elif event_type == "call.answered":
             if call_control_id:
-                await self._client.media_stream_start(call_control_id)
+                await self._client.start_media_stream(call_control_id)
             else:
                 self.logger.warning(f"(call.answered) No call control id found for call")
                 return
@@ -259,6 +259,7 @@ class TelnyxHandler:
             console_logger.error("Background noise not loaded in memory.")
             return
         chunk_size = 320  # 20ms of 16kHz 16-bit mono PCM = 320 bytes
+        console_logger.warning(f"Streaming background noise to Telnyx: {len(background_noise_pcm)}")
         try:
             while not stop_event.is_set():
                 pos = 0
