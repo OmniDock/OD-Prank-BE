@@ -27,7 +27,7 @@ async def refine_description_node(state: DesignChatState) -> Dict:
         </Setup>
 
         <Rules>
-            - Use BOTH the assistant questions and the user answers as context. Treat short user replies as answers to the most recent assistant question.
+            - Use BOTH the assistant questions and the user answers as context. Treat user replies as answers to the most recent assistant question.
             - Start from the current description and MERGE in new facts from the chat. Preserve correct existing details; update only when the user changes them.
             - Include, when available (do not invent):
               • Caller persona/role (e.g., DHL driver) and attitude/tone if implied

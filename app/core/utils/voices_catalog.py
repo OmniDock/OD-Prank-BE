@@ -22,20 +22,18 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.MARTIN.value,
         "name": "Martin",
-        "description": "Sympathische, bodenständige Stimme mit einem Hauch von Abenteuerlust.",
-        "avatar_url": "martin.webp",
+        "description": "Older, serious sounding german voice with slight austrian accent",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
-        "intro": "[exhales] Hey, ich bin Martin. [curious] Ich geb’s zu: Eigentlich bin ich der Vernünftige hier… aber heute mach ich mal ’ne Ausnahme. [laughs] Also, lass uns was Verrücktes starten – ich bin dabei, wenn du’s bist.",
+        "intro": "[serious][mock-official] Servus Martin mein Name, ... [pause][smirks in voice]zuständig fürs gemeinsame Blödsinn machen."
     },
     {
         "id": ElevenLabsVoiceIdEnum.TIMO.value,
         "name": "Timo",
         "description": "Locker, spontan und immer für einen Spaß zu haben.",
-        "avatar_url": "timo.webp",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
-        "intro": "[exhales] Servus, ich bin Timo. [curious] Normalerweise halte ich mich aus so was raus… aber heute hab ich richtig Lust auf Quatsch. [laughs] Also, komm – wir machen das Beste draus. [whispers] Aber pssst… nicht verraten.",
+        "intro": "[chill] Was geht? Timo hier! [quicker] Lass dich von der gechillten Stimme nicht täuschen... [slightly excited] wir nehmen heute ein paar Leute richtig hops, hast' Bock?",
     },
     {
         "id": ElevenLabsVoiceIdEnum.SIMON.value,
@@ -177,8 +175,8 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
 DEFAULT_SETTINGS = {
     "stability": 0.0,
     "use_speaker_boost": False,
-    "similarity_boost": 1.3,
-    "style": 1.8,
+    "similarity_boost": 0.5,
+    "style": 1.6,
     "speed": 1.2,
 }
 
