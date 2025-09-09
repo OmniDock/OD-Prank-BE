@@ -310,10 +310,11 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
             Voice Line: Ich bedanke mich ganz herzlich und wünsche Ihnen einen wundervollen Abend.
 
             Output:
-            [calm][warm]Also... ich bedanke mich ganz -herzlich-. [gentle laugh]Und wünsche Ihnen... einen wundervollen Abend, ja?
+            [calm][warm]Also... ich bedanke mich ganz -herzlich-. Und wünsche Ihnen [gentle laugh] ...einen wundervollen Abend, ja?
 
         Analyze the lines in the context of the scenario description and the other lines to find which emotions, emphasis, pauses and prosody make the most sense to convey natural authentic human speech 
-        for the given character in the given context of the scenario and that particular voice line. Add the as many relevent tags, word changes, filler words and punctuation, as needed.
+        for the given character in the given context of the scenario and that particular voice line. Use as many tags, word changes, filler words and punctuation, per sentence and subsenteces as nedded to get the voice line to sound as natural and realistic for the given scenarion as possible
+        to be as close to the emotions, emphasis, pauses and prosody that create natural authentic human speech as possible. Assume that any part of the sentence that is not guided by tags, punctuation etc. is insufficient in sounding natural and realistic.
         IMPORTANT:
         - At the very least one tag and one change from rule number 2 that is not a '?' or '!' and one change from number 6 for EVERY voice line.
         - Use as much changes and tags as needed to make the voice line sound as natural and realistic for the given scenarion as possible.
@@ -338,14 +339,13 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         And want to do the following in the conversation
         Goals: {conversation_goals}
         Conversation progres: {escalation_plan}
-        Cultural Context: {cultural_context}
                 
         Return the optimized versions.
     """
 
     lines_text = "\n\n".join([f"{i+1}. {line}" for i, line in enumerate(lines)])
 
-    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.5).with_structured_output(TTSOutput)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.8).with_structured_output(TTSOutput)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt_v2),
         ("user", user_prompt)
@@ -365,7 +365,6 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
             "persona_gender": state.analysis.persona_gender if state.analysis else "N/A",
             "conversation_goals": ", ".join(state.analysis.conversation_goals) if state.analysis and state.analysis.conversation_goals else "N/A",
             "escalation_plan": " -> ".join(state.analysis.escalation_plan) if state.analysis and state.analysis.escalation_plan else "N/A",
-            "cultural_context": state.analysis.cultural_context if state.analysis else "N/A"
         }
     
 
