@@ -41,6 +41,8 @@ class Scenario(Base, TimestampMixin):
         cascade="all, delete-orphan",
         order_by="VoiceLine.order_index"
     )
+
+    call_logs = relationship("CallLog", back_populates="scenario")
     
     def __repr__(self):
         return f"<Scenario(id={self.id}, title='{self.title}', language='{self.language.value}')>"

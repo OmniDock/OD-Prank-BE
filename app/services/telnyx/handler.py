@@ -12,6 +12,13 @@ from app.services.telnyx.sessions import TelnyxSessionService, CallSession
 from app.services.audio_preload_service import AudioPreloadService 
 from app.services.tts_service import TTSService
 from app.services.cache_service import CacheService
+from app.models.call_log import CallLog
+from app.models.scenario import Scenario
+from app.models.blacklist import Blacklist
+from sqlalchemy import select, func
+from fastapi import HTTPException
+import datetime
+import pytz
 
 
 class TelnyxHandler: 
@@ -24,21 +31,44 @@ class TelnyxHandler:
         self.logger = console_logger 
 
     async def initiate_call(
-            self,
-            db_session: AsyncSession,
-            user_id: str,
-            scenario_id: int,
-            to_number: str,
+        self,
+        db_session: AsyncSession,
+        user_id: str,
+        scenario_id: int,
+        to_number: str,
+        *args, **kwargs
     ) -> Tuple[str, str, str, str]:
-        """
-        Initiate a call to the given number.
-        """
+        # --- Restriction Checks ---
+        # 1. Scenario ownership/public
+        scenario = await db_session.get(Scenario, scenario_id)
+        if not scenario or (scenario.user_id != user_id and not getattr(scenario, "is_public", False)):
+            # Frontend should display this error message
+            raise HTTPException(status_code=403, detail="You do not have permission to use this scenario.")
+        # 2. Blacklist check
+        result = await db_session.execute(select(Blacklist).where(Blacklist.phone_number == to_number))
+        if result.scalar():
+            raise HTTPException(status_code=403, detail="This phone number is blacklisted.")
+        # 3. Rate limit (max 10 calls in 24h)
+        since = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+        count_result = await db_session.execute(
+            select(func.count()).select_from(CallLog).where(
+                CallLog.user_id == user_id,
+                CallLog.call_timestamp >= since
+            )
+        )
+        if count_result.scalar() >= 10:
+            raise HTTPException(status_code=429, detail="Call limit exceeded for the last 24 hours.")
+        # 4. Time-of-day check (no calls after 22:00 Europe/Berlin)
+        now = datetime.datetime.now(pytz.timezone("Europe/Berlin"))
+        if now.hour >= 22:
+            raise HTTPException(status_code=403, detail="Calls are not allowed after 22:00.")
+        # --- End Restriction Checks ---
         
         # PRELOADING AUDIO (TO BE EXCHANGED LATER)
         audio_service = AudioPreloadService(db_session)
         success, message = await audio_service.preload_scenario_audio(user_id, scenario_id)
         if not success: 
-            raise RuntimeError(f"Failed to preload audio for scenario {scenario_id}: {message}")
+            raise HTTPException(status_code=500, detail=f"Failed to preload audio for scenario {scenario_id}: {message}")
         
         # INITIATING THE CALL 
         call_leg_id, call_control_id, call_session_id, conference_name = await self._client.initiate_call(to_number)
@@ -59,7 +89,17 @@ class TelnyxHandler:
         await self._session_service.add_ccid_to_conference(conference_name, call_control_id)
 
         self.logger.info(f"Initiated call {call_leg_id} (control_id={call_control_id}) to {to_number}")
-
+        # --- Log the call ---
+        call_log = CallLog(
+            user_id=user_id,
+            to_number=to_number,
+            scenario_id=scenario_id,
+            call_timestamp=datetime.datetime.utcnow(),
+            call_status="initiated",
+            metadata=None
+        )
+        db_session.add(call_log)
+        await db_session.commit()
         return call_leg_id, call_control_id, call_session_id, conference_name
     
 
