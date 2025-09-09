@@ -39,16 +39,12 @@ async def preload_background_noise_from_supabase(storage_path="office.wav"):
         else:
             wav_bytes = res
         with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
-            # Accept only μ-law (format 7), 8kHz, mono, 8-bit
-            if wf.getframerate() != 8000 or wf.getnchannels() != 1 or wf.getsampwidth() != 1 or wf.getcomptype() != 'NONE':
-                raise ValueError("Background noise WAV must be 8kHz, mono, 8-bit (μ-law, format 7, uncompressed)")
-            if wf.getparams().comptype == 'NONE' and wf.getparams().sampwidth == 1 and wf.getparams().nchannels == 1 and wf.getparams().framerate == 8000 and wf.getparams().nframes > 0:
-                # This is likely μ-law, but wave module does not decode it; just read the bytes
-                background_noise_pcm = wf.readframes(wf.getnframes())
-                # These are μ-law bytes, ready to stream to Telnyx
-            else:
-                raise ValueError(f"Unsupported WAV format: framerate={wf.getframerate()}, channels={wf.getnchannels()}, sampwidth={wf.getsampwidth()}, comptype={wf.getcomptype()}")
-            console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)} (μ-law bytes)")
+            # Only check for 8kHz, mono, 8-bit. Do not check format/compression type.
+            if wf.getframerate() != 8000 or wf.getnchannels() != 1 or wf.getsampwidth() != 1:
+                raise ValueError("Background noise WAV must be 8kHz, mono, 8-bit (μ-law or PCM)")
+            # Proxy the raw bytes (μ-law or PCM) directly to Telnyx; no decoding is done here.
+            background_noise_pcm = wf.readframes(wf.getnframes())
+            console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)} (proxied bytes)")
     except Exception as e:
         console_logger.error(f"Failed to preload background noise from Supabase: {e}")
 
