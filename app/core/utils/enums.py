@@ -1,17 +1,17 @@
-import enum
+from enum import Enum   
 
-class LanguageEnum(enum.Enum):
+class LanguageEnum(Enum):
     ENGLISH = "ENGLISH"
     GERMAN = "GERMAN"
 
-class VoiceLineTypeEnum(enum.Enum):
+class VoiceLineTypeEnum(Enum):
     OPENING = "OPENING"
     QUESTION = "QUESTION"
     RESPONSE = "RESPONSE"
     CLOSING = "CLOSING"
     FILLER = "FILLER"
 
-class VoiceLineAudioStatusEnum(enum.Enum):
+class VoiceLineAudioStatusEnum(Enum):
     PENDING = "PENDING"
     READY = "READY"
     FAILED = "FAILED"
@@ -21,11 +21,11 @@ class VoiceLineAudioStatusEnum(enum.Enum):
 #########################################
 # ElevenLabs Voice IDs and Metadata
 #########################################
-class GenderEnum(enum.Enum):
+class GenderEnum(Enum):
     MALE = "MALE"
     FEMALE = "FEMALE"
 
-class ElevenLabsVoiceIdEnum(enum.Enum):
+class ElevenLabsVoiceIdEnum(Enum):
     """Top-tier ElevenLabs voice IDs for different languages and genders"""
     SUSI = "v3V1d2rk6528UrLKRuy8" 
     MARTIN = "a5qh6GnXXXlZQrD05l99"
@@ -46,8 +46,12 @@ class ElevenLabsVoiceIdEnum(enum.Enum):
     IVANNA = "4NejU5DwQjevnR6mh3mb"
     LEONI = "pBZVCk298iJlHAcHQwLr"
 
-class ElevenLabsModelEnum(enum.Enum):
+class ElevenLabsModelEnum(Enum):
     """ElevenLabs model options"""
     ELEVEN_TTV_V3 = "eleven_v3"      
 
 
+class SubscriptionEnum(Enum):
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
