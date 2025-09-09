@@ -31,7 +31,7 @@ background_noise_pcm = None
 def preload_background_noise_from_supabase(storage_path="office-noise.wav"):
     global background_noise_pcm
     try:
-        console_logger.info(f"Preloading background noise from Supabase: {storage_path}")
+        console_logger.info(f"Preloading background noise from Supabase: {storage_path} length: {len(background_noise_pcm)}")
         client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
         # Download the file from Supabase Storage
         res = client.storage.from_("ringtones").download(storage_path)
@@ -41,7 +41,7 @@ def preload_background_noise_from_supabase(storage_path="office-noise.wav"):
             wav_bytes = res
         with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
             background_noise_pcm = wf.readframes(wf.getnframes())
-        console_logger.info(f"Loaded background noise from Supabase: {storage_path}")
+        console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)}")
     except Exception as e:
         console_logger.error(f"Failed to preload background noise from Supabase: {e}")
 
