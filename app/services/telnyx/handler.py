@@ -41,7 +41,7 @@ class TelnyxHandler:
         # --- Restriction Checks ---
         # 1. Scenario ownership/public
         scenario = await db_session.get(Scenario, scenario_id)
-        if not scenario or (scenario.user_id != user_id and not getattr(scenario, "is_public", False)):
+        if not scenario or (str(scenario.user_id) != user_id and not getattr(scenario, "is_public", False)):
             # Frontend should display this error message
             raise HTTPException(status_code=403, detail="You do not have permission to use this scenario.")
         # 2. Blacklist check
