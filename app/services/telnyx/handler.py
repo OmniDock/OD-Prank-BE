@@ -314,7 +314,7 @@ class TelnyxHandler:
             try:
                 cache = await CacheService.get_global()
                 if event_type == "conference.participant.joined":
-                    await self._client.start_media_stream(call_control_id)
+                    # await self._client.start_media_stream(call_control_id)
                     await cache.set(f"conf:{conference_name}:pstn_joined", "1", ttl=3600)
                 else:
                     await cache.delete(f"conf:{conference_name}:pstn_joined")
