@@ -28,7 +28,7 @@ import io
 # Preload background noise into memory at startup
 background_noise_pcm = None
 
-def preload_background_noise_from_supabase(storage_path="office-background.wav"):
+async def preload_background_noise_from_supabase(storage_path="office-background.wav"):
     global background_noise_pcm
     try:
         console_logger.info(f"Preloading background noise from Supabase: {storage_path} length:")
@@ -46,8 +46,6 @@ def preload_background_noise_from_supabase(storage_path="office-background.wav")
             console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)}")
     except Exception as e:
         console_logger.error(f"Failed to preload background noise from Supabase: {e}")
-
-preload_background_noise_from_supabase()
 
 
 class TelnyxHandler: 
@@ -190,23 +188,23 @@ class TelnyxHandler:
             else:
                 return 
 
-        # elif event_type == "call.answered":
-        #     if call_control_id:
-        #         console_logger.warning(f"(call.answered) Starting media stream for call control id {call_control_id}")
-        #         await self._client.start_media_stream(call_control_id)
-        #     else:
-        #         self.logger.warning(f"(call.answered) No call control id found for call")
-        #         return
-        #     pass
-
-        elif event_type == "conference.participant.joined":
+        elif event_type == "call.answered":
             if call_control_id:
-                console_logger.warning(f"(conference.participant.joined) Starting media stream for call control id {call_control_id}")
+                console_logger.warning(f"(call.answered) Starting media stream for call control id {call_control_id}")
                 await self._client.start_media_stream(call_control_id)
             else:
-                self.logger.warning(f"(conference.participant.joined) No call control id found for call")
+                self.logger.warning(f"(call.answered) No call control id found for call")
                 return
             pass
+
+        # elif event_type == "conference.participant.joined":
+        #     if call_control_id:
+        #         console_logger.warning(f"(conference.participant.joined) Starting media stream for call control id {call_control_id}")
+        #         await self._client.start_media_stream(call_control_id)
+        #     else:
+        #         self.logger.warning(f"(conference.participant.joined) No call control id found for call")
+        #         return
+        #     pass
 
         elif event_type == "call.hangup":
             conference_name = await self._session_service.get_conference_name_by_ccid(call_control_id)
