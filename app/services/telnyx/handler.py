@@ -33,13 +33,15 @@ def preload_background_noise_from_supabase(storage_path="office-background.wav")
     try:
         console_logger.info(f"Preloading background noise from Supabase: {storage_path} length:")
         client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
-        # Download the file from Supabase Storage
         res = client.storage.from_("ringtones").download(storage_path)
         if hasattr(res, 'data'):
             wav_bytes = res.data
         else:
             wav_bytes = res
         with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
+            # Validate format
+            if wf.getframerate() != 8000 or wf.getnchannels() != 1 or wf.getsampwidth() != 1:
+                raise ValueError("Background noise WAV must be 8kHz, mono, 8-bit (μ-law)")
             background_noise_pcm = wf.readframes(wf.getnframes())
             console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)}")
     except Exception as e:
@@ -268,7 +270,7 @@ class TelnyxHandler:
         if background_noise_pcm is None:
             console_logger.error("Background noise not loaded in memory.")
             return
-        chunk_size = 320  # 20ms of 16kHz 16-bit mono PCM = 320 bytes
+        chunk_size = 160  # 20ms of 8kHz 8-bit mono μ-law = 160 bytes
         console_logger.warning(f"Streaming background noise to Telnyx: {len(background_noise_pcm)}")
         try:
             while not stop_event.is_set():
