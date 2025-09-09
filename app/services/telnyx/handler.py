@@ -25,6 +25,7 @@ from supabase import create_client
 from app.core.config import settings
 import io
 import struct
+import audioop
 
 # Preload background noise into memory at startup
 background_noise_pcm = None
@@ -32,9 +33,11 @@ background_noise_pcm = None
 
 def _extract_wav_ulaw_or_pcm8_bytes(wav_bytes: bytes) -> bytes:
     """
-    Minimal RIFF/WAV parser to extract the raw payload from μ-law (format 7) or 8-bit PCM (format 1) files.
-    We only validate: 8kHz sample rate, mono channel, 8 bits per sample.
-    Returns the raw data bytes which can be proxied to Telnyx as 160-byte chunks.
+    Minimal RIFF/WAV parser that returns μ-law (G.711) bytes suitable for Telnyx.
+    - Accepts μ-law (format 7) as-is
+    - Converts A-law (format 6) to μ-law
+    - Converts PCM 8/16-bit (format 1) to μ-law
+    Requires 8kHz sample rate, mono.
     """
     if not wav_bytes or len(wav_bytes) < 12:
         raise ValueError("Invalid WAV: file too short")
@@ -63,7 +66,7 @@ def _extract_wav_ulaw_or_pcm8_bytes(wav_bytes: bytes) -> bytes:
             fmt_code, num_channels, sample_rate, byte_rate, block_align, bits_per_sample = struct.unpack(
                 '<HHIIHH', wav_bytes[chunk_start:chunk_start+16]
             )
-            # If there are extra fmt bytes, we ignore them
+            # ignore any extra fmt bytes
         elif chunk_id == b'data':
             data_bytes = wav_bytes[chunk_start:chunk_end]
         # Chunks are word-aligned; skip padding byte if size is odd
@@ -75,19 +78,34 @@ def _extract_wav_ulaw_or_pcm8_bytes(wav_bytes: bytes) -> bytes:
     if sample_rate != 8000 or num_channels != 1:
         raise ValueError(f"Background noise WAV must be 8kHz mono (got {sample_rate} Hz, {num_channels} ch)")
 
-    if fmt_code == 7:  # μ-law
+    # μ-law as-is
+    if fmt_code == 7:
         if bits_per_sample != 8:
             raise ValueError("μ-law WAV must be 8 bits per sample")
         return data_bytes
-    elif fmt_code == 1:  # PCM
+
+    # A-law -> linear -> μ-law
+    if fmt_code == 6:
         if bits_per_sample != 8:
-            raise ValueError("PCM WAV must be 8 bits per sample to proxy as-is")
-        return data_bytes
-    else:
-        raise ValueError(f"Unsupported WAV format code: {fmt_code}")
+            raise ValueError("A-law WAV must be 8 bits per sample")
+        linear16 = audioop.alaw2lin(data_bytes, 2)
+        return audioop.lin2ulaw(linear16, 2)
+
+    # PCM -> μ-law
+    if fmt_code == 1:
+        if bits_per_sample == 16:
+            return audioop.lin2ulaw(data_bytes, 2)
+        if bits_per_sample == 8:
+            # WAV PCM 8-bit is unsigned; convert to signed 8-bit, then to 16-bit, then to μ-law
+            signed8 = audioop.bias(data_bytes, 1, -128)
+            linear16 = audioop.lin2lin(signed8, 1, 2)
+            return audioop.lin2ulaw(linear16, 2)
+        raise ValueError(f"Unsupported PCM bits per sample: {bits_per_sample}")
+
+    raise ValueError(f"Unsupported WAV format code: {fmt_code}")
 
 
-async def preload_background_noise_from_supabase(storage_path="office.wav"):
+async def preload_background_noise_from_supabase(storage_path="office-new.wav"):
     global background_noise_pcm
     try:
         console_logger.info(f"Preloading background noise from Supabase: {storage_path} length:")
@@ -97,9 +115,9 @@ async def preload_background_noise_from_supabase(storage_path="office.wav"):
             wav_bytes = res.data
         else:
             wav_bytes = res
-        # Extract μ-law/PCM8 payload and proxy directly to Telnyx (no decoding/resampling)
+        # Extract or convert to μ-law payload and proxy directly to Telnyx (no decoding/resampling beyond μ-law encoding)
         background_noise_pcm = _extract_wav_ulaw_or_pcm8_bytes(wav_bytes)
-        console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)} (proxied bytes)")
+        console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)} (μ-law bytes)")
     except Exception as e:
         console_logger.error(f"Failed to preload background noise from Supabase: {e}")
 
@@ -203,7 +221,7 @@ class TelnyxHandler:
         payload = data.get("payload", {})
         call_control_id = payload.get("call_control_id")
 
-        self.logger.info(f"Telnyx webhook event: {event_type}")
+        self.logger.info(f"Telnyx webhook event: {event_type} with call_control_id {call_control_id}")
 
         if not call_control_id:
             console_logger.warning("Webhook without call_control_id; ignoring.")
