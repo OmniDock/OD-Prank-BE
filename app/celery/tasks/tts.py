@@ -211,7 +211,6 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
                 model=model,
                 voice_settings=voice_settings,
                 text=text,
-                # Pass duration_ms to VoiceLineAudio
                 duration_ms=duration_ms,
             )
             console_logger.info(f"[Celery] TTS ready vl={voice_line_id}")

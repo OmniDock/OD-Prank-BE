@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     
     STORAGE_BUCKET_VOICE_LINES: str = Field(default="voice-lines")
     
+    
     # Database
     DATABASE_URL: str = Field(default="postgresql://postgres:password@localhost:5432/your_db")
     MIGRATION_DATABASE_URL: str = Field(default="postgresql://postgres:password@localhost:5432/your_db")

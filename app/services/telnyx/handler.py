@@ -19,6 +19,33 @@ from sqlalchemy import select, func
 from fastapi import HTTPException
 import datetime
 import pytz
+import base64
+import wave
+from supabase import create_client
+from app.core.config import settings
+import io
+
+# Preload background noise into memory at startup
+background_noise_pcm = None
+
+def preload_background_noise_from_supabase(storage_path="office-noise.wav"):
+    global background_noise_pcm
+    try:
+        console_logger.info(f"Preloading background noise from Supabase: {storage_path}")
+        client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+        # Download the file from Supabase Storage
+        res = client.storage.from_("ringtones").download(storage_path)
+        if hasattr(res, 'data'):
+            wav_bytes = res.data
+        else:
+            wav_bytes = res
+        with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
+            background_noise_pcm = wf.readframes(wf.getnframes())
+        console_logger.info(f"Loaded background noise from Supabase: {storage_path}")
+    except Exception as e:
+        console_logger.error(f"Failed to preload background noise from Supabase: {e}")
+
+preload_background_noise_from_supabase()
 
 
 class TelnyxHandler: 
@@ -214,6 +241,39 @@ class TelnyxHandler:
 
 
 
+    async def _ensure_background_noise_loaded(self):
+        global background_noise_pcm
+        if background_noise_pcm is None:
+            await preload_background_noise_from_supabase()
+
+    async def _stream_background_noise(self, ws: WebSocket, stop_event: asyncio.Event):
+        global background_noise_pcm
+        await self._ensure_background_noise_loaded()
+        if background_noise_pcm is None:
+            console_logger.error("Background noise not loaded in memory.")
+            return
+        chunk_size = 320  # 20ms of 16kHz 16-bit mono PCM = 320 bytes
+        try:
+            while not stop_event.is_set():
+                pos = 0
+                while pos < len(background_noise_pcm) and not stop_event.is_set():
+                    chunk = background_noise_pcm[pos:pos+chunk_size]
+                    payload = base64.b64encode(chunk).decode('ascii')
+                    msg = json.dumps({
+                        "event": "media",
+                        "media": {"payload": payload}
+                    })
+                    try:
+                        await ws.send_text(msg)
+                    except Exception as e:
+                        console_logger.error(f"Failed to send background noise: {e}")
+                        return
+                    await asyncio.sleep(0.02)  # 20ms per chunk
+                    pos += chunk_size
+        except Exception as e:
+            console_logger.error(f"Background noise streaming error: {e}")
+
+
     async def handle_media_ws(self, ws: WebSocket, call_control_id: str):
         await ws.accept()
 
@@ -225,6 +285,8 @@ class TelnyxHandler:
             return
         
         self._session_service.add_websocket(call_control_id, ws)
+        stop_event = asyncio.Event()
+        bg_task = asyncio.create_task(self._stream_background_noise(ws, stop_event))
         try:
             while True:
                 inbound_msg = await ws.receive_text()
@@ -236,6 +298,8 @@ class TelnyxHandler:
         except Exception as e:
             console_logger.error(f"Media WS error: {e}")
         finally:
+            stop_event.set()
+            await bg_task
             self._session_service.remove_websocket(call_control_id, ws)
             await ws.close()
 
@@ -252,7 +316,7 @@ class TelnyxHandler:
             raise RuntimeError(f"Voice line {voice_line_id} not found in session")
 
         # Stop any active voice line playback first
-        await self.stop_voice_line(user_id, conference_name)
+        # await self.stop_voice_line(user_id, conference_name)
 
         audio = session.voice_line_audios[voice_line_id]
 
