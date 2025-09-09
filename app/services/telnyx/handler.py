@@ -189,7 +189,11 @@ class TelnyxHandler:
                 return 
 
         elif event_type == "call.answered":
-            # await self._client.media_stream_start(call_control_id)
+            if call_control_id:
+                await self._client.media_stream_start(call_control_id)
+            else:
+                self.logger.warning(f"(call.answered) No call control id found for call")
+                return
             pass
 
         elif event_type == "call.hangup":
@@ -274,7 +278,6 @@ class TelnyxHandler:
                     pos += chunk_size
         except Exception as e:
             console_logger.error(f"Background noise streaming error: {e}")
-
 
     async def handle_media_ws(self, ws: WebSocket, call_control_id: str):
         await ws.accept()
