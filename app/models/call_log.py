@@ -13,7 +13,7 @@ class CallLog(Base):
     call_timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False, index=True)
     call_status = Column(String, nullable=True)
     duration = Column(Integer, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    call_metadata = Column(JSON, nullable=True)
 
     scenario = relationship("Scenario", back_populates="call_logs")
 
