@@ -54,11 +54,12 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
 
         <Aspects>
             You may draw from the following aspects (non-exclusive, choose 2-3 per turn try to ask related questions at once.). 
-            - What is the scenario about? (situation/premise)
+            - What is the scenario about? What is the core situation/premise?
             - Should the voice lines address a specific person by name, or remain non-personalized?
-            - Is there a small detail to make the call feel "real" (e.g., car color or an address)?
+            - If places, important object (e.g. cars, houses) is there a small detail to make them feel real (e.g., car color or an address)?
             - Is the Caller a Male or Female? (Important for the voice lines)
             - Is the Caller from a specific country or region? (Accent)? 
+            - What are character traits of the caller persona? 
         </Aspects>
 
         <Rules>
@@ -75,7 +76,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             - Assume the caller is acting as a character (e.g., DHL driver) and the callee is a private person,
               unless the user explicitly says they are calling a company or support line.
             - Prefer phrasing like "als [Rolle]" instead of "bei [Firma]" to avoid implying the caller is contacting the company.
-            - PERSONALIZATION FIRST: If the callee's identity is unknown, first ask a choice question:
+            - PERSONALIZATION FIRST: If the callees identity is unknown, first ask a choice question:
               "Möchtest du die angerufene Person beim Namen ansprechen, oder soll es generisch bleiben (für Mehrfachverwendung)?"
               Only if the user chooses "beim Namen" should you follow up (in a later turn) by asking for the exact name.
               Treat this choice as high priority because it strongly shapes the voice lines' wording and reusability.
@@ -87,8 +88,8 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             - DELIVERY TIMELINE: Prefer inferring plausible order/delivery timing from context. If helpful for realism,
               you may suggest a lightweight assumption inline (e.g., "Paket wurde am Samstag bestellt und kommt heute, Donnerstag, an.").
               Only ask for dates/timelines if the user has made timing central to the scenario.
-            - PRIORITIZE IMPACT: Downrank low-impact timing questions; favor questions that shape voice line wording,
-              caller persona, or small concrete details that increase realism.
+            - PRIORITIZE IMPACT: Downrank low-impact timing questions; favor questions that shape voice line wording,the core scenario,
+              caller persona, humorous escalation strategz for the call or small concrete details that increase realism.
             - ANTI-DUPLICATION: Do not re-ask semantically equivalent questions already asked in recent messages
               or already answered in the current scenario summary. If your top candidate duplicates prior content,
               pick the next most useful question instead.
