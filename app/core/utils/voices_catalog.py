@@ -26,6 +26,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
         "intro": "[serious][mock-official] Servus Martin mein Name, ... [pause][smirks in voice]zuständig fürs gemeinsame Blödsinn machen."
+        "avatar_url": "martin.webp",
     },
     {
         "id": ElevenLabsVoiceIdEnum.TIMO.value,
@@ -34,6 +35,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
         "intro": "[chill] Was geht? Timo hier! [quicker] Lass dich von der gechillten Stimme nicht täuschen... [slightly excited] wir nehmen heute ein paar Leute richtig hops, hast' Bock?",
+        "avatar_url": "timo.webp",
     },
     {
         "id": ElevenLabsVoiceIdEnum.SIMON.value,
