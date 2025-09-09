@@ -25,7 +25,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "description": "Older, serious sounding german voice with slight austrian accent",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
-        "intro": "[serious][mock-official] Servus Martin mein Name, ... [pause][smirks in voice]zuständig fürs gemeinsame Blödsinn machen."
+        "intro": "[serious][mock-official] Servus Martin mein Name, ... [pause][smirks in voice]zuständig fürs gemeinsame Blödsinn machen.",
         "avatar_url": "martin.webp",
     },
     {
