@@ -211,6 +211,9 @@ class TelnyxHandler:
         if not session.voice_line_audios or voice_line_id not in session.voice_line_audios:
             raise RuntimeError(f"Voice line {voice_line_id} not found in session")
 
+        # Stop any active voice line playback first
+        await self.stop_voice_line(user_id, conference_name)
+
         audio = session.voice_line_audios[voice_line_id]
 
         # Use pre-cached signed URL if available, otherwise generate new one
