@@ -3,7 +3,7 @@ from app.core.logging import console_logger
 from app.core.config import settings
 from app.core.auth import get_current_user, AuthUser
 import stripe
-from app.core.utils.product_catalog import PRODUCT_PRICE_CATALOG
+from app.core.utils.product_catalog import PRODUCT_PRICE_CATALOG, PRODUCT_CATALOG
 # Initialize Stripe with the secret key
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -72,7 +72,10 @@ def get_products():
         # Get all active products from Stripe
         all_products = stripe.Product.list(active=True)
         
-        products_with_prices = {}
+        # Import product catalog
+        
+        # Create a copy of the product catalog to modify
+        updated_catalog = PRODUCT_CATALOG.copy()
         
         for product in all_products.data:
             # Get all prices for this product
@@ -80,9 +83,11 @@ def get_products():
             
             # Format price information
             price_list = []
+            stripe_price = None
+            stripe_interval = None
+            
             for price in prices.data:
                 price_info = {
-                    # "id": price.id,
                     "unit_amount": price.unit_amount,
                     "currency": price.currency,
                     "recurring": {
@@ -93,19 +98,37 @@ def get_products():
                     "nickname": price.nickname
                 }
                 price_list.append(price_info)
+                
+                # Store the first price for catalog update
+                if stripe_price is None:
+                    stripe_price = price.unit_amount / 100  # Convert from cents
+                    stripe_interval = price.recurring.interval if price.recurring else None
+            
+            # Match product catalog entry by name (lowercase)
+            product_name_lower = product.name.lower()
+            
+            # Find matching catalog entry
+            for catalog_key, catalog_entry in updated_catalog.items():
+                if catalog_key.lower() == product_name_lower:
+                    # Update catalog entry with Stripe data
+                    catalog_entry['price'] = stripe_price
+                    catalog_entry['interval'] = stripe_interval
+                    break
             
             product_info = {
-                # "id": product.id,
                 "name": product.name,
                 "description": product.description,
                 "images": product.images,
                 "metadata": product.metadata,
                 "prices": price_list
             }
-            
-            products_with_prices[product.name] = product_info
         
-        return {"products": products_with_prices}
+        # Convert catalog to list of dictionaries
+        products_list = []
+        for catalog_key, catalog_entry in updated_catalog.items():
+            products_list.append(catalog_entry)
+        
+        return {"products": products_list}
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
