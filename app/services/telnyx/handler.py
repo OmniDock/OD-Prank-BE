@@ -41,7 +41,7 @@ def preload_background_noise_from_supabase(storage_path="office-noise.wav"):
             wav_bytes = res
         with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
             background_noise_pcm = wf.readframes(wf.getnframes())
-        console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)}")
+            console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)}")
     except Exception as e:
         console_logger.error(f"Failed to preload background noise from Supabase: {e}")
 
@@ -190,6 +190,7 @@ class TelnyxHandler:
 
         elif event_type == "call.answered":
             if call_control_id:
+                console_logger.warning(f"(call.answered) Starting media stream for call control id {call_control_id}")
                 await self._client.start_media_stream(call_control_id)
             else:
                 self.logger.warning(f"(call.answered) No call control id found for call")
@@ -289,9 +290,13 @@ class TelnyxHandler:
             await ws.close()
             console_logger.error(f"(xyz) No session found for call control id {call_control_id}")
             return
+
+        console_logger.warning(f"(xyz) Adding WebSocket for call control id {call_control_id}")
         
         self._session_service.add_websocket(call_control_id, ws)
         stop_event = asyncio.Event()
+
+        console_logger.warning(f"(xyz) Creating background noise task for call control id {call_control_id}")
         bg_task = asyncio.create_task(self._stream_background_noise(ws, stop_event))
         try:
             while True:
