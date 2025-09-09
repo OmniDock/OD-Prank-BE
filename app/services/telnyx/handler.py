@@ -24,9 +24,68 @@ import wave
 from supabase import create_client
 from app.core.config import settings
 import io
+import struct
 
 # Preload background noise into memory at startup
 background_noise_pcm = None
+
+
+def _extract_wav_ulaw_or_pcm8_bytes(wav_bytes: bytes) -> bytes:
+    """
+    Minimal RIFF/WAV parser to extract the raw payload from μ-law (format 7) or 8-bit PCM (format 1) files.
+    We only validate: 8kHz sample rate, mono channel, 8 bits per sample.
+    Returns the raw data bytes which can be proxied to Telnyx as 160-byte chunks.
+    """
+    if not wav_bytes or len(wav_bytes) < 12:
+        raise ValueError("Invalid WAV: file too short")
+    if wav_bytes[0:4] != b"RIFF" or wav_bytes[8:12] != b"WAVE":
+        raise ValueError("Invalid WAV: missing RIFF/WAVE header")
+
+    fmt_code = None
+    num_channels = None
+    sample_rate = None
+    bits_per_sample = None
+    data_bytes = None
+
+    offset = 12
+    total_len = len(wav_bytes)
+    while offset + 8 <= total_len:
+        chunk_id = wav_bytes[offset:offset+4]
+        chunk_size = struct.unpack('<I', wav_bytes[offset+4:offset+8])[0]
+        chunk_start = offset + 8
+        chunk_end = chunk_start + chunk_size
+        if chunk_end > total_len:
+            break
+
+        if chunk_id == b'fmt ':
+            if chunk_size < 16:
+                raise ValueError("Invalid WAV: fmt chunk too short")
+            fmt_code, num_channels, sample_rate, byte_rate, block_align, bits_per_sample = struct.unpack(
+                '<HHIIHH', wav_bytes[chunk_start:chunk_start+16]
+            )
+            # If there are extra fmt bytes, we ignore them
+        elif chunk_id == b'data':
+            data_bytes = wav_bytes[chunk_start:chunk_end]
+        # Chunks are word-aligned; skip padding byte if size is odd
+        offset = chunk_end + (chunk_size & 1)
+
+    if fmt_code is None or data_bytes is None or sample_rate is None or num_channels is None or bits_per_sample is None:
+        raise ValueError("Invalid WAV: missing fmt or data chunk")
+
+    if sample_rate != 8000 or num_channels != 1:
+        raise ValueError(f"Background noise WAV must be 8kHz mono (got {sample_rate} Hz, {num_channels} ch)")
+
+    if fmt_code == 7:  # μ-law
+        if bits_per_sample != 8:
+            raise ValueError("μ-law WAV must be 8 bits per sample")
+        return data_bytes
+    elif fmt_code == 1:  # PCM
+        if bits_per_sample != 8:
+            raise ValueError("PCM WAV must be 8 bits per sample to proxy as-is")
+        return data_bytes
+    else:
+        raise ValueError(f"Unsupported WAV format code: {fmt_code}")
+
 
 async def preload_background_noise_from_supabase(storage_path="office.wav"):
     global background_noise_pcm
@@ -38,13 +97,9 @@ async def preload_background_noise_from_supabase(storage_path="office.wav"):
             wav_bytes = res.data
         else:
             wav_bytes = res
-        with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
-            # Only check for 8kHz, mono, 8-bit. Do not check format/compression type.
-            if wf.getframerate() != 8000 or wf.getnchannels() != 1 or wf.getsampwidth() != 1:
-                raise ValueError("Background noise WAV must be 8kHz, mono, 8-bit (μ-law or PCM)")
-            # Proxy the raw bytes (μ-law or PCM) directly to Telnyx; no decoding is done here.
-            background_noise_pcm = wf.readframes(wf.getnframes())
-            console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)} (proxied bytes)")
+        # Extract μ-law/PCM8 payload and proxy directly to Telnyx (no decoding/resampling)
+        background_noise_pcm = _extract_wav_ulaw_or_pcm8_bytes(wav_bytes)
+        console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)} (proxied bytes)")
     except Exception as e:
         console_logger.error(f"Failed to preload background noise from Supabase: {e}")
 

@@ -7,6 +7,7 @@ from app.services.preview_tts_service import PreviewTTSService
 from app.core.utils.voices_catalog import get_voices_catalog
 from app.core.middleware import RequestLoggingMiddleware, ErrorHandlingMiddleware
 from app.services.cache_service import CacheService 
+from app.services.telnyx.handler import preload_background_noise_from_supabase
 
 
 @asynccontextmanager
@@ -17,9 +18,13 @@ async def lifespan(app: FastAPI):
     app.state.cache = cache
 
     # Startup: Ensure voice previews
-    # service = PreviewTTSService()
-    # catalog = get_voices_catalog()
-    # await service.ensure_previews_for_catalog(catalog)
+    service = PreviewTTSService()
+    catalog = get_voices_catalog()
+    await service.ensure_previews_for_catalog(catalog)
+
+    # Startup: Preload background noise
+    #await preload_background_noise_from_supabase()
+
     yield
 
     # Shutdown: close global cache
