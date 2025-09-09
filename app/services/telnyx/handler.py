@@ -31,7 +31,7 @@ background_noise_pcm = None
 def preload_background_noise_from_supabase(storage_path="office-noise.wav"):
     global background_noise_pcm
     try:
-        console_logger.info(f"Preloading background noise from Supabase: {storage_path} length: {len(background_noise_pcm)}")
+        console_logger.info(f"Preloading background noise from Supabase: {storage_path} length:")
         client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
         # Download the file from Supabase Storage
         res = client.storage.from_("ringtones").download(storage_path)
