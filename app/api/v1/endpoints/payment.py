@@ -9,43 +9,30 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 router = APIRouter(tags=["payment"])
 
-
-#need to link to customer
 @router.post("/checkout/create-session")
-def create_checkout_session(request: dict):
-    sub_type = request.get("subscription_type")
-    print(sub_type)
-    print(PRODUCT_PRICE_CATALOG[sub_type])
+def create_checkout_session(request: dict, user: AuthUser = Depends(get_current_user)):
+    email = user.email
+    customers = stripe.Customer.list(email=email, limit=1)
     params = {
         "ui_mode": "embedded",
         "mode": "subscription",
-        "line_items": [{
-            "price": price_id,
-            "quantity": quantity
-        }],
         "return_url": settings.STRIPE_RETURN_URL + "/{CHECKOUT_SESSION_ID}",
         "automatic_tax": {"enabled": True},
     }
 
+    if customers.data:
+        customer_id = customers.data[0].id
+        params["customer"] = customer_id
+        
     try:
         sub_type = request.get("subscription_type")
         price_id = PRODUCT_PRICE_CATALOG[sub_type]['price_id']
         quantity = PRODUCT_PRICE_CATALOG[sub_type]['quantity']
-        session = stripe.checkout.Session.create(
-            ui_mode="embedded",                # <— embedded form
-            mode="subscription",               # <— create a subscription
-            line_items=[{
-                "price": price_id,
-                "quantity": quantity
-            }],
-            # customer=body.customerId,          # optional, if you map users->customers
-            return_url=settings.STRIPE_RETURN_URL + "/{CHECKOUT_SESSION_ID}",
-            # Optional niceties:
-            automatic_tax={"enabled": True},
-            allow_promotion_codes=True,
-            # consent_collection={"terms_of_service": "required"}
-        )
-        # IMPORTANT: return the client_secret for the client to mount checkout
+        params["line_items"] = [{
+            "price": price_id,
+            "quantity": quantity
+        }]
+        session = stripe.checkout.Session.create(**params)
         return {"client_secret": session["client_secret"], "id": session["id"]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
