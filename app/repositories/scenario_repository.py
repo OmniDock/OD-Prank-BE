@@ -190,3 +190,9 @@ class ScenarioRepository:
         # Delete the scenario (cascade will handle related data)
         await self.db_session.delete(scenario)
         console_logger.info(f"Deleted scenario {scenario_id} for user {user_id}")
+    
+    async def get_public_scenarios(self) -> List[Scenario]:
+        """Get all public scenarios (regardless of user)"""
+        query = select(Scenario).where(Scenario.is_public == True)
+        result = await self.db_session.execute(query)
+        return result.scalars().all()

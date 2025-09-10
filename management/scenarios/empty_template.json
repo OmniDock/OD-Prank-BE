@@ -1,0 +1,119 @@
+[
+{
+  "title": "",
+  "description": "",
+  "language": "",
+  "preferred_voice_id": null,
+  "target_name": null,
+  "scenario_analysis": null,
+  "clarifying_questions": null,
+  "clarifications": null,
+  "was_rewritten": false,
+  "is_safe": null,
+  "is_not_safe_reason": null,
+  "is_public": false,
+  "is_active": false,
+  "voice_lines": [
+    {
+      "text": "",
+      "type": "OPENING",
+      "order_index": 0
+    },
+    {
+      "text": "",
+      "type": "OPENING",
+      "order_index": 1
+    },
+    {
+      "text": "",
+      "type": "FILLER",
+      "order_index": 2
+    },
+    {
+      "text": "",
+      "type": "FILLER",
+      "order_index": 3
+    },
+    {
+      "text": "",
+      "type": "FILLER",
+      "order_index": 4
+    },
+    {
+      "text": "",
+      "type": "FILLER",
+      "order_index": 5
+    },
+    {
+      "text": "",
+      "type": "RESPONSE",
+      "order_index": 6
+    },
+    {
+      "text": "",
+      "type": "RESPONSE",
+      "order_index": 7
+    },
+    {
+      "text": "",
+      "type": "RESPONSE",
+      "order_index": 8
+    },
+    {
+      "text": "",
+      "type": "RESPONSE",
+      "order_index": 9
+    },
+    {
+      "text": "",
+      "type": "RESPONSE",
+      "order_index": 10
+    },
+    {
+      "text": "",
+      "type": "RESPONSE",
+      "order_index": 11
+    },
+    {
+      "text": "",
+      "type": "QUESTION",
+      "order_index": 12
+    },
+    {
+      "text": "",
+      "type": "QUESTION",
+      "order_index": 13
+    },
+    {
+      "text": "",
+      "type": "QUESTION",
+      "order_index": 14
+    },
+    {
+      "text": "",
+      "type": "QUESTION",
+      "order_index": 15
+    },
+    {
+      "text": "",
+      "type": "QUESTION",
+      "order_index": 16
+    },
+    {
+      "text": "",
+      "type": "QUESTION",
+      "order_index": 17
+    },
+    {
+      "text": "",
+      "type": "CLOSING",
+      "order_index": 18
+    },
+    {
+      "text": "",
+      "type": "CLOSING",
+      "order_index": 19
+    }
+  ]
+}
+]

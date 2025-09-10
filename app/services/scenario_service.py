@@ -448,3 +448,9 @@ class ScenarioService:
             "is_complete": is_complete,
             "can_activate": can_activate
         }
+    
+    async def get_public_scenarios(self) -> List[int]:
+        """Get public scenarios"""
+        scenarios = await self.repository.get_public_scenarios()
+        responses = [scenario.id for scenario in scenarios]
+        return responses

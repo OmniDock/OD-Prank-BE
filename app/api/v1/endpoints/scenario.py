@@ -244,3 +244,13 @@ async def delete_scenario(
         raise HTTPException(status_code=500, detail=f"Failed to delete scenario: {str(e)}")
 
 
+@router.get('public-scenarios', response_model=List[ScenarioResponse])
+async def get_public_scenarios(
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    """Get public scenarios"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        return await scenario_service.get_public_scenarios()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get public scenarios: {str(e)}")
