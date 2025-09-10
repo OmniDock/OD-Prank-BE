@@ -69,15 +69,16 @@ def session_status(session_id: str):
 @router.get('/product-info')
 def get_products():
     try:
-        # Get all active products from Stripe
-        all_products = stripe.Product.list(active=True)
-        
-        # Import product catalog
-        
         # Create a copy of the product catalog to modify
         updated_catalog = PRODUCT_CATALOG.copy()
         
-        for product in all_products.data:
+        # Query Stripe for each product using the stripe_product_id from catalog
+        for catalog_key, catalog_entry in updated_catalog.items():
+            stripe_product_id = catalog_entry['stripe_product_id']
+            
+            # Get product from Stripe
+            product = stripe.Product.retrieve(stripe_product_id)
+            
             # Get all prices for this product
             prices = stripe.Price.list(product=product.id, active=True)
             
@@ -104,30 +105,17 @@ def get_products():
                     stripe_price = price.unit_amount / 100  # Convert from cents
                     stripe_interval = price.recurring.interval if price.recurring else None
             
-            # Match product catalog entry by name (lowercase)
-            product_name_lower = product.name.lower()
-            
-            # Find matching catalog entry
-            for catalog_key, catalog_entry in updated_catalog.items():
-                if catalog_key.lower() == product_name_lower:
-                    # Update catalog entry with Stripe data
-                    catalog_entry['price'] = stripe_price
-                    catalog_entry['interval'] = stripe_interval
-                    break
-            
-            product_info = {
-                "name": product.name,
-                "description": product.description,
-                "images": product.images,
-                "metadata": product.metadata,
-                "prices": price_list
-            }
+            # Update catalog entry with Stripe data
+            catalog_entry['price'] = stripe_price
+            catalog_entry['interval'] = stripe_interval
         
-        # Convert catalog to list of dictionaries
+        # Convert catalog to list of dictionaries, excluding stripe_product_id and id
         products_list = []
         for catalog_key, catalog_entry in updated_catalog.items():
-            products_list.append(catalog_entry)
-        
+            # Create a copy without stripe_product_id and id, then add catalog_key as id
+            filtered_entry = {'id' : catalog_key}
+            filtered_entry.update({k: v for k, v in catalog_entry.items() if k not in ['stripe_product_id', 'id']})
+            products_list.append(filtered_entry)
         return {"products": products_list}
         
     except Exception as e:

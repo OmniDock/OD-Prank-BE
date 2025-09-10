@@ -20,7 +20,7 @@ PRODUCT_PRICE_CATALOG = {
 
 PRODUCT_CATALOG = {
     SubscriptionEnum.WEEKLY.value: {
-        'id': SubscriptionEnum.WEEKLY.value,
+        'stripe_product_id': settings.STRIPE_WEEKLY_PRODUCT_ID,
         'tagline': "For weekly users",
         'price': None,
         'interval': None,
@@ -33,7 +33,7 @@ PRODUCT_CATALOG = {
         'ctaHref': "",
     },
     SubscriptionEnum.MONTHLY.value: {
-        'id': SubscriptionEnum.MONTHLY.value,
+        'stripe_product_id': settings.STRIPE_MONTHLY_PRODUCT_ID,
         'tagline': "For prankster",
         'price': None,
         'interval': None,
@@ -46,7 +46,7 @@ PRODUCT_CATALOG = {
         'ctaHref': "",
     },
     SubscriptionEnum.YEARLY.value: {
-        'id': SubscriptionEnum.YEARLY.value,
+        'stripe_product_id': settings.STRIPE_YEARLY_PRODUCT_ID,
         'tagline': "For true pranksters",
         'price': None,
         'interval': None,
