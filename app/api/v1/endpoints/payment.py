@@ -16,6 +16,17 @@ def create_checkout_session(request: dict):
     sub_type = request.get("subscription_type")
     print(sub_type)
     print(PRODUCT_PRICE_CATALOG[sub_type])
+    params = {
+        "ui_mode": "embedded",
+        "mode": "subscription",
+        "line_items": [{
+            "price": price_id,
+            "quantity": quantity
+        }],
+        "return_url": settings.STRIPE_RETURN_URL + "/{CHECKOUT_SESSION_ID}",
+        "automatic_tax": {"enabled": True},
+    }
+
     try:
         sub_type = request.get("subscription_type")
         price_id = PRODUCT_PRICE_CATALOG[sub_type]['price_id']
