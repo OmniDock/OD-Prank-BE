@@ -21,7 +21,7 @@ class TelnyxHTTPClient:
         self.AUTH_HEADER = {"Authorization": f"Bearer {settings.TELNYX_API_KEY}"}
         self.WEBHOOK_URL = f"{settings.TELNYX_WEBHOOK_BASE_URL}{settings.API_V1_STR}/telnyx/webhook"
         self.FROM_NUMBER = settings.TELNYX_PHONE_NUMBER
-        self.logging_enabled = False
+        self.logging_enabled = True
         self.logger = console_logger 
         self.TUNNEL_BASE_URL = settings.TUNNEL_URL.replace("https://", "wss://").replace("http://", "ws://")
 
@@ -45,6 +45,8 @@ class TelnyxHTTPClient:
                 "end_conference_on_exit": True,
             }
         }
+
+        console_logger.info(f"Initiating call to {to_number} with payload: {payload}")
 
         async with httpx.AsyncClient(timeout=20.0) as client:
             resp = await client.post(
