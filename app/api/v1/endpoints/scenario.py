@@ -78,6 +78,7 @@ async def process_scenario(
         console_logger.error(f"Processing failed: {str(e)}")
         return ScenarioProcessResponse(status="error", error=str(e))
     
+    
 @router.post("/process/chat", response_model=ScenarioProcessResponse)
 async def process_chat(
     scenario_create_request: ScenarioCreateRequest = Body(...),
@@ -90,6 +91,9 @@ async def process_chat(
     """
     console_logger.debug(f"scenario_create_request: {scenario_create_request}")
     try:
+        from app.services.cache_service import CacheService
+        cache = await CacheService.get_global()
+        await cache.delete(f"design_chat:user:{user.id_str}")
         service = ScenarioService(db_session)
         result = await service.process_chat(user=user,scenario_create_request=scenario_create_request)
         return ScenarioProcessResponse(**result)

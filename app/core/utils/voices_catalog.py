@@ -179,7 +179,7 @@ DEFAULT_SETTINGS = {
     "use_speaker_boost": False,
     "similarity_boost": 0.5,
     "style": 1.6,
-    "speed": 1.2,
+    "speed": 1.35,
 }
 
 def get_voices_catalog() -> List[Dict[str, Any]]:
