@@ -105,7 +105,7 @@ def _extract_wav_ulaw_or_pcm8_bytes(wav_bytes: bytes) -> bytes:
     raise ValueError(f"Unsupported WAV format code: {fmt_code}")
 
 
-async def preload_background_noise_from_supabase(storage_path="office-new.wav"):
+async def preload_background_noise_from_supabase(storage_path="callbackgroundnoise.wav"):
     global background_noise_pcm
     try:
         console_logger.info(f"Preloading background noise from Supabase: {storage_path} length:")
