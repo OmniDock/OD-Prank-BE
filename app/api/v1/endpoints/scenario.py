@@ -139,6 +139,21 @@ async def get_public_scenario_ids(
         raise HTTPException(status_code=500, detail=f"Failed to get public scenarios: {str(e)}")
 
 
+@router.get('/public-scenarios/{scenario_id}', response_model=ScenarioResponse)
+async def get_public_scenario_detail(
+    scenario_id: int,
+    db_session: AsyncSession = Depends(get_db_session),
+) -> ScenarioResponse:
+    """Get a single public scenario with signed audio for preferred voice"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        return await scenario_service.get_public_scenario_detail(scenario_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get public scenario: {str(e)}")
+
+
 @router.get("/{scenario_id}", response_model=ScenarioResponse)
 async def get_scenario(
     scenario_id: int,

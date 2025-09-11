@@ -19,6 +19,8 @@ class Scenario(Base, TimestampMixin):
     preferred_voice_id: Mapped[str] = mapped_column(String(100), nullable=True)
     target_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    background_image_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
     # Scenario analysis from LangChain processing (stored as JSON)
     scenario_analysis: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
     
