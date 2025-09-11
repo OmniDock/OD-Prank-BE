@@ -60,6 +60,8 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             - Is the Caller a Male or Female? (Important for the voice lines)
             - Is the Caller from a specific country or region? (Accent)? 
             - What are character traits of the caller persona? 
+            - How should the question "Where did you get my number?" be answered?
+            - How should the question "How do you know my name?" be answered?
         </Aspects>
 
         <Rules>
