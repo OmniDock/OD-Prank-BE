@@ -51,7 +51,7 @@ class ElevenLabsModelEnum(Enum):
     ELEVEN_TTV_V3 = "eleven_v3"      
 
 
-class SubscriptionEnum(Enum):
+class ProductNameEnum(Enum):
+    SINGLE = "single"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
-    YEARLY = "yearly"
