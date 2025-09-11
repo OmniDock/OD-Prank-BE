@@ -191,8 +191,12 @@ class ScenarioRepository:
         await self.db_session.delete(scenario)
         console_logger.info(f"Deleted scenario {scenario_id} for user {user_id}")
     
-    async def get_public_scenarios(self) -> List[int]:
+    async def get_public_scenarios(self) -> List[Scenario]:
         """Get all public scenarios (regardless of user)"""
-        query = select(Scenario).where(Scenario.is_public == True)
+        query = (
+            select(Scenario)
+            .options(selectinload(Scenario.voice_lines)) # load voice lines from realtionshp 
+            .where(Scenario.is_public == True)
+        )
         result = await self.db_session.execute(query)
         return result.scalars().all()

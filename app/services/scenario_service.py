@@ -449,8 +449,13 @@ class ScenarioService:
             "can_activate": can_activate
         }
     
-    async def get_public_scenarios(self) -> List[int]:
+    async def get_public_scenarios(self) -> List[Scenario]:
         """Get public scenarios"""
-        scenarios = await self.repository.get_public_scenarios()
-        responses = [scenario.id for scenario in scenarios]
-        return responses
+        scenarios: List[Scenario] = await self.repository.get_public_scenarios()
+        scenarios_responses: List[ScenarioResponse] = []
+        for s in scenarios:
+            s_response = await self._to_scenario_response(s, include_audio=False)
+            scenarios_responses.append(s_response)
+        return scenarios_responses
+    
+    
