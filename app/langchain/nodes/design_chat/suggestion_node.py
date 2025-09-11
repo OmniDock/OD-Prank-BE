@@ -50,6 +50,16 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             If the scenario is completely empty start with something like "Was für einen Prank hast du im Kopf?"
             Frame questions from the point of view of the caller persona the user plays (e.g., "als DHL-Fahrer"),
             not as if the user is calling the company (avoid phrasing like "bei DHL").
+
+          <Important>
+            User come to our page and want to move quickly. Scenario generation happens by pressing the button below the Prompt Window.
+            Either if you: 
+              - Feel like the scenario contains enough details to work with it properly,
+              - You had 2-3 turns of questions and answers with the user, 
+              - You feel like the user is done with the scenario,
+            You should output a short nudge to proceed (no question). You can also add this to a question as a reminder.
+          </Important>
+
         </Your Role>
 
         <Aspects>
