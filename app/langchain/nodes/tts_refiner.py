@@ -7,7 +7,6 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.langchain.state import ScenarioState
 from app.core.logging import console_logger
-import asyncio
 
 
 class TTSOutput(BaseModel):
@@ -377,24 +376,21 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         return lines  # Return original if refinement fails
 
 
-from langchain_core.runnables import RunnableParallel, RunnableLambda
-
-
 async def tts_refiner_node(state: ScenarioState) -> dict:
+    """
+    Refine all plain lines for TTS
+    """
     console_logger.info("Running TTS refiner node")
-
-    async def refine_for_state(s: ScenarioState, vt: str):
-        lines = s.plain_lines.get(vt) or []
-        if not lines:
-            return []
-        refined = await refine_lines(lines, vt, s)
-        console_logger.debug(f"Refined {len(refined)} {vt} lines for TTS")
-        return refined
-
-    parallel = RunnableParallel({
-        vt: RunnableLambda(lambda s, vt=vt: refine_for_state(s, vt))
-        for vt in state.plain_lines.keys()
-    })
-
-    tts_lines = await parallel.ainvoke(state)
+    
+    tts_lines = {}
+    
+    for voice_type, lines in state.plain_lines.items():
+        if lines:
+            refined = await refine_lines(lines, voice_type, state)
+            tts_lines[voice_type] = refined
+            console_logger.debug(f"Refined {len(refined)} {voice_type} lines for TTS")
+        else:
+            tts_lines[voice_type] = []
+    
     return {"tts_lines": tts_lines}
+
