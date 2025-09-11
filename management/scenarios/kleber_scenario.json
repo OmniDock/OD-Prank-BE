@@ -1,0 +1,120 @@
+[
+    {   
+    "title": "Straßenkleber",
+    "description": "Ein euphorischer Klima-Aktivist kündigt am Telefon eine „Straßenklebung“ direkt vor der Haustür an. Zwischen Selbstgerechtigkeit, schräger Freundlichkeit und übertriebenem Eifer versucht er, die   Anwohner fürs Klima zu begeistern – mit unfreiwillig komischem Effekt.",
+    "language": "GERMAN",
+    "preferred_voice_id": null,
+    "target_name": null,
+    "scenario_analysis": null,
+    "clarifying_questions": null,
+    "clarifications": null,
+    "was_rewritten": false,
+    "is_safe": true,
+    "is_not_safe_reason": null,
+    "is_public": true,
+    "is_active": false,
+    "voice_lines": [
+        {
+            "text": "[excited][friendly] Joschka hier, hi! [pauses] Wir machen morgen eine -Straßenklebung-. [slightly proud] Bei… Ihnen. [curious] Haben Sie schon davon gehört?",
+            "type": "OPENING",
+            "order_index": 0
+        },
+        {
+            "text": "[friendly][slightly rushed] Hallo, Joschka hier… [pauses] wollte Ihnen kurz mitteilen, dass wir [proud][friendly] morgen eine Straßenklebung bei Ihnen haben machen.",
+            "type": "OPENING",
+            "order_index": 1
+        },
+        {
+            "text": "[proud][cheerful] Wir hatten vor zwei Wochen eine sehr erfolgreiche Klebung in Düsseldorf. [slightly excited] Sachschaden: 100.000 Euro. [informative] Der Straßenbelag war fällig, weil die uns freimeisseln mussten.",
+            "type": "RESPONSE",
+            "order_index": 2
+        },
+        {
+            "text": "[proud][friendly] Ja… uns ist die ZUKUNFT DES PLANETEN nunmal wichtig!",
+            "type": "RESPONSE",
+            "order_index": 3
+        },
+        {
+            "text": "[cheerful][friendly] Ja dann… können sie natürlich auch mitmachen… [slightly proud] wir freuen uns immer über neue Kämpfer fürs Klima!",
+            "type": "RESPONSE",
+            "order_index": 4
+        },
+        {
+            "text": "[calm][reassuring] Keine Sorge wegen morgen… [slightly proud] Das zahlen nicht Sie, das zahlt der Staat.",
+            "type": "RESPONSE",
+            "order_index": 5
+        },
+        {
+            "text": "[friendly][informative] Der Klimagruppenleiter wird auch morgen noch einmal bei Ihnen schellen… [pauses] [reassuring] wie bei allen Anwohnern!",
+            "type": "RESPONSE",
+            "order_index": 6
+        },
+        {
+            "text": "[slightly proud][calm] Wenn alles klappt… [pauses] dauert das Ganze nur so... seine 8 Stunden. [informative] Aber wir wollen vorbereitet sein.",
+            "type": "RESPONSE",
+            "order_index": 7
+        },
+        {
+            "text": "[curious][slightly skeptical] Warum nicht? [pauses] [slightly indignant] Glauben Sie nicht ans Klima?",
+            "type": "QUESTION",
+            "order_index": 8
+        },
+        {
+            "text": "[friendly][curious] Können Sie noch IRGENDWAS für uns tun morgen? [pauses] Getränke,... Zigarettchen?",
+            "type": "QUESTION",
+            "order_index": 9
+        },
+        {
+            "text": "[curious][slightly skeptical] Sehn Sie das anders?",
+            "type": "QUESTION",
+            "order_index": 10
+        },
+        {
+            "text": "[curious][inquisitive] Wie kommen Sie darauf?",
+            "type": "QUESTION",
+            "order_index": 11
+        },
+        {
+            "text": "[slightly skeptical][curious] Glauben Sie, dass das überhaupt notwendig ist?",
+            "type": "QUESTION",
+            "order_index": 12
+        },
+        {
+            "text": "[slightly concerned][curious] Also… sie wollen nicht was Gutes für -unseren- Planeten tun?",
+            "type": "QUESTION",
+            "order_index": 13
+        },
+        {
+            "text": "[friendly][proud] Ich würde mich freuen, wenn Sie unsere Bewegung morgen kennenlernen könnten! [excited] Bis dann!",
+            "type": "CLOSING",
+            "order_index": 14
+        },
+        {
+            "text": "[friendly][cheerful] Bleiben Sie gesund! [excited] Joooschka!",
+            "type": "CLOSING",
+            "order_index": 15
+        },
+        {
+            "text": "[affirmative][calm] Ja",
+            "type": "FILLER",
+            "order_index": 16
+        },
+        {
+            "text": "[affirmative][friendly] Ja, ja.",
+            "type": "FILLER",
+            "order_index": 17
+        },
+        {
+            "text": "[negative][firm] Nein.",
+            "type": "FILLER",
+            "order_index": 18
+        },
+        {
+            "text": "[hesitant][confused] Ich weiss nicht, was Sie meinen!",
+            "type": "FILLER",
+            "order_index": 19
+        }
+    ]
+    }
+]
+  
