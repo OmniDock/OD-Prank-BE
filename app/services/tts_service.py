@@ -18,11 +18,13 @@ import io
 import os
 import random
 from app.services.cache_service import CacheService
+from pydub import AudioSegment
 
 
 TTS_ATTEMPT_TIMEOUT = int(os.getenv("TTS_ATTEMPT_TIMEOUT", "20"))
 TTS_OVERALL_TIMEOUT = int(os.getenv("TTS_OVERALL_TIMEOUT", "120"))
 SUPABASE_TIMEOUT = int(os.getenv("SUPABASE_TIMEOUT", "20"))
+TTS_DEFAULT_TEMPO = float(os.getenv("TTS_TEMPO", "1.3"))  # 1.0 = no change
 
 
 class TTSService: 
@@ -82,14 +84,31 @@ class TTSService:
         return self._sha256(f"{th}|{sh}")
     
 
-    def _pcm16_to_wav(self, pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1) -> bytes:
+    def _pcm16_to_wav(self, pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1, tempo: Optional[float] = None) -> bytes:
         buf = io.BytesIO()
         with wave.open(buf, "wb") as wf:
             wf.setnchannels(channels)
             wf.setsampwidth(2)  
             wf.setframerate(sample_rate)
             wf.writeframes(pcm_bytes)
-        return buf.getvalue()
+        wav_bytes = buf.getvalue()
+        # Apply pitch-preserving tempo adjustment (via ffmpeg atempo) if configured
+        effective_tempo = TTS_DEFAULT_TEMPO if tempo is None else tempo
+        return self._apply_tempo(wav_bytes, effective_tempo)
+
+    def _apply_tempo(self, wav_bytes: bytes, tempo: Optional[float]) -> bytes:
+        try:
+            if tempo is None or abs(float(tempo) - 1.0) < 1e-3:
+                return wav_bytes
+            # ffmpeg atempo supports 0.5–2.0 per filter; clamp into range
+            clamped = max(0.5, min(2.0, float(tempo)))
+            seg = AudioSegment.from_file(io.BytesIO(wav_bytes), format="wav")
+            out = io.BytesIO()
+            seg.export(out, format="wav", parameters=["-filter:a", f"atempo={clamped:.3f}"])
+            return out.getvalue()
+        except Exception as e:
+            console_logger.warning(f"Tempo adjustment failed; returning original WAV. Error: {e}")
+            return wav_bytes
     
     async def generate_audio(self, text: str, voice_id: str = None, 
                            model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,

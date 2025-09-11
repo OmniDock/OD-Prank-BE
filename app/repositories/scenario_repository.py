@@ -190,3 +190,56 @@ class ScenarioRepository:
         # Delete the scenario (cascade will handle related data)
         await self.db_session.delete(scenario)
         console_logger.info(f"Deleted scenario {scenario_id} for user {user_id}")
+    
+    async def get_public_scenarios(self) -> List[Scenario]:
+        """Get all public scenarios (regardless of user)"""
+        query = (
+            select(Scenario)
+            .options(selectinload(Scenario.voice_lines)) # load voice lines from realtionshp 
+            .where(Scenario.is_public == True)
+        )
+        result = await self.db_session.execute(query)
+        return result.scalars().all()
+
+    async def get_public_scenario_by_id(self, scenario_id: int, load_audio: bool = False) -> Optional[Scenario]:
+        """Get a single public scenario by ID, optionally with preferred audio loaded"""
+        # Base query: public scenarios only
+        query = (
+            select(Scenario)
+            .options(selectinload(Scenario.voice_lines))
+            .where(Scenario.id == scenario_id)
+            .where(Scenario.is_public == True)
+        )
+        result = await self.db_session.execute(query)
+        scenario = result.scalar_one_or_none()
+        if not scenario:
+            return None
+
+        # Only load audio if explicitly requested and scenario has a preferred voice
+        if not load_audio or not scenario.preferred_voice_id:
+            return scenario
+
+        # Load the corresponding READY audios for all voice lines (for preferred voice)
+        voice_line_ids = [vl.id for vl in scenario.voice_lines]
+        if not voice_line_ids:
+            return scenario
+
+        audio_query = (
+            select(VoiceLineAudio)
+            .where(
+                and_(
+                    VoiceLineAudio.voice_line_id.in_(voice_line_ids),
+                    VoiceLineAudio.voice_id == scenario.preferred_voice_id,
+                    VoiceLineAudio.status == VoiceLineAudioStatusEnum.READY,
+                )
+            )
+        )
+        audio_result = await self.db_session.execute(audio_query)
+        audios = audio_result.scalars().all()
+        audio_map = {audio.voice_line_id: audio for audio in audios}
+
+        # Attach the audio to each voice line for easy access during serialization
+        for voice_line in scenario.voice_lines:
+            if voice_line.id in audio_map:
+                voice_line._preferred_audio = audio_map[voice_line.id]
+        return scenario

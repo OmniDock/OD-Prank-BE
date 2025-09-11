@@ -19,20 +19,24 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     #     "languages": [LanguageEnum.GERMAN],
     #     "gender": GenderEnum.FEMALE,
     # },
-    # {
-    #     "id": ElevenLabsVoiceIdEnum.MARTIN.value,
-    #     "name": "Martin",
-    #     "description": "-",
-    #     "languages": [LanguageEnum.GERMAN],
-    #     "gender": GenderEnum.MALE,
-    # },
-    # {
-    #     "id": ElevenLabsVoiceIdEnum.TIMO.value,
-    #     "name": "Timo",
-    #     "description": "-",
-    #     "languages": [LanguageEnum.GERMAN],
-    #     "gender": GenderEnum.MALE,
-    # },
+    {
+        "id": ElevenLabsVoiceIdEnum.MARTIN.value,
+        "name": "Martin",
+        "description": "Older, serious sounding german voice with slight austrian accent",
+        "languages": [LanguageEnum.GERMAN],
+        "gender": GenderEnum.MALE,
+        "intro": "[serious][mock-official] Servus Martin mein Name, ... [pause][smirks in voice]zuständig fürs gemeinsame Blödsinn machen.",
+        "avatar_url": "martin.webp",
+    },
+    {
+        "id": ElevenLabsVoiceIdEnum.TIMO.value,
+        "name": "Timo",
+        "description": "Locker, spontan und immer für einen Spaß zu haben.",
+        "languages": [LanguageEnum.GERMAN],
+        "gender": GenderEnum.MALE,
+        "intro": "[chill] Was geht? Timo hier! [quicker] Lass dich von der gechillten Stimme nicht täuschen... [slightly excited] wir nehmen heute ein paar Leute richtig hops, hast' Bock?",
+        "avatar_url": "timo.webp",
+    },
     {
         "id": ElevenLabsVoiceIdEnum.SIMON.value,
         "name": "Simon",
@@ -173,9 +177,9 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
 DEFAULT_SETTINGS = {
     "stability": 0.0,
     "use_speaker_boost": False,
-    "similarity_boost": 1.3,
-    "style": 1.8,
-    "speed": 1.2,
+    "similarity_boost": 0.5,
+    "style": 1.6,
+    "speed": 1.35,
 }
 
 def get_voices_catalog() -> List[Dict[str, Any]]:

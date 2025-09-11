@@ -448,3 +448,21 @@ class ScenarioService:
             "is_complete": is_complete,
             "can_activate": can_activate
         }
+    
+    async def get_public_scenarios(self) -> List[Scenario]:
+        """Get public scenarios"""
+        scenarios: List[Scenario] = await self.repository.get_public_scenarios()
+        scenarios_responses: List[ScenarioResponse] = []
+        for s in scenarios:
+            s_response = await self._to_scenario_response(s, include_audio=False)
+            scenarios_responses.append(s_response)
+        return scenarios_responses
+    
+    async def get_public_scenario_detail(self, scenario_id: int) -> ScenarioResponse:
+        """Get a single public scenario with signed audio for preferred voice"""
+        scenario = await self.repository.get_public_scenario_by_id(scenario_id, load_audio=True)
+        if not scenario:
+            raise ValueError(f"Scenario {scenario_id} not found")
+        return await self._to_scenario_response(scenario, include_audio=True)
+    
+    

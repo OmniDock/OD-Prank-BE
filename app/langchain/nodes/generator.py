@@ -34,18 +34,15 @@ def get_type_instructions(voice_type: str) -> str:
         "QUESTION": """
             QUESTION - Questions during conversation:
             - ONLY real QUESTIONS, no statements or explanations
-            - Escalate from normal to absurd (last question should be absurd)
+            - Escalate from normal to absurd 
             - Sparse "Mr./Mrs. [Name]" in questions - it's unnatural
-            - Ask absurd question deadpan: "What color is your front door?"
-            - Blame weird questions on "the system"
             - Avoid repetition - each question different
         """,
         "RESPONSE": """
             RESPONSE - Reactions to objections:
-            - React to objections/questions the target is likely to give
+            - Think of reactions the React the target is likely to give and create fitting responses accordingly
             - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
             - Stay in character
-            - Blame problems on system/protocol
             - Get slightly annoyed at too many questions
             - Redirect back to main topic
         """,
@@ -58,8 +55,8 @@ def get_type_instructions(voice_type: str) -> str:
         """,
         "FILLER": """
             FILLER - Natural pauses and fillers:
+            - MUST include atleast one 'yes' and alteast one 'no' filler 
             - Use natural pauses with "..." or fillers
-            - MUST include a form of 'yes' and 'no' 
             - No repetition - each filler different
         """
     }
@@ -178,8 +175,8 @@ async def generator_node(state: ScenarioState) -> dict:
 def _get_already_generated_lines_prompt(state: ScenarioState) -> str:
     """Get already generated lines as a prompt"""
     prompt_start_template = '''
-    - Use the context of already generated lines for new lines. Think of the most likely responses to the already generated lines that the target of the prank call might give and 
-        create new lines based on those responses that fit you as the character, the scenario and progress the escalation plan. 
+    - Use the context of the lines you already came up with for new lines. These are YOUR OWN lines and NOT the targets questions or responses. DO NOT RESPOND TO YOUR OWN LINES
+      Think of the most likely responses or objections to your already generated lines that the target might give and create new lines based on those responses that fit you as the character, the scenario and progress the escalation. 
 
     Already generated lines:
     '''

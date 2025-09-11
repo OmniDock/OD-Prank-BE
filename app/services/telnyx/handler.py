@@ -12,6 +12,114 @@ from app.services.telnyx.sessions import TelnyxSessionService, CallSession
 from app.services.audio_preload_service import AudioPreloadService 
 from app.services.tts_service import TTSService
 from app.services.cache_service import CacheService
+from app.models.call_log import CallLog
+from app.models.scenario import Scenario
+from app.models.blacklist import Blacklist
+from sqlalchemy import select, func
+from fastapi import HTTPException
+import datetime
+import pytz
+import base64
+import wave
+from supabase import create_client
+from app.core.config import settings
+import io
+import struct
+import audioop
+
+# Preload background noise into memory at startup
+background_noise_pcm = None
+
+
+def _extract_wav_ulaw_or_pcm8_bytes(wav_bytes: bytes) -> bytes:
+    """
+    Minimal RIFF/WAV parser that returns μ-law (G.711) bytes suitable for Telnyx.
+    - Accepts μ-law (format 7) as-is
+    - Converts A-law (format 6) to μ-law
+    - Converts PCM 8/16-bit (format 1) to μ-law
+    Requires 8kHz sample rate, mono.
+    """
+    if not wav_bytes or len(wav_bytes) < 12:
+        raise ValueError("Invalid WAV: file too short")
+    if wav_bytes[0:4] != b"RIFF" or wav_bytes[8:12] != b"WAVE":
+        raise ValueError("Invalid WAV: missing RIFF/WAVE header")
+
+    fmt_code = None
+    num_channels = None
+    sample_rate = None
+    bits_per_sample = None
+    data_bytes = None
+
+    offset = 12
+    total_len = len(wav_bytes)
+    while offset + 8 <= total_len:
+        chunk_id = wav_bytes[offset:offset+4]
+        chunk_size = struct.unpack('<I', wav_bytes[offset+4:offset+8])[0]
+        chunk_start = offset + 8
+        chunk_end = chunk_start + chunk_size
+        if chunk_end > total_len:
+            break
+
+        if chunk_id == b'fmt ':
+            if chunk_size < 16:
+                raise ValueError("Invalid WAV: fmt chunk too short")
+            fmt_code, num_channels, sample_rate, byte_rate, block_align, bits_per_sample = struct.unpack(
+                '<HHIIHH', wav_bytes[chunk_start:chunk_start+16]
+            )
+            # ignore any extra fmt bytes
+        elif chunk_id == b'data':
+            data_bytes = wav_bytes[chunk_start:chunk_end]
+        # Chunks are word-aligned; skip padding byte if size is odd
+        offset = chunk_end + (chunk_size & 1)
+
+    if fmt_code is None or data_bytes is None or sample_rate is None or num_channels is None or bits_per_sample is None:
+        raise ValueError("Invalid WAV: missing fmt or data chunk")
+
+    if sample_rate != 8000 or num_channels != 1:
+        raise ValueError(f"Background noise WAV must be 8kHz mono (got {sample_rate} Hz, {num_channels} ch)")
+
+    # μ-law as-is
+    if fmt_code == 7:
+        if bits_per_sample != 8:
+            raise ValueError("μ-law WAV must be 8 bits per sample")
+        return data_bytes
+
+    # A-law -> linear -> μ-law
+    if fmt_code == 6:
+        if bits_per_sample != 8:
+            raise ValueError("A-law WAV must be 8 bits per sample")
+        linear16 = audioop.alaw2lin(data_bytes, 2)
+        return audioop.lin2ulaw(linear16, 2)
+
+    # PCM -> μ-law
+    if fmt_code == 1:
+        if bits_per_sample == 16:
+            return audioop.lin2ulaw(data_bytes, 2)
+        if bits_per_sample == 8:
+            # WAV PCM 8-bit is unsigned; convert to signed 8-bit, then to 16-bit, then to μ-law
+            signed8 = audioop.bias(data_bytes, 1, -128)
+            linear16 = audioop.lin2lin(signed8, 1, 2)
+            return audioop.lin2ulaw(linear16, 2)
+        raise ValueError(f"Unsupported PCM bits per sample: {bits_per_sample}")
+
+    raise ValueError(f"Unsupported WAV format code: {fmt_code}")
+
+
+async def preload_background_noise_from_supabase(storage_path="callbackgroundnoise.wav"):
+    global background_noise_pcm
+    try:
+        console_logger.info(f"Preloading background noise from Supabase: {storage_path} length:")
+        client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+        res = client.storage.from_("ringtones").download(storage_path)
+        if hasattr(res, 'data'):
+            wav_bytes = res.data
+        else:
+            wav_bytes = res
+        # Extract or convert to μ-law payload and proxy directly to Telnyx (no decoding/resampling beyond μ-law encoding)
+        background_noise_pcm = _extract_wav_ulaw_or_pcm8_bytes(wav_bytes)
+        console_logger.info(f"Loaded background noise from Supabase: {storage_path} length: {len(background_noise_pcm)} (μ-law bytes)")
+    except Exception as e:
+        console_logger.error(f"Failed to preload background noise from Supabase: {e}")
 
 
 class TelnyxHandler: 
@@ -24,21 +132,44 @@ class TelnyxHandler:
         self.logger = console_logger 
 
     async def initiate_call(
-            self,
-            db_session: AsyncSession,
-            user_id: str,
-            scenario_id: int,
-            to_number: str,
+        self,
+        db_session: AsyncSession,
+        user_id: str,
+        scenario_id: int,
+        to_number: str,
+        *args, **kwargs
     ) -> Tuple[str, str, str, str]:
-        """
-        Initiate a call to the given number.
-        """
+        # --- Restriction Checks ---
+        # 1. Scenario ownership/public
+        scenario = await db_session.get(Scenario, scenario_id)
+        if not scenario or (str(scenario.user_id) != user_id and not getattr(scenario, "is_public", False)):
+            # Frontend should display this error message
+            raise HTTPException(status_code=403, detail="You do not have permission to use this scenario.")
+        # 2. Blacklist check
+        result = await db_session.execute(select(Blacklist).where(Blacklist.phone_number == to_number))
+        if result.scalar():
+            raise HTTPException(status_code=403, detail="This phone number is blacklisted.")
+        # 3. Rate limit (max 10 calls in 24h)
+        since = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+        count_result = await db_session.execute(
+            select(func.count()).select_from(CallLog).where(
+                CallLog.user_id == user_id,
+                CallLog.call_timestamp >= since
+            )
+        )
+        if count_result.scalar() >= 10:
+            raise HTTPException(status_code=429, detail="Call limit exceeded for the last 24 hours.")
+        # 4. Time-of-day check (no calls after 22:00 Europe/Berlin)
+        now = datetime.datetime.now(pytz.timezone("Europe/Berlin"))
+        if now.hour >= 22:
+            raise HTTPException(status_code=403, detail="Calls are not allowed after 22:00.")
+        # --- End Restriction Checks ---
         
         # PRELOADING AUDIO (TO BE EXCHANGED LATER)
         audio_service = AudioPreloadService(db_session)
         success, message = await audio_service.preload_scenario_audio(user_id, scenario_id)
         if not success: 
-            raise RuntimeError(f"Failed to preload audio for scenario {scenario_id}: {message}")
+            raise HTTPException(status_code=500, detail=f"Failed to preload audio for scenario {scenario_id}: {message}")
         
         # INITIATING THE CALL 
         call_leg_id, call_control_id, call_session_id, conference_name = await self._client.initiate_call(to_number)
@@ -59,7 +190,17 @@ class TelnyxHandler:
         await self._session_service.add_ccid_to_conference(conference_name, call_control_id)
 
         self.logger.info(f"Initiated call {call_leg_id} (control_id={call_control_id}) to {to_number}")
-
+        # --- Log the call ---
+        call_log = CallLog(
+            user_id=user_id,
+            to_number=to_number,
+            scenario_id=scenario_id,
+            call_timestamp=datetime.datetime.utcnow(),
+            call_status="initiated",
+            metadata=None
+        )
+        db_session.add(call_log)
+        await db_session.commit()
         return call_leg_id, call_control_id, call_session_id, conference_name
     
 
@@ -80,10 +221,10 @@ class TelnyxHandler:
         payload = data.get("payload", {})
         call_control_id = payload.get("call_control_id")
 
-        self.logger.info(f"Telnyx webhook event: {event_type}")
+        self.logger.info(f"Telnyx webhook event: {event_type} with call_control_id {call_control_id}")
 
         if not call_control_id:
-            console_logger.warning("Webhook without call_control_id; ignoring.")
+            console_logger.warning(f"Webhook without call_control_id; ignoring. {event}")
             return
 
         if event_type == "call.initiated":
@@ -113,6 +254,7 @@ class TelnyxHandler:
                     await self._session_service.add_ccid_to_conference(conference_name, call_control_id)
                     await self._client.answer_with_retry(call_control_id)
                     await self._client.join_conference_by_name(call_control_id, conference_name, mute=True)
+                    await self._client.start_media_stream(call_control_id)
 
                 else:
                     self.logger.warning(f"(call.initiated) (outgoing) No conference name found in custom headers")
@@ -121,6 +263,12 @@ class TelnyxHandler:
                 return 
 
         elif event_type == "call.answered":
+            if call_control_id:
+                console_logger.warning(f"(call.answered) Starting media stream for call control id {call_control_id}")
+                await self._client.start_media_stream(call_control_id)
+            else:
+                self.logger.warning(f"(call.answered) No call control id found for call")
+                return
             pass
 
         elif event_type == "call.hangup":
@@ -166,6 +314,7 @@ class TelnyxHandler:
             try:
                 cache = await CacheService.get_global()
                 if event_type == "conference.participant.joined":
+                    # await self._client.start_media_stream(call_control_id)
                     await cache.set(f"conf:{conference_name}:pstn_joined", "1", ttl=3600)
                 else:
                     await cache.delete(f"conf:{conference_name}:pstn_joined")
@@ -173,6 +322,39 @@ class TelnyxHandler:
                 pass
 
 
+
+    async def _ensure_background_noise_loaded(self):
+        global background_noise_pcm
+        if background_noise_pcm is None:
+            await preload_background_noise_from_supabase()
+
+    async def _stream_background_noise(self, ws: WebSocket, stop_event: asyncio.Event):
+        global background_noise_pcm
+        await self._ensure_background_noise_loaded()
+        if background_noise_pcm is None:
+            console_logger.error("Background noise not loaded in memory.")
+            return
+        chunk_size = 160  # 20ms of 8kHz 8-bit mono μ-law = 160 bytes
+        console_logger.warning(f"Streaming background noise to Telnyx: {len(background_noise_pcm)}")
+        try:
+            while not stop_event.is_set():
+                pos = 0
+                while pos < len(background_noise_pcm) and not stop_event.is_set():
+                    chunk = background_noise_pcm[pos:pos+chunk_size]
+                    payload = base64.b64encode(chunk).decode('ascii')
+                    msg = json.dumps({
+                        "event": "media",
+                        "media": {"payload": payload}
+                    })
+                    try:
+                        await ws.send_text(msg)
+                    except Exception as e:
+                        console_logger.error(f"Failed to send background noise: {e}")
+                        return
+                    await asyncio.sleep(0.02)  # 20ms per chunk
+                    pos += chunk_size
+        except Exception as e:
+            console_logger.error(f"Background noise streaming error: {e}")
 
     async def handle_media_ws(self, ws: WebSocket, call_control_id: str):
         await ws.accept()
@@ -183,8 +365,14 @@ class TelnyxHandler:
             await ws.close()
             console_logger.error(f"(xyz) No session found for call control id {call_control_id}")
             return
+
+        console_logger.warning(f"(xyz) Adding WebSocket for call control id {call_control_id}")
         
         self._session_service.add_websocket(call_control_id, ws)
+        stop_event = asyncio.Event()
+
+        console_logger.warning(f"(xyz) Creating background noise task for call control id {call_control_id}")
+        bg_task = asyncio.create_task(self._stream_background_noise(ws, stop_event))
         try:
             while True:
                 inbound_msg = await ws.receive_text()
@@ -196,6 +384,8 @@ class TelnyxHandler:
         except Exception as e:
             console_logger.error(f"Media WS error: {e}")
         finally:
+            stop_event.set()
+            await bg_task
             self._session_service.remove_websocket(call_control_id, ws)
             await ws.close()
 
@@ -210,6 +400,9 @@ class TelnyxHandler:
         # Ensure voice line exists in session
         if not session.voice_line_audios or voice_line_id not in session.voice_line_audios:
             raise RuntimeError(f"Voice line {voice_line_id} not found in session")
+
+        # Stop any active voice line playback first
+        # await self.stop_voice_line(user_id, conference_name)
 
         audio = session.voice_line_audios[voice_line_id]
 

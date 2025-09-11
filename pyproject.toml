@@ -32,4 +32,6 @@ dependencies = [
     "gunicorn>=23.0.0",
     "uvicorn-worker>=0.3.0",
     "stripe>=12.5.1",
+    "pytz>=2025.2",
+    "psycopg2-binary>=2.9.10",
 ]

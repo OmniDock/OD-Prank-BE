@@ -19,6 +19,8 @@ class Scenario(Base, TimestampMixin):
     preferred_voice_id: Mapped[str] = mapped_column(String(100), nullable=True)
     target_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    background_image_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
     # Scenario analysis from LangChain processing (stored as JSON)
     scenario_analysis: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
     
@@ -41,6 +43,8 @@ class Scenario(Base, TimestampMixin):
         cascade="all, delete-orphan",
         order_by="VoiceLine.order_index"
     )
+
+    call_logs = relationship("CallLog", back_populates="scenario")
     
     def __repr__(self):
         return f"<Scenario(id={self.id}, title='{self.title}', language='{self.language.value}')>"

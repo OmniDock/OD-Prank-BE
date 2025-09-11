@@ -96,13 +96,19 @@ async def generate_single_voice_line(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
 
+
+from pydub import AudioSegment
+import io
 @router.post("/generate/public-test", response_model=PublicTTSTestResponse)
 async def generate_public_test_audio(
     request: PublicTTSTestRequest,
+    tempo: float = 1.3,  
     user: AuthUser = Depends(get_current_user),
 ):
-    """Generate ad-hoc TTS from text and upload WAV to public/testing/{timestamp}.wav"""
     try:
+        if tempo <= 0.0 or tempo < 0.5 or tempo > 2.0:
+            raise HTTPException(status_code=400, detail="tempo must be between 0.5 and 2.0")
+
         tts = TTSService()
         # Generate PCM audio
         pcm = await tts.generate_audio(
@@ -111,8 +117,19 @@ async def generate_public_test_audio(
             model=request.model,
             voice_settings=request.voice_settings,
         )
-        # Convert to WAV
+        # Convert to WAV (16k mono)
         wav_bytes = tts._pcm16_to_wav(pcm)
+
+        # Optional: speed up with pitch preservation using ffmpeg atempo
+        if abs(tempo - 1.0) > 1e-3:
+            try:
+                seg = AudioSegment.from_file(io.BytesIO(wav_bytes), format="wav")
+                buf = io.BytesIO()
+                # ffmpeg atempo preserves pitch; valid range per-filter is 0.5–2.0 (our validation enforces this)
+                seg.export(buf, format="wav", parameters=["-filter:a", f"atempo={tempo:.3f}"])
+                wav_bytes = buf.getvalue()
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Tempo adjustment failed: {str(e)}")
 
         # Build storage path
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -152,7 +169,7 @@ async def generate_public_test_audio(
                     "temporarily unavailable",
                     "connect error",
                 ]
-                is_5xx = bool(re.search(r"\b5\d{2}\b", msg)) or any(code in msg for code in [" 502", " 503", " 504"]) 
+                is_5xx = bool(re.search(r"\b5\d{2}\b", msg)) or any(code in msg for code in [" 502", " 503", " 504"])
                 is_transient = is_5xx or any(t in msg for t in transient_tokens)
                 if is_transient and attempt < max_attempts:
                     delay = min(10.0, base_delay * (2 ** (attempt - 1)))
