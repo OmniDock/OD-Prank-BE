@@ -4,7 +4,7 @@
       "description": "Gutgläubiger Mitarbeiter des 'Landessporthalleninstituts' ruft überfreundlich an weil jemand Flühctlinge in der eigenen Wohnung aufnehmen muss, weil das Flüchtlingsheim überfüllt ist.",
       "language": "GERMAN",
       "preferred_voice_id": null,
-      "target_name": "Sebi",
+      "target_name": null,
       "scenario_analysis": null,
       "clarifying_questions": null,
       "clarifications": null,
