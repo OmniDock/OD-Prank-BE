@@ -124,7 +124,19 @@ async def enhance_voice_lines(
         raise HTTPException(status_code=500, detail=f"Failed to enhance voice lines: {str(e)}")
 
 
+
 # ========= RETRIEVE SCENARIOS AND CRUD =========
+
+@router.get('/public-scenarios', response_model=List[int])
+async def get_public_scenarios(
+    db_session: AsyncSession = Depends(get_db_session)
+) -> List[int]:
+    """Get public scenarios"""
+    try:
+        scenario_service = ScenarioService(db_session)
+        return await scenario_service.get_public_scenarios()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get public scenarios: {str(e)}")
 
 @router.get("/{scenario_id}", response_model=ScenarioResponse)
 async def get_scenario(
@@ -163,6 +175,7 @@ async def get_user_scenarios(
 class ScenarioUpdatePreferredVoice(BaseModel):
     preferred_voice_id: str
 
+
 @router.patch("/{scenario_id}/preferred-voice", response_model=ScenarioResponse)
 async def update_scenario_preferred_voice(
     scenario_id: int,
@@ -191,6 +204,7 @@ class AudioGenerationStatusResponse(BaseModel):
     is_complete: bool
     can_activate: bool  
 
+    
 @router.patch("/{scenario_id}/active", response_model=ScenarioResponse)
 async def set_scenario_active(
     scenario_id: int,
@@ -208,6 +222,7 @@ async def set_scenario_active(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update active status: {str(e)}")
 
+    
 @router.get("/{scenario_id}/audio-status", response_model=AudioGenerationStatusResponse)
 async def get_audio_generation_status(
     scenario_id: int,
@@ -224,6 +239,7 @@ async def get_audio_generation_status(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get audio status: {str(e)}")
 
+    
 
 @router.delete("/{scenario_id}")
 async def delete_scenario(
@@ -243,14 +259,3 @@ async def delete_scenario(
         console_logger.error(f"Error deleting scenario {scenario_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete scenario: {str(e)}")
 
-
-@router.get('public-scenarios', response_model=List[ScenarioResponse])
-async def get_public_scenarios(
-    db_session: AsyncSession = Depends(get_db_session),
-):
-    """Get public scenarios"""
-    try:
-        scenario_service = ScenarioService(db_session)
-        return await scenario_service.get_public_scenarios()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get public scenarios: {str(e)}")
