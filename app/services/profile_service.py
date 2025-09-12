@@ -3,7 +3,7 @@ from app.models.user_profile import UserProfile
 from app.core.auth import AuthUser
 from sqlalchemy import select
 from app.repositories.profile_repository import ProfileRepository
-from app.schemas.profile import Credits
+from app.schemas.profile import CreditResponse
 
 class ProfileService:
     def __init__(self, db: AsyncSession):
@@ -30,11 +30,11 @@ class ProfileService:
             await self.db.rollback()
             raise Exception(f"Failed to update credits: {str(e)}")
     
-    async def get_credits(self, user: AuthUser) -> Credits:
+    async def get_credits(self, user: AuthUser) -> CreditResponse:
         try:
             profile = await self.profile_repo.ensure_user_profile(user)
             prank_credits = profile.prank_credits 
             call_credits = profile.call_credits
-            return Credits(prank_credit_amount=prank_credits, call_credit_amount=call_credits)
+            return CreditResponse(prank_credit_amount=prank_credits, call_credit_amount=call_credits)
         except Exception as e:
             raise Exception(f"Failed to get credits: {str(e)}")
