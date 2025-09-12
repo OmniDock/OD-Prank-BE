@@ -14,19 +14,20 @@ router = APIRouter(tags=["payment"])
 
 @router.post("/checkout/create-session")
 def create_checkout_session(request: dict, user: AuthUser = Depends(get_current_user)):
-    email = user.email
-    customers = stripe.Customer.list(email=email, limit=1)
+    user_email = user.email
+    customers = stripe.Customer.list(email=user_email, limit=1)
     params = {
         "ui_mode": "embedded",
         "mode": "subscription",
         "return_url": settings.STRIPE_RETURN_URL + "/{CHECKOUT_SESSION_ID}",
         "automatic_tax": {"enabled": True},
-        "customer_email": email
     }
 
     if customers.data:
         customer_id = customers.data[0].id
         params["customer"] = customer_id
+    else:
+        params["customer_email"] = user_email
         
     try:
         sub_type = request.get("subscription_type")
@@ -183,12 +184,14 @@ async def handle_successful_payment(session, mode):
                 console_logger.warning(f"No auth user found with email: {customer_email}")
             
             if user:
-                console_logger.info(f"Payment successful - User ID: {user.id}, Email: {customer_email}, Price ID: {price_id}, Product ID: {product_id}, Catalog Key: {catalog_key}, Mode: {mode}")
+                console_logger.info(f"Payment successful - User Profile ID: {user.profile_uuid}, Email: {customer_email}, Price ID: {price_id}, Product ID: {product_id}, Catalog Key: {catalog_key}, Mode: {mode}")
                 
-                # Here you can update user's subscription status in your database
-                # user.subscription_id = subscription_id
-                # user.subscription_type = catalog_key
-                # await db_session.commit()
+                # Update user's subscription status in your database
+                user.subscription_id = subscription_id
+                user.subscription_type = catalog_key
+                await db_session.commit()
+                
+                console_logger.info(f"Updated user {user.profile_uuid} subscription: {catalog_key}")
                 
             else:
                 console_logger.warning(f"Payment successful but no UserProfile found for email: {customer_email}")
@@ -196,4 +199,4 @@ async def handle_successful_payment(session, mode):
         except Exception as e:
             console_logger.error(f"Error processing payment for {customer_email}: {str(e)}")
         finally:
-            break  # Exit the async generator
+            break  

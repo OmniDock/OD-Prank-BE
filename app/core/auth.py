@@ -4,6 +4,9 @@ from jose import JWTError, jwt
 from typing import Optional
 from app.core.config import settings
 from uuid import UUID
+from app.models.user_profile import UserProfile
+from sqlalchemy import select
+from app.core.database import get_db_session
 
 security = HTTPBearer()
 
