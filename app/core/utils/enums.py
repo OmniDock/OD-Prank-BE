@@ -55,3 +55,8 @@ class ProductNameEnum(Enum):
     SINGLE = "single"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
+
+class SubscriptionTypeEnum(Enum):
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+

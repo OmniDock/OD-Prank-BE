@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
 from app.services.profile_service import ProfileService
+from app.core.utils.product_catalog import PRODUCT_CATALOG
 router = APIRouter(tags=["profile"])
 
 @router.get("/")

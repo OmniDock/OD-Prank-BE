@@ -69,15 +69,14 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str = Field(default="")
     STRIPE_RETURN_URL: str = Field(default="")
     STRIPE_WEBHOOK_SECRET: str = Field(default="")
+    #Products
     STRIPE_SINGLE_PRODUCT_ID: str = Field(default="")
     STRIPE_WEEKLY_PRODUCT_ID: str = Field(default="")   
     STRIPE_MONTHLY_PRODUCT_ID: str = Field(default="")
+    #Prices
     STRIPE_SINGLE_PRICE_ID: str = Field(default="")
     STRIPE_WEEKLY_PRICE_ID: str = Field(default="")
     STRIPE_MONTHLY_PRICE_ID: str = Field(default="")
-
-
-
 
     # CORS
     BACKEND_CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:8080")

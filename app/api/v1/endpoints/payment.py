@@ -4,21 +4,22 @@ from app.core.logging import console_logger
 from app.core.config import settings
 from app.core.auth import get_current_user, AuthUser
 from app.core.database import get_db_session
+from app.services.profile_service import ProfileService
 from app.models.user_profile import UserProfile
 from sqlalchemy import select, text
 from app.core.utils.product_catalog import PRODUCT_PRICE_CATALOG, PRODUCT_CATALOG
-# Initialize Stripe with the secret key
+from app.core.utils.enums import ProductNameEnum
+from app.schemas.payment import CheckoutSessionParams, LineItem
+
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 router = APIRouter(tags=["payment"])
-
 @router.post("/checkout/create-session")
 def create_checkout_session(request: dict, user: AuthUser = Depends(get_current_user)):
     user_email = user.email
     customers = stripe.Customer.list(email=user_email, limit=1)
     params = {
         "ui_mode": "embedded",
-        "mode": "subscription",
         "return_url": settings.STRIPE_RETURN_URL + "/{CHECKOUT_SESSION_ID}",
         "automatic_tax": {"enabled": True},
     }
@@ -30,9 +31,14 @@ def create_checkout_session(request: dict, user: AuthUser = Depends(get_current_
         params["customer_email"] = user_email
         
     try:
-        sub_type = request.get("subscription_type")
-        price_id = PRODUCT_PRICE_CATALOG[sub_type]['price_id']
-        quantity = PRODUCT_PRICE_CATALOG[sub_type]['quantity']
+        product_type = request.get("product_type",None)
+        if product_type not in PRODUCT_PRICE_CATALOG:
+            raise HTTPException(status_code=400, detail=f"Invalid product type: {product_type}")
+        
+        mode = 'payment' if product_type == ProductNameEnum.SINGLE.value else 'subscription'
+        price_id = PRODUCT_PRICE_CATALOG[product_type]['price_id']
+        quantity = PRODUCT_PRICE_CATALOG[product_type]['quantity']
+        params["mode"] = mode
         params["line_items"] = [{
             "price": price_id,
             "quantity": quantity
@@ -87,7 +93,6 @@ def get_products():
                 stripe_price = price_data.unit_amount / 100
                 stripe_interval = price_data.recurring.interval if price_data.recurring else None
                 
-                
                 # Update catalog entry with Stripe data
                 catalog_entry['price'] = stripe_price
                 catalog_entry['interval'] = stripe_interval
@@ -98,7 +103,6 @@ def get_products():
             filtered_entry = {'id': catalog_key}
             filtered_entry.update({k: v for k, v in catalog_entry.items() if k not in ['stripe_product_id']})
             products_list.append(filtered_entry)
-        print('products_list', products_list)
         return {"products": products_list}
         
     except Exception as e:
@@ -129,7 +133,7 @@ async def stripe_webhook(request: Request):
 
 async def handle_successful_payment(session, mode):
     customer_email = session['customer_details']['email']
-    subscription_id = session['subscription']
+    subscription_id = session.get('subscription', None)
     
     # Get the price ID from the session
     if mode == 'subscription':
@@ -154,49 +158,11 @@ async def handle_successful_payment(session, mode):
             line_items = stripe.checkout.Session.list_line_items(session['id'])
             price_id = line_items['data'][0]['price']['id']
             product_id = line_items['data'][0]['price']['product']
-    
-    # Map price_id back to your catalog key
-    catalog_key = None
-    for key, value in PRODUCT_PRICE_CATALOG.items():
-        if value['price_id'] == price_id:
-            catalog_key = key
-            break
-    
-    # Get user from database using email
+        
     async for db_session in get_db_session():
-        try:
-            # First, get the user_id from Supabase auth system using email
-            auth_user_query = text("SELECT id FROM auth.users WHERE email = :email")
-            auth_result = await db_session.execute(auth_user_query, {"email": customer_email})
-            auth_user = auth_result.fetchone()
-            
-            user = None
-            if auth_user:
-                user_id = auth_user[0]  # Get the UUID from the result
-                
-                # Now get the UserProfile using the user_id
-                profile_query = select(UserProfile).where(UserProfile.user_id == user_id)
-                profile_result = await db_session.execute(profile_query)
-                user = profile_result.scalar_one_or_none()
-                
-                console_logger.info(f"Found auth user with ID: {user_id} for email: {customer_email}")
-            else:
-                console_logger.warning(f"No auth user found with email: {customer_email}")
-            
-            if user:
-                console_logger.info(f"Payment successful - User Profile ID: {user.profile_uuid}, Email: {customer_email}, Price ID: {price_id}, Product ID: {product_id}, Catalog Key: {catalog_key}, Mode: {mode}")
-                
-                # Update user's subscription status in your database
-                user.subscription_id = subscription_id
-                user.subscription_type = catalog_key
-                await db_session.commit()
-                
-                console_logger.info(f"Updated user {user.profile_uuid} subscription: {catalog_key}")
-                
-            else:
-                console_logger.warning(f"Payment successful but no UserProfile found for email: {customer_email}")
-                
-        except Exception as e:
-            console_logger.error(f"Error processing payment for {customer_email}: {str(e)}")
-        finally:
-            break  
+        profile_service = ProfileService(db_session)
+        await profile_service.update_user_profile_after_payment(
+            customer_email=customer_email, 
+            product_id=product_id, 
+            subscription_id=subscription_id
+            )
