@@ -21,9 +21,14 @@ def get_engine():
     global _ENGINE, _ENGINE_PID
     pid = os.getpid()
     if _ENGINE is None or _ENGINE_PID != pid:
+        # Enforce SSL for Supabase session pooler on 5432
+        connect_args = {}
+        if ".supabase.com" in DATABASE_URL.lower():
+            connect_args["ssl"] = True
         _ENGINE = create_async_engine(
             DATABASE_URL,
             poolclass=NullPool,  # oder: pool_size=5, max_overflow=0 für kleine Pools
+            connect_args=connect_args or None,
         )
         _ENGINE_PID = pid
     return _ENGINE
