@@ -17,6 +17,7 @@ from app.celery.tasks.tts import generate_voice_line_task
 import asyncio
 from datetime import datetime, timezone
 import re
+from app.core.utils.audio import pcm16_to_wav_with_tempo
 
 router = APIRouter(tags=["tts"])
 
@@ -97,8 +98,6 @@ async def generate_single_voice_line(
         raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
 
 
-from pydub import AudioSegment
-import io
 @router.post("/generate/public-test", response_model=PublicTTSTestResponse)
 async def generate_public_test_audio(
     request: PublicTTSTestRequest,
@@ -117,19 +116,8 @@ async def generate_public_test_audio(
             model=request.model,
             voice_settings=request.voice_settings,
         )
-        # Convert to WAV (16k mono)
-        wav_bytes = tts._pcm16_to_wav(pcm)
-
-        # Optional: speed up with pitch preservation using ffmpeg atempo
-        if abs(tempo - 1.0) > 1e-3:
-            try:
-                seg = AudioSegment.from_file(io.BytesIO(wav_bytes), format="wav")
-                buf = io.BytesIO()
-                # ffmpeg atempo preserves pitch; valid range per-filter is 0.5–2.0 (our validation enforces this)
-                seg.export(buf, format="wav", parameters=["-filter:a", f"atempo={tempo:.3f}"])
-                wav_bytes = buf.getvalue()
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Tempo adjustment failed: {str(e)}")
+        # Convert to WAV (16k mono) and apply optional tempo adjustment via shared utility
+        wav_bytes = pcm16_to_wav_with_tempo(pcm, tempo=tempo)
 
         # Build storage path
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")

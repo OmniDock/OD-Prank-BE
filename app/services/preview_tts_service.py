@@ -4,8 +4,7 @@ from app.core.logging import console_logger
 from app.core.utils.enums import ElevenLabsModelEnum, LanguageEnum, GenderEnum
 from app.services.tts_service import TTSService
 from app.core.utils.voices_catalog import PREVIEW_VERSION, get_voices_catalog
-import io
-import wave
+from app.core.utils.audio import pcm16_to_wav_with_tempo
 
 
 class PreviewTTSService:
@@ -57,13 +56,7 @@ class PreviewTTSService:
         # Storage is reused from TTSService
 
     def _pcm16_to_wav(self, pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1) -> bytes:
-        buf = io.BytesIO()
-        with wave.open(buf, "wb") as wf:
-            wf.setnchannels(channels)
-            wf.setsampwidth(2)
-            wf.setframerate(sample_rate)
-            wf.writeframes(pcm_bytes)
-        return buf.getvalue()
+        return pcm16_to_wav_with_tempo(pcm_bytes, sample_rate=sample_rate, channels=channels, tempo=None)
 
     def _public_url(self, path: str) -> str:
         # Note: path should not start with leading slash
