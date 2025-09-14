@@ -15,6 +15,7 @@ from app.services.cache_service import CacheService
 from app.models.call_log import CallLog
 from app.models.scenario import Scenario
 from app.models.blacklist import Blacklist
+from app.services.profile_service import ProfileService
 from sqlalchemy import select, func
 from fastapi import HTTPException
 import datetime
@@ -127,7 +128,6 @@ class TelnyxHandler:
     _session_service = TelnyxSessionService()
     _client = TelnyxHTTPClient()
     _active_playbacks_tasks: Dict[str, asyncio.Task] = {}
-
     def __init__(self):
         self.logger = console_logger 
 
@@ -290,7 +290,7 @@ class TelnyxHandler:
                 return
 
             # Check if this is a successful call completion before cleanup
-            await self._handle_call_completion(session, call_control_id)
+            # await self._handle_call_completion(session, call_control_id)
 
             outbound_ccid = session.outbound_call_control_id
             if outbound_ccid and outbound_ccid != call_control_id:
@@ -376,28 +376,7 @@ class TelnyxHandler:
             
             # Check if call meets success criteria
             if duration_seconds >= MIN_DURATION_SECONDS:
-                # 🎯 DUMMY BUSINESS LOGIC - Replace with your actual logic
-                console_logger.info(
-                    f"🎉🎉🎉 CALL DONE SUCCESSFULLY! 🎉🎉🎉\n"
-                    f"User: {session.user_id}\n"
-                    f"Scenario: {session.scenario_id}\n"
-                    f"To: {session.to_number}\n"
-                    f"Duration: {duration_seconds} seconds\n"
-                    f"Conference: {session.conference_name}\n"
-                    f"Call answered at: {session.call_answered_at}\n"
-                    f"PSTN joined at: {session.pstn_joined_at}\n"
-                    f"WebRTC joined at: {session.webrtc_joined_at}\n"
-                    f"Call started at: {session.call_started_at}\n"
-                    f"Call ended at: {call_ended.isoformat()}"
-                )
-                
-                # Here you would add your actual business logic:
-                # - Update user credits/subscription
-                # - Send analytics events
-                # - Trigger notifications
-                # - Update scenario statistics
-                # - Queue follow-up actions
-                # etc.
+                print("Call ended successfully, updating credits")
                 
             else:
                 console_logger.info(

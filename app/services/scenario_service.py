@@ -1,8 +1,10 @@
 from app.langchain import ScenarioProcessor, SingleLineEnhancer, ScenarioState
 from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, VoiceLineResponse, VoiceLineAudioResponse
 from app.core.auth import AuthUser
+from app.repositories.profile_repository import ProfileRepository
 from app.repositories.scenario_repository import ScenarioRepository
 from app.repositories.voice_line_repository import VoiceLineRepository
+from app.services.profile_service import ProfileService
 from app.core.database import AsyncSession
 from app.core.logging import console_logger
 from app.services.tts_service import TTSService
@@ -17,6 +19,8 @@ class ScenarioService:
     """Service for managing scenarios with LangChain processing"""
 
     def __init__(self, db_session: AsyncSession):
+        self.profile_repository = ProfileRepository(db_session)
+        self.profile_service = ProfileService(db_session)
         self.repository = ScenarioRepository(db_session)
         self.voice_line_repository = VoiceLineRepository(db_session)
         self.db_session = db_session
@@ -39,7 +43,8 @@ class ScenarioService:
 
         state = ScenarioState(**result)
         created = await self.create_scenario_from_state(user, state)
-
+        await self.profile_service.update_credits(user, -1, 0)
+        
         return {
             "status": "complete",
             "scenario_id": created.scenario.id
