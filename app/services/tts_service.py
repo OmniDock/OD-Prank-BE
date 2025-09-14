@@ -24,7 +24,7 @@ from pydub import AudioSegment
 TTS_ATTEMPT_TIMEOUT = int(os.getenv("TTS_ATTEMPT_TIMEOUT", "20"))
 TTS_OVERALL_TIMEOUT = int(os.getenv("TTS_OVERALL_TIMEOUT", "120"))
 SUPABASE_TIMEOUT = int(os.getenv("SUPABASE_TIMEOUT", "20"))
-TTS_DEFAULT_TEMPO = float(os.getenv("TTS_TEMPO", "1.3"))  # 1.0 = no change
+TTS_DEFAULT_TEMPO = float(os.getenv("TTS_TEMPO", "1.1"))  # 1.0 = no change
 
 
 class TTSService: 

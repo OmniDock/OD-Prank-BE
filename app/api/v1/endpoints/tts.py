@@ -102,7 +102,7 @@ import io
 @router.post("/generate/public-test", response_model=PublicTTSTestResponse)
 async def generate_public_test_audio(
     request: PublicTTSTestRequest,
-    tempo: float = 1.3,  
+    tempo: float = 1.1,  
     user: AuthUser = Depends(get_current_user),
 ):
     try:
