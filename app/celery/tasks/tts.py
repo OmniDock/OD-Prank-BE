@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import io
-import json
 import os
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import wave
@@ -15,88 +13,29 @@ from supabase import Client, create_client
 
 from app.celery.config import celery_app
 from app.core.config import settings
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.pool import NullPool
-import os
-import uuid
-
-DATABASE_URL = (
-    settings.DATABASE_URL
-    .replace("postgresql://", "postgresql+asyncpg://")
-    .replace("postgres://", "postgresql+asyncpg://")
-)
-
-_ENGINE = None
-_ENGINE_PID = None
-_SESSION_MAKER = None
-
-def get_engine():
-    global _ENGINE, _ENGINE_PID
-    pid = os.getpid()
-    if _ENGINE is None or _ENGINE_PID != pid:
-        _ENGINE = create_async_engine(
-            DATABASE_URL,
-            poolclass=NullPool,  # oder: pool_size=5, max_overflow=0 für kleine Pools
-        )
-        _ENGINE_PID = pid
-    return _ENGINE
-
-def get_session_maker():
-    global _SESSION_MAKER, _ENGINE_PID
-    pid = os.getpid()
-    if _SESSION_MAKER is None or _ENGINE_PID != pid:
-        engine = get_engine()
-        _SESSION_MAKER = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    return _SESSION_MAKER
 from app.core.logging import console_logger
 from app.core.database import get_session_maker
 from app.core.utils.enums import ElevenLabsModelEnum, VoiceLineAudioStatusEnum
+from app.core.utils.audio import pcm16_to_wav_with_tempo
+from app.core.utils.tts_common import (
+    compute_text_hash,
+    compute_settings_hash,
+    compute_content_hash,
+    private_voice_line_storage_path,
+)
 from app.models.voice_line_audio import VoiceLineAudio
 from sqlalchemy import select
 
 
 # ---- Minimal, service-independent helpers ----
 
-def _sha256(s: str) -> str:
-    import hashlib
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()
-
-
-def _normalize_text(text: str) -> str:
-    return (text or "").strip()
-
-
-def compute_text_hash(text: str) -> str:
-    return _sha256(_normalize_text(text))
-
-
-def compute_settings_hash(voice_id: str, model: ElevenLabsModelEnum, voice_settings: Optional[Dict[str, Any]]) -> str:
-    payload = {
-        "voice_id": voice_id,
-        "model_id": model.value if isinstance(model, ElevenLabsModelEnum) else model,
-        "voice_settings": voice_settings or {},
-    }
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    return _sha256(canonical)
-
-
-def compute_content_hash(text: str, voice_id: str, model: ElevenLabsModelEnum, voice_settings: Optional[Dict[str, Any]]) -> str:
-    return _sha256(f"{compute_text_hash(text)}|{compute_settings_hash(voice_id, model, voice_settings)}")
-
-
 def _pcm16_to_wav(pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1) -> bytes:
-    buf = io.BytesIO()
-    with wave.open(buf, "wb") as wf:
-        wf.setnchannels(channels)
-        wf.setsampwidth(2)
-        wf.setframerate(sample_rate)
-        wf.writeframes(pcm_bytes)
-    return buf.getvalue()
+    # Reuse shared utility which also applies tempo based on TTS_TEMPO env (default 1.1)
+    return pcm16_to_wav_with_tempo(pcm_bytes, sample_rate=sample_rate, channels=channels, tempo=None)
 
 
 def _private_storage_path(user_id: str, voice_line_id: int) -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    return f"private/{user_id}/voice_lines/{voice_line_id}_{ts}_{uuid.uuid4().hex[:8]}.wav"
+    return private_voice_line_storage_path(user_id, voice_line_id)
 
 
 async def _generate_tts_bytes(text: str, voice_id: str, model: ElevenLabsModelEnum, voice_settings: Optional[Dict[str, Any]]) -> bytes:
@@ -164,7 +103,7 @@ async def _mark_asset(db_session, voice_line_id: int, content_hash: str, status:
         await db_session.commit()
 
 
-@celery_app.task(name="tts.generate_voice_line", bind=True, rate_limit="10/m", soft_time_limit=180)
+@celery_app.task(name="tts.generate_voice_line", bind=True, soft_time_limit=180)
 def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
     """Generate TTS WAV and store it, then mark the PENDING asset READY/FAILED.
 

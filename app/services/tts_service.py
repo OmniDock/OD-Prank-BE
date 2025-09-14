@@ -13,18 +13,22 @@ import hashlib
 import json
 import re
 import asyncio
-import wave 
-import io 
+ 
 import os
 import random
 from app.services.cache_service import CacheService
-from pydub import AudioSegment
+from app.core.utils.audio import pcm16_to_wav_with_tempo
+from app.core.utils.tts_common import (
+    compute_text_hash as compute_text_hash_fn,
+    compute_settings_hash as compute_settings_hash_fn,
+    compute_content_hash as compute_content_hash_fn,
+    private_voice_line_storage_path,
+)
 
 
 TTS_ATTEMPT_TIMEOUT = int(os.getenv("TTS_ATTEMPT_TIMEOUT", "20"))
 TTS_OVERALL_TIMEOUT = int(os.getenv("TTS_OVERALL_TIMEOUT", "120"))
 SUPABASE_TIMEOUT = int(os.getenv("SUPABASE_TIMEOUT", "20"))
-TTS_DEFAULT_TEMPO = float(os.getenv("TTS_TEMPO", "1.3"))  # 1.0 = no change
 
 
 class TTSService: 
@@ -62,53 +66,30 @@ class TTSService:
         return t
 
 
-    def _sha256(self, s: str) -> str:
-        return hashlib.sha256(s.encode("utf-8")).hexdigest()
-
     def compute_text_hash(self, text: str) -> str:
-        return self._sha256(self._normalize_text(text))
+        return compute_text_hash_fn(text)
 
     def compute_settings_hash(self, voice_id: str, model_id: ElevenLabsModelEnum, voice_settings: Optional[Dict]) -> str:
-        payload = {
-            "voice_id": voice_id,
-            "model_id": model_id.value if isinstance(model_id, ElevenLabsModelEnum) else model_id,
-            "voice_settings": voice_settings or self.default_voice_settings(),
-        }
-        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-        return self._sha256(canonical)
+        return compute_settings_hash_fn(
+            voice_id,
+            model_id.value if isinstance(model_id, ElevenLabsModelEnum) else model_id,
+            voice_settings or self.default_voice_settings(),
+        )
 
     def compute_content_hash(self, text: str, voice_id: str, model_id: ElevenLabsModelEnum, voice_settings: Optional[Dict]) -> str:
-        # Use processed text for consistent hashing
-        th = self.compute_text_hash(text)
-        sh = self.compute_settings_hash(voice_id, model_id, voice_settings)
-        return self._sha256(f"{th}|{sh}")
+        return compute_content_hash_fn(
+            text,
+            voice_id,
+            model_id.value if isinstance(model_id, ElevenLabsModelEnum) else model_id,
+            voice_settings or self.default_voice_settings(),
+        )
     
 
     def _pcm16_to_wav(self, pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1, tempo: Optional[float] = None) -> bytes:
-        buf = io.BytesIO()
-        with wave.open(buf, "wb") as wf:
-            wf.setnchannels(channels)
-            wf.setsampwidth(2)  
-            wf.setframerate(sample_rate)
-            wf.writeframes(pcm_bytes)
-        wav_bytes = buf.getvalue()
-        # Apply pitch-preserving tempo adjustment (via ffmpeg atempo) if configured
-        effective_tempo = TTS_DEFAULT_TEMPO if tempo is None else tempo
-        return self._apply_tempo(wav_bytes, effective_tempo)
+        # Use shared utility to convert PCM to WAV and apply pitch-preserving tempo (defaults via env in utility)
+        return pcm16_to_wav_with_tempo(pcm_bytes, sample_rate=sample_rate, channels=channels, tempo=tempo)
 
-    def _apply_tempo(self, wav_bytes: bytes, tempo: Optional[float]) -> bytes:
-        try:
-            if tempo is None or abs(float(tempo) - 1.0) < 1e-3:
-                return wav_bytes
-            # ffmpeg atempo supports 0.5–2.0 per filter; clamp into range
-            clamped = max(0.5, min(2.0, float(tempo)))
-            seg = AudioSegment.from_file(io.BytesIO(wav_bytes), format="wav")
-            out = io.BytesIO()
-            seg.export(out, format="wav", parameters=["-filter:a", f"atempo={clamped:.3f}"])
-            return out.getvalue()
-        except Exception as e:
-            console_logger.warning(f"Tempo adjustment failed; returning original WAV. Error: {e}")
-            return wav_bytes
+    
     
     async def generate_audio(self, text: str, voice_id: str = None, 
                            model: ElevenLabsModelEnum = ElevenLabsModelEnum.ELEVEN_TTV_V3,
@@ -212,13 +193,8 @@ class TTSService:
             raise
 
     def _get_storage_path(self, user_id: str, voice_line_id: int) -> str:
-        """
-        Generate private storage path for user
-        Structure: /private/{user_id}/voice_lines/{voice_line_id}_{timestamp}_{uuid}.wav
-        """
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        filename = f"{voice_line_id}_{timestamp}_{uuid.uuid4().hex[:8]}.wav"
-        return f"private/{user_id}/voice_lines/{filename}"
+        """Generate private storage path for user."""
+        return private_voice_line_storage_path(user_id, voice_line_id)
 
     async def store_audio_file(self, audio_data: bytes, voice_line_id: int, user_id: str) -> Tuple[Optional[str], Optional[str]]:
         """
