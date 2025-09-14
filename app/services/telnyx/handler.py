@@ -266,10 +266,18 @@ class TelnyxHandler:
             if call_control_id:
                 console_logger.warning(f"(call.answered) Starting media stream for call control id {call_control_id}")
                 await self._client.start_media_stream(call_control_id)
+                
+                # Track when PSTN leg is answered
+                conference_name = await self._session_service.get_conference_name_by_ccid(call_control_id)
+                if conference_name:
+                    session = await self._session_service.get_conference_session(conference_name)
+                    if session and session.outbound_call_control_id == call_control_id:
+                        session.call_answered_at = datetime.datetime.utcnow().isoformat()
+                        await self._session_service.add_conference_session(session)
+                        console_logger.info(f"PSTN call answered at {session.call_answered_at}")
             else:
                 self.logger.warning(f"(call.answered) No call control id found for call")
                 return
-            pass
 
         elif event_type == "call.hangup":
             conference_name = await self._session_service.get_conference_name_by_ccid(call_control_id)
@@ -280,6 +288,9 @@ class TelnyxHandler:
             if not session:
                 self.logger.warning(f"(call.hangup) No session found for conference name {conference_name}")
                 return
+
+            # Check if this is a successful call completion before cleanup
+            await self._handle_call_completion(session, call_control_id)
 
             outbound_ccid = session.outbound_call_control_id
             if outbound_ccid and outbound_ccid != call_control_id:
@@ -298,7 +309,7 @@ class TelnyxHandler:
                 pass
 
         elif event_type in ("conference.participant.joined", "conference.participant.left", "conference.participant.removed"):
-            # Track PSTN leg presence for UI status
+            # Track PSTN leg presence for UI status and call timing
             conference_name = event.get("data", {}).get("payload", {}).get("conference_name")
             if not conference_name:
                 # Fallback via ccid mapping
@@ -308,20 +319,93 @@ class TelnyxHandler:
             session = await self._session_service.get_conference_session(conference_name)
             if not session:
                 return
+            
             is_pstn_leg = session.outbound_call_control_id and session.outbound_call_control_id == call_control_id
-            if not is_pstn_leg:
-                return
+            is_webrtc_leg = session.webrtc_call_control_id and session.webrtc_call_control_id == call_control_id
+            
             try:
                 cache = await CacheService.get_global()
+                now = datetime.datetime.utcnow().isoformat()
+                
                 if event_type == "conference.participant.joined":
-                    # await self._client.start_media_stream(call_control_id)
-                    await cache.set(f"conf:{conference_name}:pstn_joined", "1", ttl=3600)
-                else:
-                    await cache.delete(f"conf:{conference_name}:pstn_joined")
-            except Exception:
-                pass
+                    # Track when each leg joins
+                    if is_pstn_leg and not session.pstn_joined_at:
+                        session.pstn_joined_at = now
+                        await cache.set(f"conf:{conference_name}:pstn_joined", "1", ttl=3600)
+                        console_logger.info(f"PSTN leg joined conference at {now}")
+                    elif is_webrtc_leg and not session.webrtc_joined_at:
+                        session.webrtc_joined_at = now
+                        console_logger.info(f"WebRTC leg joined conference at {now}")
+                    
+                    # Check if both parties are now connected (effective call start)
+                    if (session.pstn_joined_at and session.webrtc_joined_at 
+                        and not session.both_parties_connected):
+                        session.both_parties_connected = True
+                        session.call_started_at = now
+                        console_logger.info(f"🎉 Both parties connected! Call started at {now} for conference {conference_name}")
+                    
+                    await self._session_service.add_conference_session(session)
+                    
+                else:  # participant left/removed
+                    if is_pstn_leg:
+                        await cache.delete(f"conf:{conference_name}:pstn_joined")
+                        
+            except Exception as e:
+                console_logger.error(f"Error tracking conference participant event: {e}")
 
-
+    async def _handle_call_completion(self, session: CallSession, call_control_id: str):
+        """
+        Handle call completion and trigger business logic for successful calls.
+        """
+        try:
+            MIN_DURATION_SECONDS = 5 # Minimum call duration to consider successful
+            
+            if not session.both_parties_connected or not session.call_started_at:
+                console_logger.debug(f"Call not successful - parties connected: {session.both_parties_connected}")
+                return
+            
+            # Calculate call duration
+            call_started = datetime.datetime.fromisoformat(session.call_started_at)
+            call_ended = datetime.datetime.utcnow()
+            duration_seconds = int((call_ended - call_started).total_seconds())
+            
+            console_logger.info(
+                f"Call completion detected: conference={session.conference_name}, "
+                f"duration={duration_seconds}s, user={session.user_id}"
+            )
+            
+            # Check if call meets success criteria
+            if duration_seconds >= MIN_DURATION_SECONDS:
+                # 🎯 DUMMY BUSINESS LOGIC - Replace with your actual logic
+                console_logger.info(
+                    f"🎉🎉🎉 CALL DONE SUCCESSFULLY! 🎉🎉🎉\n"
+                    f"User: {session.user_id}\n"
+                    f"Scenario: {session.scenario_id}\n"
+                    f"To: {session.to_number}\n"
+                    f"Duration: {duration_seconds} seconds\n"
+                    f"Conference: {session.conference_name}\n"
+                    f"Call answered at: {session.call_answered_at}\n"
+                    f"PSTN joined at: {session.pstn_joined_at}\n"
+                    f"WebRTC joined at: {session.webrtc_joined_at}\n"
+                    f"Call started at: {session.call_started_at}\n"
+                    f"Call ended at: {call_ended.isoformat()}"
+                )
+                
+                # Here you would add your actual business logic:
+                # - Update user credits/subscription
+                # - Send analytics events
+                # - Trigger notifications
+                # - Update scenario statistics
+                # - Queue follow-up actions
+                # etc.
+                
+            else:
+                console_logger.info(
+                    f"Call too short ({duration_seconds}s < {MIN_DURATION_SECONDS}s) - not triggering success logic"
+                )
+            
+        except Exception as e:
+            console_logger.error(f"Error handling call completion: {e}")
 
     async def _ensure_background_noise_loaded(self):
         global background_noise_pcm

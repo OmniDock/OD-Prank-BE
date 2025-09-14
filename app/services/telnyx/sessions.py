@@ -22,6 +22,13 @@ class CallSession:
     conference_name: Optional[str] = None
     voice_line_audios: Optional[Dict[int, PreloadedAudio]] = None
     
+    # Call timing and success tracking fields
+    call_answered_at: Optional[str] = None      # When PSTN leg answers (ISO string)
+    pstn_joined_at: Optional[str] = None        # When PSTN joins conference
+    webrtc_joined_at: Optional[str] = None      # When WebRTC joins conference  
+    call_started_at: Optional[str] = None       # When both parties connected
+    both_parties_connected: bool = False        # Flag for successful connection
+    
     def to_dict(self) -> dict:
         """Convert to JSON-serializable dict"""
         data = asdict(self)
