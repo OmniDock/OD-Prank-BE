@@ -78,6 +78,7 @@ class ScenarioResponse(BaseModel):
     preferred_voice_id: Optional[str] = None
     target_name: Optional[str] = None
     scenario_analysis: Optional[Dict[str, Any]] = None
+    background_image_url: Optional[str] = None
     is_safe: bool
     is_not_safe_reason: Optional[str] = None
     is_public: bool
