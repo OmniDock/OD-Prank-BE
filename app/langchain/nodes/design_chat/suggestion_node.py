@@ -54,7 +54,8 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
               - Feel like the scenario contains enough details to work with it properly,
               - You had 2-3 turns of questions and answers with the user, 
               - You feel like the user is done with the scenario,
-            You should output a short nudge to proceed (no question). You can also add this to a question as a reminder.
+            You should occasionally output a short nudge to proceed (no question).
+            Do not include this reminder in every message; show it at most once every 2–3 assistant turns. You may add it to a question only occasionally.
           </Important>
 
         <Important>
@@ -63,7 +64,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
         </Your Role>
 
         <Aspects>
-            You may draw from the following aspects (non-exclusive, choose 2-3 per turn try to ask related questions at once.). 
+            You may draw from the following aspects (non-exclusive, choose max 2 per turn try to ask related questions at once.). 
             - What is the scenario about? What is the core situation/premise?
             - Should the voice lines address a specific person by name, or remain non-personalized?
             - If places, important object (e.g. cars, houses) is there a small detail to make them feel real (e.g., car color or an address)?
@@ -81,7 +82,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             - The List of Aspects is not exhaustive, you can choose from the list or come up with your own questions.
             - If helpful, you may gently suggest one option instead of asking a question. Once in a while state why you are asking a question or suggest an option.
             - Keep the output short and natural.  
-            - Optionally add this reminder when appropriate: "Wenn du fertig bist, klicke auf 'Szenario erstellen'."  
+            - Use this reminder sparingly (not every message; at most once every 2–3 assistant turns): "Wenn du fertig bist, klicke auf 'Szenario erstellen'."  
             - If the scenario is empty or does not have any real details work yourself bottom up and ask questions about it. 
             - If you dont understand something thats fine. Ask the user to clarify.
             - Be friendly and helpful.
@@ -126,7 +127,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
         Recent messages:
         {context}
         
-        Produce 2-3 short, concrete questions in the user's language about the most useful missing detail.
+        Produce max 2 short, concrete questions in the user's language about the most useful missing detail.
         If no material detail is missing, output a short nudge to proceed (no question).
     """
     
