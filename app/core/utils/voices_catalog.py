@@ -34,7 +34,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.MARTIN.value,
         "name": "Martin",
-        "description": "Older, serious sounding german voice with slight austrian accent",
+        "description": "Ältere, seriös klingende deutsche Stimme mit leicht österreichischem Akzent",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
         "intro": "[serious][mock-official] Servus Martin mein Name, ... [pause][smirks in voice]zuständig fürs gemeinsame Blödsinn machen.",
@@ -56,7 +56,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.THOMAS.value,
         "name": "Thomas",
-        "description": "Conversational German male voice.",
+        "description": "Konversationsfähige deutsche Stimme.",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.MALE,
         "avatar_url": "thomas.webp",
@@ -67,7 +67,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.DANA.value,
         "name": "Dana",
-        "description": "Middle aged German female with deep, warm, nasal voice.",
+        "description": "Mittlere, tief, warm, nasale deutsche Stimme.",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.FEMALE,
         "avatar_url": "dana.webp",
@@ -79,7 +79,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.ANNY.value,
         "name": "Anny",
-        "description": "Natural, soft female voice for storytelling",
+        "description": "Natürliche, weiche, weibliche Stimme für Storytelling",
         "languages": [LanguageEnum.GERMAN],
         "gender": GenderEnum.FEMALE,
         "avatar_url": "anny.webp",
@@ -90,7 +90,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.ROBERT.value,
         "name": "Robert",
-        "description": "Young aussie voice perfect for conversations.",
+        "description": "Junge australische Stimme für Konversationen.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.MALE,
         "avatar_url": "robert.webp",
@@ -101,7 +101,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.MAHESH.value,
         "name": "Mahesh",
-        "description": "Young Indian voice to engage, assist and connect in natural conversations.",
+        "description": "Junge indische Stimme für Engagement, Unterstützung und natürliche Konversationen.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.MALE,
         "avatar_url": "mahesh.webp",
@@ -112,7 +112,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.MIKE.value,
         "name": "Mike",
-        "description": "Old american voice. Great for conversations.",
+        "description": "Alter amerikanische Stimme. Großartig für Konversationen.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.MALE,
         "avatar_url": "mike2.webp",
@@ -123,7 +123,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.BLONDIE.value,
         "name": "Blondie",
-        "description": "British woman with a warm, natural voice.",
+        "description": "Britische Frau mit einer warmen, natürlichen Stimme.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.FEMALE,
         "avatar_url": "blondie.webp",
@@ -134,7 +134,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
     {
         "id": ElevenLabsVoiceIdEnum.EMILY.value,
         "name": "Emily",
-        "description": "A soft soothing voice that radiates warmth and kindness.",
+        "description": "Eine weiche, beruhigende Stimme, die Wärme und Hingabe strahlt.",
         "languages": [LanguageEnum.ENGLISH],
         "gender": GenderEnum.FEMALE,
         "avatar_url": "emily.webp",
