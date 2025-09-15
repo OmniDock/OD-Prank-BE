@@ -9,7 +9,7 @@ from app.core.logging import console_logger
 
 # Default tempo multiplier for generated WAV audio (1.0 = unchanged)
 # Can be overridden via environment variable TTS_TEMPO
-TTS_DEFAULT_TEMPO: float = float(os.getenv("TTS_TEMPO", "1.1"))
+TTS_DEFAULT_TEMPO: float = float(os.getenv("TTS_TEMPO", "1.15"))
 
 
 def apply_tempo(wav_bytes: bytes, tempo: Optional[float]) -> bytes:
