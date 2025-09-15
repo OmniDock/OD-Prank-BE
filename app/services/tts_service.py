@@ -8,7 +8,7 @@ import uuid
 from typing import Optional, Tuple, Dict, List
 from datetime import datetime, timezone
 from app.core.utils.enums import ElevenLabsModelEnum, ElevenLabsVoiceIdEnum, LanguageEnum, GenderEnum
-from app.core.utils.voices_catalog import get_voice_id, DEFAULT_SETTINGS
+from app.core.utils.voices_catalog import DEFAULT_SETTINGS, get_voice_settings_for
 import hashlib
 import json
 import re
@@ -57,9 +57,9 @@ class TTSService:
         # Default zu expressiveren Stimmen für junge Zielgruppe
         return ElevenLabsVoiceIdEnum.GERMAN_MALE_FELIX.value
 
-    def default_voice_settings(self) -> Dict:
-        """Optimierte Einstellungen für ElevenLabs v3 mit Audio-Tags und Akzenten"""
-        return DEFAULT_SETTINGS
+    def default_voice_settings(self, voice_id: Optional[str] = None) -> Dict:
+        """Optimierte Einstellungen pro Voice-ID mit Fallback auf DEFAULT_SETTINGS"""
+        return get_voice_settings_for(voice_id) if voice_id else DEFAULT_SETTINGS
 
     def _normalize_text(self, text: str) -> str:
         t = text.strip()
@@ -73,7 +73,7 @@ class TTSService:
         return compute_settings_hash_fn(
             voice_id,
             model_id.value if isinstance(model_id, ElevenLabsModelEnum) else model_id,
-            voice_settings or self.default_voice_settings(),
+            voice_settings or self.default_voice_settings(voice_id),
         )
 
     def compute_content_hash(self, text: str, voice_id: str, model_id: ElevenLabsModelEnum, voice_settings: Optional[Dict]) -> str:
@@ -81,7 +81,7 @@ class TTSService:
             text,
             voice_id,
             model_id.value if isinstance(model_id, ElevenLabsModelEnum) else model_id,
-            voice_settings or self.default_voice_settings(),
+            voice_settings or self.default_voice_settings(voice_id),
         )
     
 
@@ -108,7 +108,7 @@ class TTSService:
             # Determine voice ID
             selected_voice_id = self.select_voice_id(voice_id)
 
-            vs_dict = voice_settings or self.default_voice_settings()
+            vs_dict = voice_settings or self.default_voice_settings(selected_voice_id)
 
             def _convert_sync() -> bytes:
                 # ElevenLabs SDK is synchronous; run in a thread to avoid blocking the event loop

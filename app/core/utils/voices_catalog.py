@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.core.utils.enums import (
     ElevenLabsVoiceIdEnum,
     LanguageEnum,
@@ -10,7 +10,7 @@ from app.core.utils.enums import (
 # Central curated voices catalog used by API and preview generation
 # ################################################################################
 
-PREVIEW_VERSION = "v9"
+PREVIEW_VERSION = "v10"
 
 DEFAULT_SETTINGS = {
     "stability": 0.0,
@@ -22,7 +22,7 @@ DEFAULT_SETTINGS = {
 
 DEFAULT_SETTINGS_V2 = {
     "stability": 0.5,
-    "use_speaker_boost": Fa;se,
+    "use_speaker_boost": False,
     "similarity_boost": 0.7,
     "style": 1.1,
     "speed": 0.95
@@ -148,6 +148,12 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
 
 def get_voices_catalog() -> List[Dict[str, Any]]:
     return VOICES_CATALOG
+
+def get_voice_settings_for(voice_id: Optional[str]) -> Dict[str, Any]:
+    if not voice_id:
+        return DEFAULT_SETTINGS
+    item = next((v for v in VOICES_CATALOG if v.get("id") == voice_id), None)
+    return (item or {}).get("voice_settings") or DEFAULT_SETTINGS
 
 def get_voice_id(language: LanguageEnum, gender: GenderEnum) -> str:
     """Get the default voice ID for a language and gender combination"""

@@ -103,8 +103,8 @@ class PreviewTTSService:
         text = preview_text or self.preview_text_default_en
         # Always use v3
         model = ElevenLabsModelEnum.ELEVEN_TTV_V3
-        # Reuse standard service settings to keep one ElevenLabs config
-        vs = self.tts_service.default_voice_settings()
+        # Use per-voice settings from catalog to match previews to runtime
+        vs = self.tts_service.default_voice_settings(voice_id)
         audio_bytes = await self.tts_service.generate_audio(
             text=text,
             voice_id=voice_id,
