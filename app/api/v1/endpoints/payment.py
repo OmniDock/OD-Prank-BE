@@ -131,6 +131,40 @@ async def stripe_webhook(request: Request):
     
     return {"status": "success"}
 
+
+@router.post("/cancel")
+async def cancel_subscription(
+    request: dict, 
+    user: AuthUser = Depends(get_current_user),
+    db_session = Depends(get_db_session)
+):
+    """Cancel a subscription"""
+    subscription_id = request.get("subscription_id")
+    if not subscription_id:
+        raise HTTPException(status_code=400, detail="subscription_id is required")
+    
+    # Call Stripe to cancel the subscription
+    subscription = stripe.Subscription.modify(
+        subscription_id,
+        cancel_at_period_end=True
+    )
+    
+    # Get when the subscription will be canceled
+    cancel_at = subscription.get('cancel_at') or subscription.get('current_period_end')
+    
+    # Get the profile for the auth user
+    profile_service = ProfileService(db_session)
+    await profile_service.update_user_profile_after_cancel(user, cancel_at)
+    profile = await profile_service.get_profile(user)
+    
+    return {
+        "status": "cancelled_at_period_end", 
+        "subscription_id": subscription_id,
+        "cancel_at": cancel_at,
+        "profile": profile
+    }
+
+
 async def handle_successful_payment(session, mode):
     customer_email = session['customer_details']['email']
     subscription_id = session.get('subscription', None)

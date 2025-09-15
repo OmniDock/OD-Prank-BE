@@ -83,7 +83,17 @@ class ProfileService:
         except Exception as e:
             await self.db.rollback()
             raise Exception(f"Failed to update profile: {str(e)}")
-        
+    
+    async def update_user_profile_after_cancel(self, auth_user: AuthUser, cancel_at: int) -> None:
+        try:
+            profile = await self.profile_repo.get_or_create_user_profile(auth_user)
+            profile.cancel_at = cancel_at
+            await self.db.commit()
+            await self.db.refresh(profile)
+            console_logger.info(f"Profile {profile.profile_uuid} updated with cancel_at {cancel_at}")
+        except Exception as e:
+            await self.db.rollback()
+            raise Exception(f"Failed to update profile: {str(e)}")
         
     async def get_or_create_profile_by_email(self, email: str) -> UserProfile:
         try:
