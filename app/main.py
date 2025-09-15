@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.services.preview_tts_service import PreviewTTSService
@@ -39,6 +40,7 @@ app = FastAPI(
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(ErrorHandlingMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=5)
 
 app.add_middleware(
     CORSMiddleware,

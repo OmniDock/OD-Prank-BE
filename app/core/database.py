@@ -21,10 +21,21 @@ def get_engine():
     global _ENGINE, _ENGINE_PID
     pid = os.getpid()
     if _ENGINE is None or _ENGINE_PID != pid:
-        _ENGINE = create_async_engine(
-            DATABASE_URL,
-            poolclass=NullPool,  # oder: pool_size=5, max_overflow=0 für kleine Pools
-        )
+        # In development, prefer NullPool to avoid issues with reloaders and event loop reuse
+        if settings.DEBUG:
+            _ENGINE = create_async_engine(
+                DATABASE_URL,
+                poolclass=NullPool,
+            )
+        else:
+            # Small connection pool for production-like environments
+            _ENGINE = create_async_engine(
+                DATABASE_URL,
+                pool_size=5,
+                max_overflow=5,
+                pool_recycle=1800,
+                pool_timeout=10,
+            )
         _ENGINE_PID = pid
     return _ENGINE
 
