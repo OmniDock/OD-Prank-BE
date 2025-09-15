@@ -70,10 +70,11 @@ class ProfileService:
             raise ValueError(f"Product ID {product_id} not found in product catalog")
         try:
             profile = await self.profile_repo.get_or_create_user_profile_by_email(customer_email)
-            profile.subscription_id = subscription_id
-            profile.subscription_type = subscription_type
             profile.prank_credits += prank_increment
             profile.call_credits += call_increment
+            if subscription_type:
+                profile.subscription_id = subscription_id
+                profile.subscription_type = subscription_type
             await self.db.commit()
             await self.db.refresh(profile)
             console_logger.info(f"Profile {profile.profile_uuid} updated with {prank_increment} prank credits and {call_increment} call credits")
