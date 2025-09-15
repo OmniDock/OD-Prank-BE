@@ -157,12 +157,12 @@ class TelnyxHandler:
                 CallLog.call_timestamp >= since
             )
         )
-        if count_result.scalar() >= 10:
-            raise HTTPException(status_code=429, detail="Call limit exceeded for the last 24 hours.")
-        # 4. Time-of-day check (no calls after 22:00 Europe/Berlin)
-        now = datetime.datetime.now(pytz.timezone("Europe/Berlin"))
-        if now.hour >= 22:
-            raise HTTPException(status_code=403, detail="Calls are not allowed after 22:00.")
+        # if count_result.scalar() >= 10:
+        #     raise HTTPException(status_code=429, detail="Call limit exceeded for the last 24 hours.")
+        # # 4. Time-of-day check (no calls after 22:00 Europe/Berlin)
+        # now = datetime.datetime.now(pytz.timezone("Europe/Berlin"))
+        # if now.hour >= 22:
+        #     raise HTTPException(status_code=403, detail="Calls are not allowed after 22:00.")
         # --- End Restriction Checks ---
         
         # PRELOADING AUDIO (TO BE EXCHANGED LATER)
