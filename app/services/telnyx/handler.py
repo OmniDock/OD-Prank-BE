@@ -212,7 +212,7 @@ class TelnyxHandler:
 
 
 
-    async def handle_webhook_event(self, event: dict):
+    async def handle_webhook_event(self, event: dict, db: AsyncSession):
         """
         Handle a webhook event from Telnyx.
         """
@@ -290,7 +290,7 @@ class TelnyxHandler:
                 return
 
             # Check if this is a successful call completion before cleanup
-            # await self._handle_call_completion(session, call_control_id)
+            await self._handle_call_completion(session, call_control_id, db)
 
             outbound_ccid = session.outbound_call_control_id
             if outbound_ccid and outbound_ccid != call_control_id:
@@ -353,12 +353,12 @@ class TelnyxHandler:
             except Exception as e:
                 console_logger.error(f"Error tracking conference participant event: {e}")
 
-    async def _handle_call_completion(self, session: CallSession, call_control_id: str):
+    async def _handle_call_completion(self, session: CallSession, db: AsyncSession):
         """
         Handle call completion and trigger business logic for successful calls.
         """
         try:
-            MIN_DURATION_SECONDS = 5 # Minimum call duration to consider successful
+            MIN_DURATION_SECONDS = 10 # Minimum call duration to consider successful
             
             if not session.both_parties_connected or not session.call_started_at:
                 console_logger.debug(f"Call not successful - parties connected: {session.both_parties_connected}")
@@ -376,11 +376,12 @@ class TelnyxHandler:
             
             # Check if call meets success criteria
             if duration_seconds >= MIN_DURATION_SECONDS:
-                print("Call ended successfully, updating credits")
+                profile_service = ProfileService(db)
+                await profile_service.update_user_credits_by_id(user_id=session.user_id, prank_credit_amount=0, call_credit_amount=-1)
                 
             else:
                 console_logger.info(
-                    f"Call too short ({duration_seconds}s < {MIN_DURATION_SECONDS}s) - not triggering success logic"
+                    f"Not subtracting credits call was ({duration_seconds}s < {MIN_DURATION_SECONDS}s) < {MIN_DURATION_SECONDS}s"
                 )
             
         except Exception as e:

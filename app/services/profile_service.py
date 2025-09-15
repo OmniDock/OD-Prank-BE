@@ -15,14 +15,26 @@ class ProfileService:
     
     async def get_profile(self, user: AuthUser) -> UserProfile:
         try:
-            profile = await self.profile_repo.ensure_user_profile(user)
+            profile = await self.profile_repo.get_or_create_user_profile(user)
             return profile
         except Exception as e:
             raise Exception(f"Failed to get profile: {str(e)}")
     
     async def update_credits(self, user: AuthUser, prank_credit_amount: int, call_credit_amount: int) -> UserProfile:
         try:
-            profile = await self.profile_repo.ensure_user_profile(user)
+            profile = await self.profile_repo.get_or_create_user_profile(user)
+            profile.prank_credits += prank_credit_amount
+            profile.call_credits += call_credit_amount
+            await self.db.commit()
+            await self.db.refresh(profile)
+            return profile
+        except Exception as e:
+            await self.db.rollback()
+            raise Exception(f"Failed to update credits: {str(e)}")
+    
+    async def update_user_credits_by_id(self, user_id: str, prank_credit_amount: int, call_credit_amount: int) -> UserProfile:
+        try:
+            profile = await self.profile_repo.get_or_create_user_profile_by_id(user_id)
             profile.prank_credits += prank_credit_amount
             profile.call_credits += call_credit_amount
             await self.db.commit()
@@ -34,7 +46,7 @@ class ProfileService:
     
     async def get_credits(self, user: AuthUser) -> CreditResponse:
         try:
-            profile = await self.profile_repo.ensure_user_profile(user)
+            profile = await self.profile_repo.get_or_create_user_profile(user)
             prank_credits = profile.prank_credits 
             call_credits = profile.call_credits
             return CreditResponse(prank_credit_amount=prank_credits, call_credit_amount=call_credits)
@@ -46,11 +58,11 @@ class ProfileService:
         prank_increment = 0
         call_increment = 0
         subscription_type = None
-        for key, value in PRODUCT_CATALOG.items():
-            if value['stripe_product_id'] == product_id:
-                catalog_key = key
-                prank_increment = value.get('prank_amount', 0)
-                call_increment = value.get('call_amount', 0)
+        for product_name, product_data in PRODUCT_CATALOG.items():
+            if product_data['stripe_product_id'] == product_id:
+                catalog_key = product_name
+                prank_increment = product_data.get('prank_amount', 0)
+                call_increment = product_data.get('call_amount', 0)
                 if catalog_key in ['weekly', 'monthly']:
                     subscription_type = catalog_key
                 break
@@ -58,7 +70,7 @@ class ProfileService:
         if catalog_key is None:
             raise ValueError(f"Product ID {product_id} not found in product catalog")
         try:
-            profile = await self.profile_repo.ensure_user_profile_by_email(customer_email)
+            profile = await self.profile_repo.get_or_create_user_profile_by_email(customer_email)
             profile.subscription_id = subscription_id
             profile.subscription_type = subscription_type
             profile.prank_credits += prank_increment
@@ -73,7 +85,7 @@ class ProfileService:
         
     async def get_or_create_profile_by_email(self, email: str) -> UserProfile:
         try:
-            profile = await self.profile_repo.ensure_user_profile_by_email(email)
+            profile = await self.profile_repo.get_or_create_user_profile_by_email(email)
             return profile
         except Exception as e:
             raise Exception(f"Failed to get profile by email: {str(e)}")

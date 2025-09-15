@@ -53,10 +53,11 @@ async def start_call(
 
 
 @router.post("/webhook")
-async def telnyx_webhook(req: Request):
+async def telnyx_webhook(req: Request,
+                         db: AsyncSession = Depends(get_db_session)):
     try:
         event = await req.json()
-        await telnyx_handler.handle_webhook_event(event)
+        await telnyx_handler.handle_webhook_event(event, db)
         return {"ok": True}
     except Exception as e:
         console_logger.error(f"Webhook error: {e}")
