@@ -18,6 +18,8 @@ class UserProfile(Base, TimestampMixin):
     
     subscription_type: Mapped[SubscriptionTypeEnum] = mapped_column(String, nullable=True, default=None)
     subscription_id: Mapped[str] = mapped_column(String, nullable=True)
+    next_billing_date: Mapped[int] = mapped_column(Integer, nullable=True)
+    cancel_at: Mapped[int] = mapped_column(Integer, nullable=True)
 
     def __repr__(self):
         return f"<profile_uuid={self.profile_uuid}, user_id={self.user_id}, user_email={self.user_email}>"

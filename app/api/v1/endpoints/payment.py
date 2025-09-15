@@ -134,6 +134,7 @@ async def stripe_webhook(request: Request):
 async def handle_successful_payment(session, mode):
     customer_email = session['customer_details']['email']
     subscription_id = session.get('subscription', None)
+    next_billing_date = None
     
     # Get the price ID from the session
     if mode == 'subscription':
@@ -147,6 +148,24 @@ async def handle_successful_payment(session, mode):
             subscription = stripe.Subscription.retrieve(subscription_id)
             price_id = subscription['items']['data'][0]['price']['id']
             product_id = subscription['items']['data'][0]['price']['product']
+        
+        # Get next billing date from subscription
+        if subscription_id:
+            try:
+                subscription = stripe.Subscription.retrieve(subscription_id)
+                next_billing_date = subscription.get('current_period_end')
+                if next_billing_date:
+                    console_logger.info(f"Next billing date for subscription {subscription_id}: {next_billing_date}")
+                    
+                    # Convert to readable format for logging
+                    from datetime import datetime
+                    readable_date = datetime.fromtimestamp(next_billing_date).strftime("%Y-%m-%d %H:%M:%S")
+                    console_logger.info(f"Readable next billing date: {readable_date}")
+                else:
+                    console_logger.warning(f"No current_period_end found for subscription {subscription_id}")
+            except stripe.error.StripeError as e:
+                console_logger.error(f"Error retrieving subscription {subscription_id}: {e}")
+                next_billing_date = None
     else:
         # For one-time payments
         line_items = session.get('line_items', {}).get('data', [])
@@ -165,5 +184,6 @@ async def handle_successful_payment(session, mode):
         await profile_service.update_user_profile_after_payment(
             customer_email=customer_email, 
             product_id=product_id, 
-            subscription_id=subscription_id
+            subscription_id=subscription_id,
+            next_billing_date=next_billing_date
             )

@@ -53,7 +53,7 @@ class ProfileService:
         except Exception as e:
             raise Exception(f"Failed to get credits: {str(e)}")
         
-    async def update_user_profile_after_payment(self, customer_email: str, product_id: str, subscription_id: str) -> None:
+    async def update_user_profile_after_payment(self, customer_email: str, product_id: str, subscription_id: str, next_billing_date: int = None) -> None:
         catalog_key = None
         prank_increment = 0
         call_increment = 0
@@ -75,6 +75,8 @@ class ProfileService:
             if subscription_type:
                 profile.subscription_id = subscription_id
                 profile.subscription_type = subscription_type
+            if next_billing_date:
+                profile.next_billing_date = next_billing_date
             await self.db.commit()
             await self.db.refresh(profile)
             console_logger.info(f"Profile {profile.profile_uuid} updated with {prank_increment} prank credits and {call_increment} call credits")
