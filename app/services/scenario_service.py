@@ -291,6 +291,7 @@ class ScenarioService:
             scenario_analysis=scenario.scenario_analysis,
             is_safe=scenario.is_safe,
             is_not_safe_reason=scenario.is_not_safe_reason,
+            background_image_url=scenario.background_image_url,
             is_public=scenario.is_public,
             is_active=scenario.is_active,
             created_at=scenario.created_at,
