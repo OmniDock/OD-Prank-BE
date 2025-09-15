@@ -64,3 +64,11 @@ PRODUCT_CATALOG = {
         'ctaHref': "",
     },
 }
+
+
+def get_product_name_by_product_id(stripe_product_id: str) -> str:
+    for product_name, product_info in PRODUCT_CATALOG.items():
+        if product_info['stripe_product_id'] == stripe_product_id:
+            return product_name
+    return 'unknown'
+

@@ -7,7 +7,7 @@ from app.core.database import get_db_session
 from app.services.profile_service import ProfileService
 from app.models.user_profile import UserProfile
 from sqlalchemy import select, text
-from app.core.utils.product_catalog import PRODUCT_PRICE_CATALOG, PRODUCT_CATALOG
+from app.core.utils.product_catalog import PRODUCT_PRICE_CATALOG, PRODUCT_CATALOG, get_product_name_by_product_id
 from app.core.utils.enums import ProductNameEnum
 from app.schemas.payment import CheckoutSessionParams, LineItem
 
@@ -159,6 +159,7 @@ async def handle_successful_payment(session, mode):
             price_id = line_items['data'][0]['price']['id']
             product_id = line_items['data'][0]['price']['product']
         
+    
     async for db_session in get_db_session():
         profile_service = ProfileService(db_session)
         await profile_service.update_user_profile_after_payment(

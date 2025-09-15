@@ -4,7 +4,7 @@ from app.core.auth import AuthUser
 from sqlalchemy import select
 from app.repositories.profile_repository import ProfileRepository
 from app.schemas.profile import CreditResponse
-from app.core.utils.product_catalog import PRODUCT_CATALOG
+from app.core.utils.product_catalog import PRODUCT_CATALOG, get_product_name_by_product_id
 from app.core.logging import console_logger
 
 class ProfileService:
@@ -58,14 +58,13 @@ class ProfileService:
         prank_increment = 0
         call_increment = 0
         subscription_type = None
-        for product_name, product_data in PRODUCT_CATALOG.items():
-            if product_data['stripe_product_id'] == product_id:
-                catalog_key = product_name
-                prank_increment = product_data.get('prank_amount', 0)
-                call_increment = product_data.get('call_amount', 0)
-                if catalog_key in ['weekly', 'monthly']:
-                    subscription_type = catalog_key
-                break
+        product_name = get_product_name_by_product_id(product_id)
+        product_data = PRODUCT_CATALOG[product_name]
+        catalog_key = product_name
+        prank_increment = product_data.get('prank_amount', 0)
+        call_increment = product_data.get('call_amount', 0)
+        if catalog_key in ['weekly', 'monthly']:
+            subscription_type = catalog_key
 
         if catalog_key is None:
             raise ValueError(f"Product ID {product_id} not found in product catalog")
