@@ -5,7 +5,7 @@ from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
 from app.services.tts_service import TTSService
 from app.repositories.voice_line_repository import VoiceLineRepository
-from app.core.utils.enums import VoiceLineAudioStatusEnum
+from app.core.utils.enums import VoiceLineAudioStatusEnum, ElevenLabsModelEnum
 from app.core.config import settings
 from app.core.utils.voices_catalog import get_voices_catalog, PREVIEW_VERSION
 from app.schemas.tts import SingleTTSRequest, RegenerateTTSRequest, TTSResult, VoiceListResponse, ScenarioTTSRequest, TTSResponse, PublicTTSTestRequest, PublicTTSTestResponse
@@ -283,3 +283,165 @@ async def get_voice_line_audio_url(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get audio URL: {str(e)}")
+
+
+@router.post("/generate/public-test-bulk")
+async def generate_public_test_audio_bulk(
+    request: dict,
+    tempo: float = 1.1,
+    user: AuthUser = Depends(get_current_user),
+):
+    try:
+        if tempo <= 0.0 or tempo < 0.5 or tempo > 2.0:
+            raise HTTPException(status_code=400, detail="tempo must be between 0.5 and 2.0")
+
+        # Extract parameters, converting single values to lists
+        texts = request.get("text", [])
+        if isinstance(texts, str):
+            texts = [texts]
+        
+        voice_ids = request.get("voice_id", [])
+        if isinstance(voice_ids, str):
+            voice_ids = [voice_ids]
+            
+        models = request.get("model", [])
+        if isinstance(models, str):
+            models = [models]
+            
+        # Voice settings - each can be a single value or list
+        voice_settings = request.get("voice_settings", {})
+        stability_values = voice_settings.get("stability", [0.0])
+        if not isinstance(stability_values, list):
+            stability_values = [stability_values]
+            
+        similarity_boost_values = voice_settings.get("similarity_boost", [0.85])
+        if not isinstance(similarity_boost_values, list):
+            similarity_boost_values = [similarity_boost_values]
+            
+        style_values = voice_settings.get("style", [1.6])
+        if not isinstance(style_values, list):
+            style_values = [style_values]
+            
+        speed_values = voice_settings.get("speed", [1.2])
+        if not isinstance(speed_values, list):
+            speed_values = [speed_values]
+            
+        use_speaker_boost_values = voice_settings.get("use_speaker_boost", [False])
+        if not isinstance(use_speaker_boost_values, list):
+            use_speaker_boost_values = [use_speaker_boost_values]
+
+        tts = TTSService()
+        results = []
+        
+        # Generate all combinations
+        import itertools
+        combinations = list(itertools.product(
+            texts, voice_ids, models, 
+            stability_values, similarity_boost_values, style_values, speed_values, use_speaker_boost_values
+        ))
+        
+        for i, (text, voice_id, model_str, stability, similarity_boost, style, speed, use_speaker_boost) in enumerate(combinations):
+            try:
+                # Convert model string to enum
+                if isinstance(model_str, str):
+                    try:
+                        model_enum = ElevenLabsModelEnum(model_str)
+                    except ValueError:
+                        model_enum = ElevenLabsModelEnum.ELEVEN_TTV_V3  # fallback
+                else:
+                    model_enum = model_str  # already an enum
+                
+                # Create voice settings for this combination
+                current_voice_settings = {
+                    "stability": stability,
+                    "similarity_boost": similarity_boost,
+                    "style": style,
+                    "speed": speed,
+                    "use_speaker_boost": use_speaker_boost
+                }
+                
+                # Generate PCM audio
+                pcm = await tts.generate_audio(
+                    text=text,
+                    voice_id=voice_id,
+                    model=model_enum,
+                    voice_settings=current_voice_settings,
+                )
+                
+                # Convert to WAV with tempo adjustment
+                wav_bytes = pcm16_to_wav_with_tempo(pcm, tempo=tempo)
+
+                # Build storage path with combination info
+                ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                storage_path = f"public/testing/bulk_{ts}_{i:03d}.wav"
+
+                # Upload to Supabase
+                def _upload_sync():
+                    return tts.storage_client.storage.from_(tts.bucket_name).upload(
+                        path=storage_path,
+                        file=wav_bytes,
+                        file_options={
+                            "content-type": "audio/wav",
+                            "cache-control": "3600",
+                            "upsert": "false",
+                        },
+                    )
+
+                # Retry logic for upload
+                max_attempts = 3
+                base_delay = 0.5
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        _ = await asyncio.to_thread(_upload_sync)
+                        break
+                    except Exception as e:
+                        if attempt < max_attempts:
+                            delay = base_delay * (2 ** (attempt - 1))
+                            await asyncio.sleep(delay)
+                            continue
+                        raise
+
+                public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{tts.bucket_name}/{storage_path}"
+                
+                results.append({
+                    "index": i,
+                    "public_url": public_url,
+                    "storage_path": storage_path,
+                    "parameters": {
+                        "text": text[:50] + "..." if len(text) > 50 else text,
+                        "voice_id": voice_id,
+                        "model": model_enum.value,
+                        "voice_settings": current_voice_settings,
+                        "tempo": tempo
+                    }
+                })
+                
+            except Exception as e:
+                results.append({
+                    "index": i,
+                    "error": str(e),
+                    "parameters": {
+                        "text": text[:50] + "..." if len(text) > 50 else text,
+                        "voice_id": voice_id,
+                        "model": model_str,
+                        "voice_settings": {
+                            "stability": stability,
+                            "similarity_boost": similarity_boost,
+                            "style": style,
+                            "speed": speed,
+                            "use_speaker_boost": use_speaker_boost
+                        },
+                        "tempo": tempo
+                    }
+                })
+
+        return {
+            "success": True,
+            "total_combinations": len(combinations),
+            "results": results
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bulk TTS generation failed: {str(e)}")

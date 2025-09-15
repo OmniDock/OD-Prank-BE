@@ -88,6 +88,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         - ALWAYS stay in character
         - NO REPETITION - each line must be unique
         - Avoid excessive name usage 
+        - Your tone and workd choice needs to match the character you are including their cultuaral context and how that person would do the escalation plan
         {_get_already_generated_lines_prompt(state)}
 
         GOOD EXAMPLES:
