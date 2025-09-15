@@ -290,7 +290,8 @@ class TelnyxHandler:
                 return
 
             # Check if this is a successful call completion before cleanup
-            await self._handle_call_completion(session, call_control_id, db)
+            console_logger.info(f"About to call _handle_call_completion for session {session.conference_name}")
+            await self._handle_call_completion(session, db)
 
             outbound_ccid = session.outbound_call_control_id
             if outbound_ccid and outbound_ccid != call_control_id:
@@ -360,8 +361,14 @@ class TelnyxHandler:
         try:
             MIN_DURATION_SECONDS = 10 # Minimum call duration to consider successful
             
+            console_logger.info(f"=== CALL COMPLETION HANDLER STARTED ===")
+            console_logger.info(f"Session data: conference={session.conference_name}, user_id={session.user_id}")
+            console_logger.info(f"Both parties connected: {session.both_parties_connected}")
+            console_logger.info(f"Call started at: {session.call_started_at}")
+            
             if not session.both_parties_connected or not session.call_started_at:
-                console_logger.debug(f"Call not successful - parties connected: {session.both_parties_connected}")
+                console_logger.warning(f"Call not successful - parties connected: {session.both_parties_connected}, call_started_at: {session.call_started_at}")
+                console_logger.info(f"=== CALL COMPLETION HANDLER ENDED (NO CREDIT UPDATE) ===")
                 return
             
             # Calculate call duration
@@ -373,19 +380,41 @@ class TelnyxHandler:
                 f"Call completion detected: conference={session.conference_name}, "
                 f"duration={duration_seconds}s, user={session.user_id}"
             )
+            console_logger.info(f"Call started: {call_started}, ended: {call_ended}")
             
             # Check if call meets success criteria
             if duration_seconds >= MIN_DURATION_SECONDS:
-                profile_service = ProfileService(db)
-                await profile_service.update_user_credits_by_id(user_id=session.user_id, prank_credit_amount=0, call_credit_amount=-1)
+                console_logger.info(f"Call duration {duration_seconds}s >= {MIN_DURATION_SECONDS}s - UPDATING CREDITS")
+                
+                try:
+                    profile_service = ProfileService(db)
+                    console_logger.info(f"ProfileService created, calling update_user_credits_by_id for user {session.user_id}")
+                    
+                    result = await profile_service.update_user_credits_by_id(
+                        user_id=session.user_id, 
+                        prank_credit_amount=0, 
+                        call_credit_amount=-1
+                    )
+                    
+                    console_logger.info(f"Credit update completed successfully. Result: {result}")
+                    console_logger.info(f"=== CALL COMPLETION HANDLER ENDED (CREDIT UPDATED) ===")
+                    
+                except Exception as credit_error:
+                    console_logger.error(f"ERROR updating credits: {credit_error}")
+                    import traceback
+                    console_logger.error(f"Credit update traceback: {traceback.format_exc()}")
                 
             else:
                 console_logger.info(
-                    f"Not subtracting credits call was ({duration_seconds}s < {MIN_DURATION_SECONDS}s) < {MIN_DURATION_SECONDS}s"
+                    f"Not subtracting credits - call duration ({duration_seconds}s) < minimum ({MIN_DURATION_SECONDS}s)"
                 )
+                console_logger.info(f"=== CALL COMPLETION HANDLER ENDED (DURATION TOO SHORT) ===")
             
         except Exception as e:
-            console_logger.error(f"Error handling call completion: {e}")
+            console_logger.error(f"Error in _handle_call_completion: {e}")
+            import traceback
+            console_logger.error(f"Call completion traceback: {traceback.format_exc()}")
+            console_logger.info(f"=== CALL COMPLETION HANDLER ENDED (ERROR) ===")
 
     async def _ensure_background_noise_loaded(self):
         global background_noise_pcm
