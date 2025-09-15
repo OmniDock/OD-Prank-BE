@@ -90,3 +90,9 @@ class ProfileService:
         except Exception as e:
             raise Exception(f"Failed to get profile by email: {str(e)}")
         
+    async def get_profile_by_id(self, user_id: str) -> UserProfile:
+        try:
+            profile = await self.profile_repo.get_or_create_user_profile_by_id(user_id)
+            return profile
+        except Exception as e:
+            raise Exception(f"Failed to get profile by id: {str(e)}")

@@ -153,10 +153,14 @@ class TelnyxHandler:
         since = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
         count_result = await db_session.execute(
             select(func.count()).select_from(CallLog).where(
-                CallLog.user_id == user_id,
+                CallLog.to_number == to_number,
                 CallLog.call_timestamp >= since
             )
         )
+        profile_service = ProfileService(db_session)
+        profile = await profile_service.get_profile_by_id(user_id)
+        if profile.call_credits <= 0:
+            raise HTTPException(status_code=403, detail="Call credits exceeded.")
         # if count_result.scalar() >= 10:
         #     raise HTTPException(status_code=429, detail="Call limit exceeded for the last 24 hours.")
         # # 4. Time-of-day check (no calls after 22:00 Europe/Berlin)
