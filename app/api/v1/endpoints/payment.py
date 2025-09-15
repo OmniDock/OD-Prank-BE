@@ -160,7 +160,6 @@ async def handle_successful_payment(session, mode):
                     # Convert to readable format for logging
                     from datetime import datetime
                     readable_date = datetime.fromtimestamp(next_billing_date).strftime("%Y-%m-%d %H:%M:%S")
-                    console_logger.info(f"Readable next billing date: {readable_date}")
                 else:
                     console_logger.warning(f"No current_period_end found for subscription {subscription_id}")
             except stripe.error.StripeError as e:
