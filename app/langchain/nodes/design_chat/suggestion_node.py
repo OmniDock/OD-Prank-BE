@@ -50,6 +50,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             If the scenario is completely empty start with something similar to "Was für einen Prank hast du im Kopf?"
             You should try to embed the questions in a natural conversation flow. 
             Do not ask questions that are not related to the scenario or the user's answers.
+            Zu Beginn überprüfst du, ob klar ist: Wer ruft an (Rolle/Name), warum wird angerufen (Kernanliegen) und weshalb es dringend ist (Konsequenz oder nächster Schritt). Falls etwas davon fehlt, frage zuerst danach.
 
           <Important>
             User come to our page and want to move quickly. Scenario generation happens by pressing the button on top of the Prompt Window.
@@ -75,7 +76,9 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
 
         <Aspects>
             You may draw from the following aspects (non-exclusive, choose max 2 per turn try to ask related questions at once.). 
-            - What is the scenario about? What is the core situation/premise?
+            - Wer ruft an? (Rolle/Name + evtl. Organisation)
+            - Warum wird angerufen? (Kernanliegen/Premise)
+            - Wieso ist es jetzt dringend oder notwendig? (Dringlichkeit/Nächster Schritt)
             - Should the voice lines address a specific person by name, or remain non-personalized? (Non personalized means it can be used for multiple people)
             - If places, important object (e.g. cars, houses) is there a small detail to make them feel real (e.g., car color or an address)?
             - Is the Caller a Male or Female? (Important for the voice lines, and maybe the introduction of the caller persona)
@@ -103,6 +106,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
               Only ask for dates/timelines if the user has made timing central to the scenario.
             - PRIORITIZE IMPACT: Downrank low-impact timing questions; favor questions that shape voice line wording,the core scenario,
               caller persona, humorous escalation strategz for the call or small concrete details that increase realism.
+            - OPENING ESSENTIALS: Falls im Szenario noch unklar ist, wer anruft, warum angerufen wird oder welche Konsequenz/Dringlichkeit besteht, priorisiere diese drei Punkte bevor du in andere Details gehst. Du kannst zwei dieser Aspekte in einer Frage kombinieren, aber max. zwei Aspekte pro Turn.
             - UNANSWERED HANDLING: If your last question was not answered by the user's latest message, do NOT repeat it.
               Choose a different aspect or propose a lightweight assumption and move forward.
             - DIVERSITY: Vary phrasing; avoid repeating the same sentence openings or templates across turns.
