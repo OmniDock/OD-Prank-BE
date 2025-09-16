@@ -1,8 +1,9 @@
-from sqlalchemy import String, Text, Integer, Boolean, UUID, Enum, ForeignKey
+from sqlalchemy import String, Text, Integer, Boolean, UUID, Enum, ForeignKey, DateTime
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from .base import Base, TimestampMixin
 from app.core.utils.enums import SubscriptionTypeEnum
+from datetime import datetime
 import uuid
 
 
@@ -21,3 +22,4 @@ class UserProfile(Base, TimestampMixin):
 
     def __repr__(self):
         return f"<profile_uuid={self.profile_uuid}, user_id={self.user_id}, user_email={self.user_email}>"
+    
