@@ -34,8 +34,6 @@ def get_type_instructions(voice_type: str) -> str:
             - Establish authority and credibility (e.g. Schulleitung, Behörde, Nachbarschaftsvertretung).
             - Stay believable and professional; use a formal tone if the language/context calls for it.
             - Length: 2–3 complete sentences, about 25–55 words total. No fragments.
-            - Punctuation: No ellipses "…" and no filler pause punctuation — write full, well-formed sentences.
-            - Make it straightforward; start the conversation naturally without telling a whole story, but ensure the opener stands on its own with all essential details.
         """,
         "QUESTION": """
             QUESTION - Questions during the conversation to keep it interesting. Those are Mid Call Questions:
@@ -54,7 +52,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Most RESPONSES should actively reiterate the premise and justify it briefly (double down) in a confident tone.
             - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
             - Ensure every response addresses a different hypothetical objection and references a fresh procedural or situational detail.
-            - Keep it naturally and believable. Dont narrate on a whole story.
+            - Keep it naturally and believable.
             - Stay in flow: no greetings, no self-introductions, no "Ich meld mich" framing — you are already in conversation.
             - The Rest follows answers to hypothetical questions.
             MANDATORY: Include AT LEAST one explicit doubling-down line that cites consensus or authority ("all the teachers agreed" / "the board signed this") and hints at consequence if ignored.
@@ -71,7 +69,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Stay in character
             - Use the name for goodbye
             - Offer varied wrap-up actions (next delivery attempt, sending proof, leaving swing assembled, texting a photo, etc.) and avoid repeating language.
-            - Keep it naturally and believable. Dont narrate on a whole story.
+            - Keep it naturally and believable.
             - Length: 1–2 complete sentences, about 20–40 words total. No fragments.
             - Punctuation: No ellipses "…"; end on a clear, decisive note.
         """,
