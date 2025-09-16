@@ -59,9 +59,10 @@ def get_type_instructions(voice_type: str) -> str:
         """,
         "FILLER": """
             FILLER - Natürliche Pausen und Füllwörter:
-            - Über den gesamten FILLER-Satz müssen mindestens einmal genau diese vorkommen: "Ja", "Nein", "hmmm" (oder "hmm"/"ähm"), "Wie bitte?", "Können Sie das nochmal wiederholen?"
             - Nutze natürliche Pausen mit "..." oder kurze Zwischenlaute
-            - Keine Wiederholung derselben Zeile - jede Zeile ist anders
+            - Pro Zeile 1 Füller/Ausrufe zufällig aus: "Ja", "Nein", "hmm"/"hmmm"/"ähm", "Okay", "Mhm", "Bitte?", "Wie bitte?", "Können Sie das nochmal wiederholen?", "Einen Moment", "Sekunde"
+            - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase in zwei aufeinanderfolgenden Zeilen
+            - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" höchstens einmal im gesamten Set verwenden
             - Kurz halten (1–6 Wörter)
         """
     }
@@ -127,7 +128,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         Generate in {language} language.
     """
 
-    temp = 0.7 if voice_type in ["OPENING", "CLOSING", "FILLER"] else 0.9
+    temp = 0.7 if voice_type in ["OPENING", "CLOSING"] else 0.9
     llm = ChatOpenAI(
         model="gpt-4.1-mini",
         temperature=temp,
