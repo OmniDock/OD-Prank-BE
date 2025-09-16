@@ -66,6 +66,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase in zwei aufeinanderfolgenden Zeilen
             - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" höchstens einmal im gesamten Set verwenden
             - Kurz halten (1–6 Wörter)
+            - Es soll immer mindstens einmal ein "Ja", "Nein", oder "hmm" geben als kure Antworten!
         """
     }
     return instructions.get(voice_type, instructions["OPENING"])
