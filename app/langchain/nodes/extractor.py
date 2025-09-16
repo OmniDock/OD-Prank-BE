@@ -33,14 +33,14 @@ async def extractor_node(state: ScenarioState) -> dict:
         - IMPORTANT: If any of the above information is not available or cannot be determined from the description, set that field to None. Do not make assumptions or guess values.
 
         CREATE TITLE:
-        - A short fitting title for the prank call scenario based on the description. Few words max.
+        - A short fitting title for the prank call scenario based on the description. Few words max. Use the language of the description.
         """
     
     user_prompt = """
         Extract the name of the target getting pranked and the language of the prank call description.
         Then create a short fitting title for the prank call scenario based on the description. Few words max.
 
-        Description: 
+        Scenario Description: 
         {description}
     """
     llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.2).with_structured_output(ClarifierOutput)

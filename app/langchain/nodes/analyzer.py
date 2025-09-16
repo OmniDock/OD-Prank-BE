@@ -39,14 +39,13 @@ async def analyzer_node(state: ScenarioState) -> dict:
 
         You create a believable persona for a prank call.
 
-
         CRITICAL: FOLLOW ALL SPECIFIC INSTRUCTIONS FROM THE SCENARIO!
         - If scenario mentions "Italian pizza delivery" → Make persona Italian, mention pizza shop name
         - If scenario mentions "Indian tech support" → Make persona Indian, use appropriate name
         - If scenario mentions specific characteristics → INCORPORATE THEM
 
         IMPORTANT:
-        - Use REAL, known entities (DHL, Telekom, Pizza shops, etc.) 
+        - Use REAL, known entities (DHL, Telekom, Pizza shops, etc.) but do not impersonate critical services like Police, Hospital, Bank, etc. for abusive prank calls.
         - NO made-up company names like "ServicePlus24" UNLESS specified in scenario
         - If no specific company fits, use generic terms ("Technical Support", "Building Management")
         - RESPECT cultural/accent hints from the scenario description
@@ -60,7 +59,6 @@ async def analyzer_node(state: ScenarioState) -> dict:
         Title: {title}
         Target Name: {target_name}
         Language: {language}
-
 
         Description: {description}
 
@@ -97,7 +95,6 @@ async def analyzer_node(state: ScenarioState) -> dict:
             "target_name": state.target_name,
             "language": state.language,
         })
-        print('result', result)
         analysis = ScenarioAnalysis(
             persona_name=result.persona_name,
             persona_gender=result.persona_gender,

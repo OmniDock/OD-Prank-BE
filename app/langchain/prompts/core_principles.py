@@ -14,11 +14,12 @@ CORE_PRINCIPLES = """
 
     2. INSERT ABSURD DETAILS
     - Strange question/requirement that doesn't fit - or a random side fact 
-    - Deliver it completely deadpan, as if totally normal
-
+    
     3. STAY IN CHARACTER
     - Character takes the absurd question/requirement as normal and serious
     - Character creates explanations for the absurdity if question
+    - Deliver it completely deadpan, as if totally normal if not stated otherwise
+
 """
 
     

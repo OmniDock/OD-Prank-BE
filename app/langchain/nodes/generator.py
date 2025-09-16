@@ -39,17 +39,18 @@ def get_type_instructions(voice_type: str) -> str:
             - Sparse "Mr./Mrs. [Name]" in questions - it's unnatural
             - Avoid repetition - each question different
         """,
-        "RESPONSE": """
+        "RESPONSE": f"""
             RESPONSE - Reactions to objections:
             - Think of likely objections the target might raise and create fitting responses accordingly
             - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
             - Stay in character
             - Get slightly annoyed at too many questions
-            - Redirect back to main topic
             - Vary strategies across lines (do not repeat the same approach):
               • clarify politely • deflect to a process/rule • mild apology + redirect • uncertainty / "not sure" • bureaucratic delay/transfer • misinterpret (lightly) then correct • soft pushback • escalate slightly
             - Do NOT always assure that details are correct (avoid repeating "the system shows", "we have confirmation"). Treat the premise as your belief, not an objective fact.
-            - OPTIONAL: Include a clear 'Mittelteil' line that reiterates the premise and justifies it briefly (double down) in at most one response; keep it to max 1 sentence when used.
+            - MANDATORY: Include a clear 'Mittelteil' line that reiterates the premise and justifies it briefly (double down) in at most one response; keep it to max 1 sentence when used.
+            - Just repeat why you are calling and confirm it yourself. (Something like, ‘But that's what all the teachers say.’)
+
         """,
         "CLOSING": """
             CLOSING - End of conversation:
@@ -66,7 +67,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase in zwei aufeinanderfolgenden Zeilen
             - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" höchstens einmal im gesamten Set verwenden
             - Kurz halten (1–6 Wörter)
-            - Es soll immer mindstens einmal ein "Ja", "Nein", oder "hmm" geben als kure Antworten!
+            - Es soll immer mindstens einmal ein "Ja", "Nein", oder "hmm" geben als kurze Antworten!
         """
     }
     return instructions.get(voice_type, instructions["OPENING"])
@@ -95,7 +96,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         - No obvious jokes
         - Maximum ONE absurd detail 
         - ALWAYS stay in character
-        - NO REPETITION - each line must be unique
+        - NO REPETITION - each line must be unique syntactically and semantically
         - Avoid excessive name usage 
         - Your tone and workd choice needs to match the character you are including their cultuaral context and how that person would do the escalation plan
         {_get_already_generated_lines_prompt(state)}
