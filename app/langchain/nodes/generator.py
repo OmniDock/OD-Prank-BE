@@ -12,6 +12,7 @@ from app.langchain.prompts.core_principles import (
 )
 from app.langchain.prompts.examples import kleber_generator_example, refugee_camp_generator_example, trash_generator_example
 from app.core.logging import console_logger
+import random 
 
 
 class GeneratorOutput(BaseModel):
@@ -93,18 +94,20 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         - Your tone and workd choice needs to match the character you are including their cultuaral context and how that person would do the escalation plan
         {_get_already_generated_lines_prompt(state)}
 
-        GOOD EXAMPLES:
-        {kleber_generator_example}
-        {refugee_camp_generator_example}
-        {trash_generator_example}
+
     """
+
+    # GOOD EXAMPLES:
+    # {kleber_generator_example}
+    # {refugee_camp_generator_example}
+    # {trash_generator_example}
 
     # Include relevant examples
     examples_text = ""
-    if voice_type in GOOD_EXAMPLES:
-        examples_text = f"\nGood examples for inspiration (DON'T copy, just use the style):\n"
-        for example in GOOD_EXAMPLES[voice_type][:3]:
-            examples_text += f"- {example}\n"
+    examples = GOOD_EXAMPLES.get(voice_type, [])
+    if examples:
+        pick = random.sample(examples, k=1)
+        examples_text = "\nStyle cues (do not copy; use only the vibe):\n" + "".join(f"- {e}\n" for e in pick)
 
     user_prompt = """
         Generate {count} {voice_type} lines for a prank call.
@@ -121,10 +124,14 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         Generate in {language} language.
     """
 
+    temp = 0.7 if voice_type in ["OPENING", "CLOSING", "FILLER"] else 0.9
     llm = ChatOpenAI(
-        model="gpt-4.1-mini", 
-        temperature=0.4 if voice_type in ["OPENING", "CLOSING", "FILLER"] else 0.6
+        model="gpt-4.1-mini",
+        temperature=temp,
+        model_kwargs={"top_p": 0.95, "frequency_penalty": 0.5, "presence_penalty": 0.3}
     ).with_structured_output(GeneratorOutput)
+
+
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
