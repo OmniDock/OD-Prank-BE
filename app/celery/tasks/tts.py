@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 import io
 import os
-import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Awaitable, Dict, Optional
 
 import wave
+import threading
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
 from supabase import Client, create_client
@@ -25,6 +25,26 @@ from app.core.utils.tts_common import (
 )
 from app.models.voice_line_audio import VoiceLineAudio
 from sqlalchemy import select
+
+
+_LOOP_LOCK = threading.Lock()
+_ASYNC_LOOP: asyncio.AbstractEventLoop | None = None
+
+
+def _run_in_loop(coro: Awaitable[Any]) -> Any:
+    """Run the given coroutine on a persistent event loop per worker."""
+    global _ASYNC_LOOP
+    with _LOOP_LOCK:
+        if _ASYNC_LOOP is None or _ASYNC_LOOP.is_closed():
+            _ASYNC_LOOP = asyncio.new_event_loop()
+            asyncio.set_event_loop(_ASYNC_LOOP)
+        loop = _ASYNC_LOOP
+
+    if loop.is_running():  # pragma: no cover - defensive; should not happen in Celery worker
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result()
+
+    return loop.run_until_complete(coro)
 
 
 # ---- Minimal, service-independent helpers ----
@@ -155,7 +175,7 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
             console_logger.info(f"[Celery] TTS ready vl={voice_line_id}")
 
     try:
-        asyncio.run(_run_once())
+        _run_in_loop(_run_once())
     except Exception as e:
         max_retries = int(os.getenv("TTS_TASK_MAX_RETRIES", "5"))
         retries = getattr(self.request, "retries", 0)
@@ -173,7 +193,5 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
                     error=str(e),
                 )
 
-        asyncio.run(_mark_failed())
+        _run_in_loop(_mark_failed())
         raise
-
-
