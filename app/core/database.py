@@ -21,20 +21,24 @@ def get_engine():
     global _ENGINE, _ENGINE_PID
     pid = os.getpid()
     if _ENGINE is None or _ENGINE_PID != pid:
-        # In development, prefer NullPool to avoid issues with reloaders and event loop reuse
-        if settings.DEBUG:
+        use_nullpool = settings.DEBUG and os.getenv("SQLALCHEMY_DISABLE_POOL", "0") == "1"
+        pool_kwargs = {
+            "pool_pre_ping": True,
+            "pool_size": 8,
+            "max_overflow": 8,
+            "pool_recycle": 1800,
+            "pool_timeout": 30,
+        }
+
+        if use_nullpool:
             _ENGINE = create_async_engine(
                 DATABASE_URL,
                 poolclass=NullPool,
             )
         else:
-            # Small connection pool for production-like environments
             _ENGINE = create_async_engine(
                 DATABASE_URL,
-                pool_size=5,
-                max_overflow=5,
-                pool_recycle=1800,
-                pool_timeout=10,
+                **pool_kwargs,
             )
         _ENGINE_PID = pid
     return _ENGINE

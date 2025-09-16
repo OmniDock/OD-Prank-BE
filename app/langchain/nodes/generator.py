@@ -24,13 +24,12 @@ def get_type_instructions(voice_type: str) -> str:
         "OPENING": """
             OPENING - First contact:
             - Introduce yourself (name/role/company)
-            - State the reason for calling
+            - State the reason for calling. Also give Context why you are calling. 
             - Establish authority and credibility (e.g. Neighbor, Volunteer Group Leader, etc.)
-            - Create urgency 
+            - Create some kind of urgency 
             - Use the target's name if needed
             - Stay believable and professional
             - Explain why you are calling without being weird while opening the call. 
-            - Keep it short: 12–30 words per sentence, max 3 sentences
         """,
         "QUESTION": """
             QUESTION - Questions during conversation:
@@ -50,7 +49,6 @@ def get_type_instructions(voice_type: str) -> str:
             - Do NOT always assure that details are correct (avoid repeating "the system shows", "we have confirmation"). Treat the premise as your belief, not an objective fact.
             - MANDATORY: Include a clear 'Mittelteil' line that reiterates the premise and justifies it briefly (double down) in at most one response; keep it to max 1 sentence when used.
             - Just repeat why you are calling and confirm it yourself. (Something like, ‘But that's what all the teachers say.’)
-
         """,
         "CLOSING": """
             CLOSING - End of conversation:
@@ -62,12 +60,21 @@ def get_type_instructions(voice_type: str) -> str:
         """,
         "FILLER": """
             FILLER - Natürliche Pausen und Füllwörter:
-            - Nutze natürliche Pausen mit "..." oder kurze Zwischenlaute
-            - Pro Zeile 1 Füller/Ausrufe zufällig aus: "Ja", "Nein", "hmm"/"hmmm"/"ähm", "Okay", "Mhm", "Bitte?", "Wie bitte?", "Können Sie das nochmal wiederholen?", "Einen Moment", "Sekunde"
+            - Pro Zeile 1 Füller/Ausrufe bspw.: 
+                - "Ja"
+                - "Nein"
+                - "hmm"/"hmmm"/"ähm"
+                - "Okay"
+                - "Mhm"
+                - "Bitte?"
+                - "Wie bitte?"
+                - "Können Sie das nochmal wiederholen?"
+                - "Einen Moment"
+                - "Sekunde"
+                - "DochDochDoch"
             - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase in zwei aufeinanderfolgenden Zeilen
             - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" höchstens einmal im gesamten Set verwenden
-            - Kurz halten (1–6 Wörter)
-            - Es soll immer mindstens einmal ein "Ja", "Nein", oder "hmm" geben als kurze Antworten!
+            - Es soll immer mindstens einmal ein "Ja", "Nein", oder "hmm" geben als Antworten!
         """
     }
     return instructions.get(voice_type, instructions["OPENING"])
