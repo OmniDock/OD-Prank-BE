@@ -219,7 +219,7 @@ Wo ist jetzt das Problem
 Closing
 Ja. Das ist Nachbarschaftshilfe! Zufrieden?
 Ich helfe gern. Wiederhören!
- 
+
 Filler 
 Ja.
 Ja, natürlich.

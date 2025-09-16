@@ -10,7 +10,6 @@ from app.langchain.prompts.core_principles import (
     CORE_PRINCIPLES, 
     GOOD_EXAMPLES
 )
-from app.langchain.prompts.examples import kleber_generator_example, refugee_camp_generator_example, trash_generator_example
 from app.core.logging import console_logger
 import random 
 
