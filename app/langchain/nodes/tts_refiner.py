@@ -24,7 +24,6 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
     if voice_type == "FILLER":
         filler_specific_rules = """
         ADDITIONAL FILLER RULES:
-        - Preserve each filler as a standalone interjection (maximum 1–3 words).
         - Never expand fillers into full sentences or add new semantic content.
         - Optional: add a single expressive tag or pause punctuation, but no new words beyond the filler itself.
         - If the input already matches the rules, return it unchanged except for required formatting.

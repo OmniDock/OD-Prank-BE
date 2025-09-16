@@ -66,7 +66,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Jede Zeile MUSS genau einen klaren Füller/Ausruf enthalten. Nutze eine Mischung aus:
                 - "Ja"
                 - "Nein"
-                - "One sec" / "Einen Moment" / "Sekunde"
+                - "Einen Moment" / "Sekunde"
                 - "Okay"
                 - "Mhm"
                 - "Bitte?"
@@ -133,7 +133,6 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         examples_text = "\nStyle cues (do not copy; use only the vibe):\n" + "".join(f"- {e}\n" for e in pick)
 
     strategy_instruction = "        Ensure each variation uses a different conversational strategy (clarify, deflect, mild apology + redirect, uncertainty, bureaucratic delay, soft pushback, slight escalation, misread-then-correct)." if voice_type != "FILLER" else ""
-    length_instruction = "        Keep each line very short (6–12 words), max 1 sentence." if voice_type != "FILLER" else "        Keep each line ultra short (1–4 words); never form a complete sentence."
     filler_output_instruction = "        Return only filler interjections or short sounds with optional pause punctuation (\"...\"/\"–\")." if voice_type == "FILLER" else ""
 
     user_prompt = """
@@ -146,16 +145,15 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         {examples_text}
 
         Create {count} DIFFERENT variations.
-{strategy_instruction}
+        {strategy_instruction}
         Voice-type specific guardrails:
           - OPENING: Follow the Who/What/Why-now pattern, restating the core premise with a concrete believable detail in one tight sentence.
           - QUESTION: Only real questions; each must end with "?"; escalate from mundane to slightly absurd; avoid repeating rhetorical tags like "okay?".
           - RESPONSE: At least one line must be a clear double-down mentioning authority/consensus and hinting at the consequence of non-compliance.
-          - FILLER: every line must include exactly one filler phrase (Yes/No/One sec/Moment/etc.) and across the set you MUST include "Yes", "No", and a "One sec"/"Moment" variant. Keine weiteren Wörter außer dem Füller selbst.
+          - FILLER: every set must include exactly all of the following filler phrases "Yes", "No", "Moment", "Sorry?" in some kind of variation.
         Return ONLY the spoken lines — no quotation marks, numbers, or bullets.
         Each line should sound natural and believable.
-{length_instruction}
-{filler_output_instruction}
+        {filler_output_instruction}
         Generate in {language} language.
     """
 
