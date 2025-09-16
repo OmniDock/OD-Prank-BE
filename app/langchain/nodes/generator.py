@@ -41,13 +41,15 @@ def get_type_instructions(voice_type: str) -> str:
         """,
         "RESPONSE": """
             RESPONSE - Reactions to objections:
-            - Think of reactions the React the target is likely to give and create fitting responses accordingly
+            - Think of likely objections the target might raise and create fitting responses accordingly
             - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
             - Stay in character
             - Get slightly annoyed at too many questions
             - Redirect back to main topic
-            - Double down in a short sentence why you are calling. (For example while responding to a confused called person not understanding why you are calling.)
-            - Include a clear 'Mittelteil' style line that reiterates the premise and justifies it briefly (double down), e.g. reaffirm the claim and add a short reason.
+            - Vary strategies across lines (do not repeat the same approach):
+              • clarify politely • deflect to a process/rule • mild apology + redirect • uncertainty / "not sure" • bureaucratic delay/transfer • misinterpret (lightly) then correct • soft pushback • escalate slightly
+            - Do NOT always assure that details are correct (avoid repeating "the system shows", "we have confirmation"). Treat the premise as your belief, not an objective fact.
+            - OPTIONAL: Include a clear 'Mittelteil' line that reiterates the premise and justifies it briefly (double down) in at most one response; keep it to max 1 sentence when used.
         """,
         "CLOSING": """
             CLOSING - End of conversation:
@@ -122,6 +124,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         {examples_text}
 
         Create {count} DIFFERENT variations.
+        Ensure each variation uses a different conversational strategy (clarify, deflect, mild apology + redirect, uncertainty, bureaucratic delay, soft pushback, slight escalation, misread-then-correct).
         Return ONLY the spoken lines, no quotation marks.
         Each line should sound natural and believable.
         Keep each line very short (6–12 words), max 1 sentence.
