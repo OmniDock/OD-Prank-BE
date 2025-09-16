@@ -1,0 +1,118 @@
+{
+    "title": "Vertreter für nachhaltige Wärmepumpen",
+    "description": "Ein angeblicher Vertreter des ‚Verbands nachhaltiger Wärmepumpen‘ will unbedingt den Heizungskeller inspizieren. Mit absurden Pflichtprüfungen, Klimaneutralitäts-Checks und Jutebeutel-Versprechen versucht er, sein Gegenüber zu überzeugen.",
+    "language": "GERMAN",
+    "preferred_voice_id": null,
+    "target_name": null,
+    "scenario_analysis": null,
+    "clarifying_questions": null,
+    "clarifications": null,
+    "was_rewritten": true,
+    "is_safe": true,
+    "is_not_safe_reason": null,
+    "is_public": true,
+    "is_active": true,
+    "voice_lines": [
+      {
+        "text": "[friendly][clear][slightly firm]Guten Tag... ich bin vom Verband nachhaltiger Wärmepumpen! [pause] Dürfen wir kurz Ihren Heizungskeller prüfen?",
+        "type": "OPENING",
+        "order_index": 0
+      },
+      {
+        "text": "[friendly][slightly insistent][official]Entschuldigen Sie die Störung... wir bieten kostenfreie Kellerbegehungen an, [pause] um Ihre Klimaneutralität zu checken!",
+        "type": "OPENING",
+        "order_index": 1
+      },
+      {
+        "text": "[friendly][firm]Einen Moment... darf ich kurz erklären... wie das hier läuft?",
+        "type": "FILLER",
+        "order_index": 2
+      },
+      {
+        "text": "[friendly][calm]Ach so... ich versteh', aber 'ne schnelle Prüfung reicht völlig aus.",
+        "type": "FILLER",
+        "order_index": 3
+      },
+      {
+        "text": "[thoughtful][friendly]Hmm, ja... unser Verfahren braucht wirklich nur den kurzen Blick.",
+        "type": "FILLER",
+        "order_index": 4
+      },
+      {
+        "text": "[firm][slightly annoyed]Bitte? Nein, es geht wirklich nur um den Kellerzugang.",
+        "type": "FILLER",
+        "order_index": 5
+      },
+      {
+        "text": "[friendly][firm]Also, ich versteh Ihre Zweifel ja... aber die Kellerprüfung ist Pflicht!",
+        "type": "RESPONSE",
+        "order_index": 6
+      },
+      {
+        "text": "[apologetic][calm]Tut mir leid, ähm, ich kann das jetzt nicht erklären... wir müssen das prüfen.",
+        "type": "RESPONSE",
+        "order_index": 7
+      },
+      {
+        "text": "[official][friendly]Das mit den 65 Grad ist echt wichtig für unsere Nachhaltigkeitskriterien.",
+        "type": "RESPONSE",
+        "order_index": 8
+      },
+      {
+        "text": "[hesitant][friendly]Vielleicht hab ich mich unklar ausgedrückt... wir überprüfen nur kurz, ja.",
+        "type": "RESPONSE",
+        "order_index": 9
+      },
+      {
+        "text": "[formal][warm]Das Verfahren erfordert diesen Blick... danke für Ihr Verständnis!",
+        "type": "RESPONSE",
+        "order_index": 10
+      },
+      {
+        "text": "[friendly][curious]Ich nehm mal an, den Jutebeutel haben Sie noch nicht erhalten?",
+        "type": "RESPONSE",
+        "order_index": 11
+      },
+      {
+        "text": "[official][friendly]Darf ich kurz nachfragen... heizen Sie denn schon klimaneutral?",
+        "type": "QUESTION",
+        "order_index": 12
+      },
+      {
+        "text": "[firm][slightly pressing]Versteh' ich das richtig... Ihre Heizung läuft noch fossil?",
+        "type": "QUESTION",
+        "order_index": 13
+      },
+      {
+        "text": "[polite][urgent]Entschuldigen Sie die Störung, aber prüfen wir mal kurz den Keller?",
+        "type": "QUESTION",
+        "order_index": 14
+      },
+      {
+        "text": "[confident][friendly]Sind Sie sich sicher, dass Ihre Heizung nachhaltig arbeitet?",
+        "type": "QUESTION",
+        "order_index": 15
+      },
+      {
+        "text": "[official][direct]Unser Protokoll verlangt... einen Blick in den Heizungskeller, wäre das möglich?",
+        "type": "QUESTION",
+        "order_index": 16
+      },
+      {
+        "text": "[curious][slightly pressing]Heizen Sie wirklich nicht mit 65 Grad — oder irre ich mich da?",
+        "type": "QUESTION",
+        "order_index": 17
+      },
+      {
+        "text": "[friendly][firm]Also... ich danke Ihnen für Ihre Zeit! [slightly teasing] Der Jutebeutel wartet ja noch auf Sie, wissen Sie?",
+        "type": "CLOSING",
+        "order_index": 18
+      },
+      {
+        "text": "[official][friendly]Wir bleiben dann beim -65-Grad-Standard. [pause][calm] Auf Wiederhören!",
+        "type": "CLOSING",
+        "order_index": 19
+      }
+    ]
+  }
+  
