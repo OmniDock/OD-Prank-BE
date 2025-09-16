@@ -51,7 +51,7 @@ class ScenarioState(BaseModel):
     target_counts: Dict[str, int] = Field(default_factory=lambda: {
         "OPENING": 2,
         "QUESTION": 5,
-        "RESPONSE": 5,
+        "RESPONSE": 7,
         "CLOSING": 2,
         "FILLER": 8
     })

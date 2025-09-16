@@ -46,12 +46,19 @@ GOOD_EXAMPLES = {
         "Can you whistle briefly? For identity verification."
     ],
     "RESPONSE": [
-        "That's... unusual. Hold on, let me check again.",
-        "I see. That explains a lot.",
-        "The system shows something different here.",
-        "No idea honestly. Doesn't say here.",
-        "We'll have to document that differently then.",
-        "The software is new. Very... specific."
+        "We had a glue protest in Düsseldorf two weeks ago. It was on TV.",
+        "Property damage: €100,000. The road surface had to be replaced because they had to chisel us loose.",
+        "Don’t worry about tomorrow. You won’t pay for that — the state will.",
+        "The climate group leader will ring your bell again tomorrow, just like with all residents.",
+        "I don’t remember who’s in charge of which city tomorrow — we’ve got nine glue actions. If people leave us alone, we leave them alone.",
+        "Unpleasant topic, but it has to be. You know the whole refugee issue.",
+        "Our gymnasiums are bursting at the seams, and we need housing for our refugees in at least halfway decent apartments — that’s why I’m calling!",
+        "So, you do have three options — we live in a free country.",
+        "How about the Tcyülüzc brothers from Bigotto in Koran, five very fine gentlemen! I know them personally. They’ll turn any apartment into a beautiful mosque. That’s how it’s always been.",
+        "We also have the Bin Salimbo family from Morocco: a father, three mothers, six children.",
+        "I’ve got here: insurance, ads, more ads, bank statements. Okay. Sorry, had to take a look. No big deal — who has much money these days.",
+        "I just wanted to help.",
+        "\"Private meetings with other couples.\" It’s this little magazine here. I don’t know if that was meant for you as well."
     ],
     "CLOSING": [
         "Alright, that's everything. Have a good day.",

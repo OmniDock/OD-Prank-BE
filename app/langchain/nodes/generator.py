@@ -37,15 +37,18 @@ def get_type_instructions(voice_type: str) -> str:
             - Escalate from normal to absurd 
             - Sparse "Mr./Mrs. [Name]" in questions - it's unnatural
             - Avoid repetition - each question different
+            - This not the type for greeting or re-introductions.
         """,
         "RESPONSE": """
             RESPONSE - Reactions to objections:
-            - Think of reactions the React the target is likely to give and create fitting responses accordingly
-            - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
-            - Stay in character
-            - Get slightly annoyed at too many questions
-            - Redirect back to main topic
-            - On one Voice Line - Reiterate on the main topic emphaisize it
+            - Think of reactions the React the target is likely to give and create fitting responses accordingly. 
+            - For example, disbelief in the authenticity or reason for the call. 
+            - e.g. "Didn't you hear from this topic? Everyone talks about this situation. <some more context>"
+            - Double down and repeat the Opening with a little more context and with different wording.
+            - Defend your statements and why you are calling. 
+            - Stay in character and keep it believable. 
+            - Add some random facts here to distract from questions asked by the target or also keep the conversation going.
+            - Add random facts here to keep the conversation going.
         """,
         "CLOSING": """
             CLOSING - End of conversation:
@@ -97,9 +100,10 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         - NO REPETITION - each line must be unique
         - Avoid excessive name usage 
         - Your tone and workd choice needs to match the character you are including their cultuaral context and how that person would do the escalation plan
+       
         {_get_already_generated_lines_prompt(state)}
 
-        GOOD EXAMPLES:
+        FULL SCENARIO EXAMPLES AS REFERENCE ONLY:
         {kleber_generator_example}
         {refugee_camp_generator_example}
         {trash_generator_example}
@@ -108,8 +112,8 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
     # Include relevant examples
     examples_text = ""
     if voice_type in GOOD_EXAMPLES:
-        examples_text = f"\nGood examples for inspiration (DON'T copy, just use the style):\n"
-        for example in GOOD_EXAMPLES[voice_type][:3]:
+        examples_text = f"\nGood examples for inspiration (DON'T copy, just use the style, length, context depth for this type of Voice Line, randomness, facts, etc.):\n"
+        for example in GOOD_EXAMPLES[voice_type]:
             examples_text += f"- {example}\n"
 
     user_prompt = """
