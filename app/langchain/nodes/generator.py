@@ -41,13 +41,13 @@ def get_type_instructions(voice_type: str) -> str:
         "RESPONSE": f"""
             RESPONSE - Reactions to objections:
             - Think of likely objections the target might raise and create fitting responses accordingly
+            - Most likely RESPONSES should reiterate over the premise and justify it briefly (double down) in at most one response;
             - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
             - Stay in character
             - Get slightly annoyed at too many questions
             - Vary strategies across lines (do not repeat the same approach):
               • clarify politely • deflect to a process/rule • mild apology + redirect • uncertainty / "not sure" • bureaucratic delay/transfer • misinterpret (lightly) then correct • soft pushback • escalate slightly
             - Do NOT always assure that details are correct (avoid repeating "the system shows", "we have confirmation"). Treat the premise as your belief, not an objective fact.
-            - MANDATORY: Include a clear 'Mittelteil' line that reiterates the premise and justifies it briefly (double down) in at most one response; keep it to max 1 sentence when used.
             - Just repeat why you are calling and confirm it yourself. (Something like, ‘But that's what all the teachers say.’)
         """,
         "CLOSING": """
