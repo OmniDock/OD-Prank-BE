@@ -10,57 +10,42 @@ from app.langchain.prompts.core_principles import (
     CORE_PRINCIPLES, 
     GOOD_EXAMPLES
 )
+from app.langchain.prompts.examples import kleber_generator_example, refugee_camp_generator_example, trash_generator_example
 from app.core.logging import console_logger
-import random 
 
 
 class GeneratorOutput(BaseModel):
     """Structured output for generation"""
     lines: List[str] = Field(description="Generated voice lines")
+
+
 def get_type_instructions(voice_type: str) -> str:
     """Get specific instructions for each voice line type"""
     instructions = {
         "OPENING": """
-            OPENING - Point of First contact:
-
-            - Imagine you are starting a conversation with a target who does not know that this call will happen. Openers should introduce the scenario.
-
-            - Cover clearly and fully: (i) Who is calling (name/role/company), (ii) What it is about (purpose), (iii) Why it matters right now (procedural/urgent reason, if available).
+            OPENING - First contact:
             - Introduce yourself (name/role/company)
-            - State why you are calling and why it matters right now. 
-            - Also include some justification for the call if present in the context. 
-
-            - Address the target exactly once with their full name if appropriate (e.g., "Herr/Frau [Vorname Nachname]" in German); avoid repeating the name.
-            - Establish authority and credibility (e.g. Schulleitung, Behörde, Nachbarschaftsvertretung).
-            - Stay believable and professional; use a formal tone if the language/context calls for it.
-            - Length: 2–3 complete sentences, about 25–55 words total. No fragments.
+            - State the reason for calling
+            - Establish authority and credibility (e.g. Neighbor, Volunteer Group Leader, etc.)
+            - Create mild urgency 
+            - Use the target's name
+            - Stay believable and professional
         """,
         "QUESTION": """
-            QUESTION - Questions during the conversation to keep it interesting. Those are Mid Call Questions:
+            QUESTION - Questions during conversation:
             - ONLY real QUESTIONS, no statements or explanations
-            - Escalate from normal to absurd but keep it believable. 
+            - Escalate from normal to absurd 
             - Sparse "Mr./Mrs. [Name]" in questions - it's unnatural
             - Avoid repetition - each question different
-            - Tie each question to a new angle (where to drop package, who can sign, how to handle your test ride, follow-up visit, etc.).
-            - Never re-introduce yourself; treat every question as mid-call context (skip "Hallo"/"Guten Tag" greetings).
-            - Length: 1 sentence, about 12–22 words. No ellipses "…"; ask a direct question.
-            - Reference the premise succinctly, without re-delivering the full opening spiel.
         """,
-        "RESPONSE": f"""
-            RESPONSE - Reactions to objections or emphasis questions for the call itself:
-            - Think of likely objections the target might raise and create fitting responses accordingly
-            - Most RESPONSES should actively reiterate the premise and justify it briefly (double down) in a confident tone.
+        "RESPONSE": """
+            RESPONSE - Reactions to objections:
+            - Think of reactions the React the target is likely to give and create fitting responses accordingly
             - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
-            - Ensure every response addresses a different hypothetical objection and references a fresh procedural or situational detail.
-            - Keep it naturally and believable.
-            - Stay in flow: no greetings, no self-introductions, no "Ich meld mich" framing — you are already in conversation.
-            - The Rest follows answers to hypothetical questions.
-            MANDATORY: Include AT LEAST one explicit doubling-down line that cites consensus or authority ("all the teachers agreed" / "the board signed this") and hints at consequence if ignored.
-
-            - Length: 1–2 complete sentences, about 20–45 words total. No fragments.
-            - Punctuation: No ellipses "…" and no filler pause punctuation; use clear, well-formed sentences.
-            - Address the target's name only if natural; avoid repeating full names.
-
+            - Stay in character
+            - Get slightly annoyed at too many questions
+            - Redirect back to main topic
+            - On one Voice Line - Reiterate on the main topic emphaisize it
         """,
         "CLOSING": """
             CLOSING - End of conversation:
@@ -68,29 +53,19 @@ def get_type_instructions(voice_type: str) -> str:
             - Mention the absurd thing casually again
             - Stay in character
             - Use the name for goodbye
-            - Offer varied wrap-up actions (next delivery attempt, sending proof, leaving swing assembled, texting a photo, etc.) and avoid repeating language.
-            - Keep it naturally and believable.
-            - Length: 1–2 complete sentences, about 20–40 words total. No fragments.
-            - Punctuation: No ellipses "…"; end on a clear, decisive note.
         """,
         "FILLER": """
-            FILLER - Natural pauses and filler words:
-            - Each line MUST contain exactly one clear filler/exclamation. Use a mix of:
+            FILLER - Natural pauses and fillers:
+            - MUST include atleast one 'yes' and alteast one 'no' filler 
+            - Use natural pauses with "..." or fillers
+            - No repetition - each filler different
+            - Keep them short and concise. 
+            - You need to include in the set of Voice Lines (Do not alter these or make sentences out of the following fillers):
                 - "Yes"
                 - "No"
-                - "One moment" / "Second"
-                - "Okay"
-                - "Mhm"
+                - "Moment"
                 - "Sorry?"
-                - "Pardon?"
-                - "Could you repeat that?"
-                - "hmm"/"hmmm"/"uhm"
-            - Ensure that across the entire set, "Yes", "No", and a "One moment please" appear.
-            - High variety across all FILLER lines: do not repeat the same phrase in the set.
-            - Vary punctuation or brief extra syllables so that each line has its own nuance.
-            - No full sentences or additional statements — only the filler word plus, if needed, a brief confirming syllable.
-            - Interrogative fillers like "Pardon?" or "Could you repeat that?" can appear in the set.
-            - Keep it ultra-short (1–4 words) and combine with natural pause punctuation ("...", "–").
+            - The rest can be a little more creative. 
         """
     }
     return instructions.get(voice_type, instructions["OPENING"])
@@ -108,72 +83,54 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
     system_prompt = f"""
         {CORE_PRINCIPLES}
 
-        You are {state.analysis.persona_name} from {state.analysis.company_service}. {voice_context}
+        You are {state.analysis.persona_name} from {state.analysis.company_service}.{voice_context}
         Your goals: {', '.join(state.analysis.conversation_goals)}
         Believable details: {', '.join(state.analysis.believability_anchors)}
         Escalation: {' → '.join(state.analysis.escalation_plan)}
 
-
-        IMPORTANT GLOBAL RULES:
-        - Voice Lines are Part of a Conversation. They should sound natural and believable. 
-        - Each Voice Line stands alone but is part of a converstation. 
-        - Each Voice Line Type should also stand alone but is still part of a conversation. For example the Opening should be a standalone line and each Line should contain all needed informations.
-        - No obvious jokes; keep it straight-faced and believable
-        - ALWAYS stay in character; never break the fourth wall
-        - NO REPETITION — each line within a type must be unique in wording and idea. 
-        - Avoid excessive name usage; at most once in OPENING, otherwise only if natural
-        - Your tone and word choice must match the character, including their cultural context and how that person would execute the escalation plan
-        - Do not hedge with "if you want"/"maybe" unless it's the chosen strategy
-        - Forbidden: "AI", "as an AI", "language model", "script", "prompt", "prank"
-        - No placeholders like [NAME]/[DATE]; always use natural wording without brackets
-
-        Already generated Voice Lines Scripts for this scenario:
-        {_get_already_generated_lines_prompt(state)}
-
-        Instruction for each line of this new type you should provide right now: 
         {get_type_instructions(voice_type)}
 
+        IMPORTANT RULES:
+        - No obvious jokes
+        - Maximum ONE absurd detail 
+        - ALWAYS stay in character
+        - NO REPETITION - each line must be unique
+        - Avoid excessive name usage 
+        - Your tone and workd choice needs to match the character you are including their cultuaral context and how that person would do the escalation plan
+        {_get_already_generated_lines_prompt(state)}
 
-
+        GOOD EXAMPLES:
+        {kleber_generator_example}
+        {refugee_camp_generator_example}
+        {trash_generator_example}
     """
-
-    # GOOD EXAMPLES:
-    # {kleber_generator_example}
-    # {refugee_camp_generator_example}
-    # {trash_generator_example}
 
     # Include relevant examples
     examples_text = ""
-    examples = GOOD_EXAMPLES.get(voice_type, [])
-    if examples:
-        pick = random.sample(examples, k=1)
-        examples_text = "\nStyle cues (do not copy; use only the vibe):\n" + "".join(f"- {e}\n" for e in pick)
+    if voice_type in GOOD_EXAMPLES:
+        examples_text = f"\nGood examples for inspiration (DON'T copy, just use the style):\n"
+        for example in GOOD_EXAMPLES[voice_type][:3]:
+            examples_text += f"- {example}\n"
 
     user_prompt = """
-        Generate {count} {voice_type} lines for a prank call in {language} language. Return ONLY the spoken lines — no quotation marks, numbers, or bullets.
+        Generate {count} {voice_type} lines for a prank call.
 
         Scenario: {title}
         Description: {description}
         Target Name: {target_name}
 
-        Create {count} DIFFERENT Voice Line Texts for each line of this new type.
         {examples_text}
+
+        Create {count} DIFFERENT variations.
+        Return ONLY the spoken lines, no quotation marks.
+        Each line should sound natural and believable.
+        Generate in {language} language.
     """
 
-    if voice_type == "FILLER":
-        temp = 0.3
-    elif voice_type in ["OPENING", "CLOSING"]:
-        temp = 0.7
-    elif voice_type == "QUESTION":
-        temp = 0.8
-    else:
-        temp = 0.9
     llm = ChatOpenAI(
-        model="gpt-4.1-mini",
-        temperature=temp,
+        model="gpt-4.1-mini", 
+        temperature=0.4 if voice_type in ["OPENING", "CLOSING", "FILLER"] else 0.6
     ).with_structured_output(GeneratorOutput)
-
-
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
@@ -190,21 +147,16 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
             "description": state.scenario_description or "",
             "target_name": state.target_name,
             "examples_text": examples_text,
-            "language": state.language,
+            "language": state.language
         })
         
-        lines = result.lines        
-        unique_lines = []
-        seen_lower = set()
-        for _ln in lines:
-            _low = _ln.lower()
-            if _low in seen_lower:
-                continue
-            seen_lower.add(_low)
-            unique_lines.append(_ln)
-
-        lines = unique_lines
-
+        # Clean up lines
+        lines = []
+        for line in result.lines:
+            cleaned = line.strip().strip('"\'')
+            if cleaned:
+                lines.append(cleaned)
+        
         console_logger.debug(f"Generated {len(lines)} {voice_type} lines")
         return lines[:state.target_counts.get(voice_type, 2)]
         
