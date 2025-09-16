@@ -150,7 +150,6 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
     llm = ChatOpenAI(
         model="gpt-4.1-mini",
         temperature=temp,
-        model_kwargs={"top_p": 0.95, "frequency_penalty": 0.5, "presence_penalty": 0.3}
     ).with_structured_output(GeneratorOutput)
 
 
