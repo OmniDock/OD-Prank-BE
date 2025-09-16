@@ -21,20 +21,21 @@ def get_type_instructions(voice_type: str) -> str:
     """Get specific instructions for each voice line type"""
     instructions = {
         "OPENING": """
-            OPENING - Point ofFirst contact:
+            OPENING - Point of First contact:
 
-            - Imagen you are starting a conversation with a target who does not know that this call will happen. Openers should introduce the scenario.
+            - Imagine you are starting a conversation with a target who does not know that this call will happen. Openers should introduce the scenario.
 
-            - Usually this follows the 3 Rules i) Who is calling ii) What it's about iii) Why it matters right now (clear urgency / next step)
+            - Cover clearly and fully: (i) Who is calling (name/role/company), (ii) What it is about (purpose), (iii) Why it matters right now (procedural/urgent reason, if available).
             - Introduce yourself (name/role/company)
             - State why you are calling and why it matters right now. 
             - Also include some justification for the call if present in the context. 
 
-            - You can add a detail to make it more believable. 
-            - Establish authority and credibility (e.g. Neighbor, Volunteer Group Leader, etc.)
-            - Use the target's name if needed
-            - Stay believable and professional
-            - Make it straight forward to the point. Dont tell a whole story. Start a Conversation here. 
+            - Address the target exactly once with their full name if appropriate (e.g., "Herr/Frau [Vorname Nachname]" in German); avoid repeating the name.
+            - Establish authority and credibility (e.g. Schulleitung, Behörde, Nachbarschaftsvertretung).
+            - Stay believable and professional; use a formal tone if the language/context calls for it.
+            - Length: 2–3 complete sentences, about 25–55 words total. No fragments.
+            - Punctuation: No ellipses "…" and no filler pause punctuation — write full, well-formed sentences.
+            - Make it straightforward; start the conversation naturally without telling a whole story, but ensure the opener stands on its own with all essential details.
         """,
         "QUESTION": """
             QUESTION - Questions during the conversation to keep it interesting. Those are Mid Call Questions:
@@ -58,6 +59,10 @@ def get_type_instructions(voice_type: str) -> str:
             - The Rest follows answers to hypothetical questions.
             MANDATORY: Include AT LEAST one explicit doubling-down line that cites consensus or authority ("all the teachers agreed" / "the board signed this") and hints at consequence if ignored.
 
+            - Length: 1–2 complete sentences, about 20–45 words total. No fragments.
+            - Punctuation: No ellipses "…" and no filler pause punctuation; use clear, well-formed sentences.
+            - Address the target's name only if natural; avoid repeating full names.
+
         """,
         "CLOSING": """
             CLOSING - End of conversation:
@@ -67,25 +72,27 @@ def get_type_instructions(voice_type: str) -> str:
             - Use the name for goodbye
             - Offer varied wrap-up actions (next delivery attempt, sending proof, leaving swing assembled, texting a photo, etc.) and avoid repeating language.
             - Keep it naturally and believable. Dont narrate on a whole story.
+            - Length: 1–2 complete sentences, about 20–40 words total. No fragments.
+            - Punctuation: No ellipses "…"; end on a clear, decisive note.
         """,
         "FILLER": """
-            FILLER - Natürliche Pausen und Füllwörter:
-            - Jede Zeile MUSS genau einen klaren Füller/Ausruf enthalten. Nutze eine Mischung aus:
-                - "Ja"
-                - "Nein"
-                - "Einen Moment" / "Sekunde"
+            FILLER - Natural pauses and filler words:
+            - Each line MUST contain exactly one clear filler/exclamation. Use a mix of:
+                - "Yes"
+                - "No"
+                - "One moment" / "Second"
                 - "Okay"
                 - "Mhm"
-                - "Bitte?"
-                - "Wie bitte?"
-                - "Können Sie das nochmal wiederholen?"
-                - "hmm"/"hmmm"/"ähm"
-            - Stelle sicher, dass über das gesamte Set hinweg "Ja", "Nein" und ein "Einen Moment bitte" vorkommen.
-            - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase im Set.
-            - Variiere die Zeichensetzung oder knappe Zusatzsilben, damit jede Zeile eine eigene Nuance bekommt.
-            - Keine vollständigen Sätze oder zusätzlichen Aussagen – nur das Füllwort plus ggf. eine knappe bestätigende Silbe.
-            - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" können im Set vorkommen.
-            - Ultra-kurz halten (1–4 Wörter) und mit natürlicher Pausen-Punktuation ("...", "–") kombinieren.
+                - "Sorry?"
+                - "Pardon?"
+                - "Could you repeat that?"
+                - "hmm"/"hmmm"/"uhm"
+            - Ensure that across the entire set, "Yes", "No", and a "One moment please" appear.
+            - High variety across all FILLER lines: do not repeat the same phrase in the set.
+            - Vary punctuation or brief extra syllables so that each line has its own nuance.
+            - No full sentences or additional statements — only the filler word plus, if needed, a brief confirming syllable.
+            - Interrogative fillers like "Pardon?" or "Could you repeat that?" can appear in the set.
+            - Keep it ultra-short (1–4 words) and combine with natural pause punctuation ("...", "–").
         """
     }
     return instructions.get(voice_type, instructions["OPENING"])
@@ -156,6 +163,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         Target Name: {target_name}
 
         Create {count} DIFFERENT Voice Line Texts.
+        {examples_text}
     """
 
     if voice_type == "FILLER":
