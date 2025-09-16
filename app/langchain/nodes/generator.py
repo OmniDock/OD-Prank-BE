@@ -103,13 +103,18 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
 
         {get_type_instructions(voice_type)}
 
-        IMPORTANT RULES:
-        - No obvious jokes
-        - Maximum ONE absurd detail 
-        - ALWAYS stay in character
-        - NO REPETITION - each line must be unique syntactically and semantically
-        - Avoid excessive name usage 
-        - Your tone and workd choice needs to match the character you are including their cultuaral context and how that person would do the escalation plan
+        IMPORTANT GLOBAL RULES:
+        - No obvious jokes; keep it straight-faced and believable
+        - Maximum ONE absurd detail
+        - ALWAYS stay in character; never break the fourth wall
+        - No stage directions or narration
+        - NO REPETITION — each line must be unique in wording and idea
+        - Avoid excessive name usage; at most once in OPENING, otherwise only if natural
+        - Your tone and word choice must match the character, including their cultural context and how that person would execute the escalation plan
+        - Never ask the target to restate the premise
+        - Do not hedge with "if you want"/"maybe" unless it's the chosen strategy
+        - Forbidden: "AI", "as an AI", "language model", "script", "prompt", "prank"
+        - No placeholders like [NAME]/[DATE]; always use natural wording without brackets
         {_get_already_generated_lines_prompt(state)}
 
 
@@ -144,16 +149,24 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
 {strategy_instruction}
         Voice-type specific guardrails:
           - OPENING: Follow the Who/What/Why-now pattern, restating the core premise with a concrete believable detail in one tight sentence.
+          - QUESTION: Only real questions; each must end with "?"; escalate from mundane to slightly absurd; avoid repeating rhetorical tags like "okay?".
           - RESPONSE: At least one line must be a clear double-down mentioning authority/consensus and hinting at the consequence of non-compliance.
           - FILLER: every line must include exactly one filler phrase (Yes/No/One sec/Moment/etc.) and across the set you MUST include "Yes", "No", and a "One sec"/"Moment" variant. Keine weiteren Wörter außer dem Füller selbst.
-        Return ONLY the spoken lines, no quotation marks.
+        Return ONLY the spoken lines — no quotation marks, numbers, or bullets.
         Each line should sound natural and believable.
 {length_instruction}
 {filler_output_instruction}
         Generate in {language} language.
     """
 
-    temp = 0.7 if voice_type in ["OPENING", "CLOSING"] else 0.9
+    if voice_type == "FILLER":
+        temp = 0.3
+    elif voice_type in ["OPENING", "CLOSING"]:
+        temp = 0.7
+    elif voice_type == "QUESTION":
+        temp = 0.8
+    else:
+        temp = 0.9
     llm = ChatOpenAI(
         model="gpt-4.1-mini",
         temperature=temp,
@@ -176,7 +189,10 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
             "description": state.scenario_description or "",
             "target_name": state.target_name,
             "examples_text": examples_text,
-            "language": state.language
+            "language": state.language,
+            "strategy_instruction": strategy_instruction,
+            "length_instruction": length_instruction,
+            "filler_output_instruction": filler_output_instruction
         })
         
         # Clean up lines
@@ -186,6 +202,25 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
             if cleaned:
                 lines.append(cleaned)
         
+        # Enforce formatting and de-duplicate
+        if voice_type == "QUESTION":
+            normalized_lines = []
+            for _ln in lines:
+                if _ln.endswith("?"):
+                    normalized_lines.append(_ln)
+                else:
+                    normalized_lines.append(_ln.rstrip(".!… ").rstrip() + "?")
+            lines = normalized_lines
+        unique_lines = []
+        seen_lower = set()
+        for _ln in lines:
+            _low = _ln.lower()
+            if _low in seen_lower:
+                continue
+            seen_lower.add(_low)
+            unique_lines.append(_ln)
+        lines = unique_lines
+
         console_logger.debug(f"Generated {len(lines)} {voice_type} lines")
         return lines[:state.target_counts.get(voice_type, 2)]
         
