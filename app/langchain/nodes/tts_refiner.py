@@ -229,6 +229,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         - General fillers: "uh", "hmm", "yeah"
         - German fille exampless: "ähm", "also", "naja", "so"
         - English fillers examples: "you know", "well", "I mean..."
+        - Use fillers sparingly; avoid ending every line with a confirmation (e.g., ", ja?", "oder?", "okay?"). Only add when the context clearly justifies it.
 
         7. Change words to abbreviations used in natural human speech. If it allows for using a fitting abbreviation change the words or word order slightly.
         Germna examples:
@@ -255,7 +256,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
             Voice Line: Ich höre seit drei Nächten dieses Klopfen aus Ihrer Wohnung.
 
             Output:
-            [annoyed][firm]Also... ich höre seit drei Nächten so'n... -Klopfen-... aus Ihrer Wohnung! [slightly dramatic]Und zwar jede Nacht, ja?
+            [annoyed][firm]Also... ich höre seit drei Nächten so'n... -Klopfen-... aus Ihrer Wohnung! [slightly dramatic]Und zwar jede Nacht.
 
         Example 2.
             Input:
@@ -310,15 +311,15 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
             Voice Line: Ich bedanke mich ganz herzlich und wünsche Ihnen einen wundervollen Abend.
 
             Output:
-            [calm][warm]Also... ich bedanke mich ganz -herzlich-. Und wünsche Ihnen [gentle laugh] ...einen wundervollen Abend, ja?
+            [calm][warm]Also... ich bedanke mich ganz -herzlich-. Und wünsche Ihnen [gentle laugh] ...einen wundervollen Abend.
 
         Analyze the lines in the context of the scenario description and the other lines to find which emotions, emphasis, pauses and prosody make the most sense to convey natural authentic human speech 
         for the given character in the given context of the scenario and that particular voice line. Use as many tags, word changes, filler words and punctuation, per sentence and subsenteces as nedded to get the voice line to sound as natural and realistic for the given scenarion as possible
         to be as close to the emotions, emphasis, pauses and prosody that create natural authentic human speech as possible. Assume that any part of the sentence that is not guided by tags, punctuation etc. is insufficient in sounding natural and realistic.
         IMPORTANT:
-        - At the very least one tag and one change from rule number 2 that is not a '?' or '!' and one change from number 6 for EVERY voice line.
-        - Use as much changes and tags as needed to make the voice line sound as natural and realistic for the given scenarion as possible.
-        - Use the changes from number 7 often unless the tone or wording is strict, formal or is directly emphasized.
+        - Do not force tags or fillers; only add them when they sound natural and are justified by context.
+        - Avoid repetitive sentence-final tics (", ja?", "oder?", "okay?"). Use them rarely and never on consecutive lines unless the character explicitly seeks confirmation.
+        - Prefer variety. If a confirmation fits, consider placing it mid-sentence rather than at the very end.
 '''
 
     # Check for voice hints
