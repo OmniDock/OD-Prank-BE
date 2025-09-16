@@ -18,8 +18,6 @@ import random
 class GeneratorOutput(BaseModel):
     """Structured output for generation"""
     lines: List[str] = Field(description="Generated voice lines")
-
-
 def get_type_instructions(voice_type: str) -> str:
     """Get specific instructions for each voice line type"""
     instructions = {
@@ -48,6 +46,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Get slightly annoyed at too many questions
             - Redirect back to main topic
             - Double down in a short sentence why you are calling. (For example while responding to a confused called person not understanding why you are calling.)
+            - Include a clear 'Mittelteil' style line that reiterates the premise and justifies it briefly (double down), e.g. reaffirm the claim and add a short reason.
         """,
         "CLOSING": """
             CLOSING - End of conversation:
@@ -57,10 +56,11 @@ def get_type_instructions(voice_type: str) -> str:
             - Use the name for goodbye
         """,
         "FILLER": """
-            FILLER - Natural pauses and fillers:
-            - MUST include atleast one 'yes' and alteast one 'no' filler and one 'hmm' or 'uh' filler
-            - Use natural pauses with "..." or fillers
-            - No repetition - each filler different
+            FILLER - Natürliche Pausen und Füllwörter:
+            - Über den gesamten FILLER-Satz müssen mindestens einmal genau diese vorkommen: "Ja", "Nein", "hmmm" (oder "hmm"/"ähm"), "Wie bitte?", "Können Sie das nochmal wiederholen?"
+            - Nutze natürliche Pausen mit "..." oder kurze Zwischenlaute
+            - Keine Wiederholung derselben Zeile - jede Zeile ist anders
+            - Kurz halten (1–6 Wörter)
         """
     }
     return instructions.get(voice_type, instructions["OPENING"])

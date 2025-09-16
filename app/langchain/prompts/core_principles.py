@@ -67,7 +67,13 @@ GOOD_EXAMPLES = {
         "Yes.",
         "No.",
         "Right.",
-        "Okay."
+        "Okay.",
+        # German cues commonly requested in feedback:
+        "Ja.",
+        "Nein.",
+        "hmmm",
+        "Wie bitte?",
+        "Können Sie das nochmal wiederholen?"
     ]
 }
 
