@@ -24,12 +24,15 @@ def get_type_instructions(voice_type: str) -> str:
         "OPENING": """
             OPENING - First contact:
             - Introduce yourself (name/role/company)
-            - State the reason for calling. Also give Context why you are calling. 
+            - State the reason for calling AND instantly restate the core premise so the target understands the situation in one sentence.
+            - Combine the premise with a concrete believable detail (school name, project, document, date) pulled from the context.
+            - Usually this follows the 3 Rules i) Who is calling ii) What it's about iii) Why it matters right now (clear urgency / next step)
             - Establish authority and credibility (e.g. Neighbor, Volunteer Group Leader, etc.)
-            - Create some kind of urgency 
+            - Create urgency without sounding cartoonish.
             - Use the target's name if needed
             - Stay believable and professional
             - Explain why you are calling without being weird while opening the call. 
+            - Keep it short: 12–30 words per sentence, max 3 sentences, no filler words.
         """,
         "QUESTION": """
             QUESTION - Questions during conversation:
@@ -41,14 +44,15 @@ def get_type_instructions(voice_type: str) -> str:
         "RESPONSE": f"""
             RESPONSE - Reactions to objections:
             - Think of likely objections the target might raise and create fitting responses accordingly
-            - Most likely RESPONSES should reiterate over the premise and justify it briefly (double down) in at most one response;
+            - Most RESPONSES should actively reiterate the premise and justify it briefly (double down) in a confident tone.
             - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
             - Stay in character
             - Get slightly annoyed at too many questions
             - Vary strategies across lines (do not repeat the same approach):
               • clarify politely • deflect to a process/rule • mild apology + redirect • uncertainty / "not sure" • bureaucratic delay/transfer • misinterpret (lightly) then correct • soft pushback • escalate slightly
             - Do NOT always assure that details are correct (avoid repeating "the system shows", "we have confirmation"). Treat the premise as your belief, not an objective fact.
-            - Just repeat why you are calling and confirm it yourself. (Something like, ‘But that's what all the teachers say.’)
+            - MANDATORY: Include at least one explicit doubling-down line that cites consensus or authority ("all the teachers agreed" / "the board signed this") and hints at consequence if ignored.
+            - Just repeat why you are calling and confirm it yourself. (Something like, "But that's what all the teachers say, we can't move forward unless you redo it.")
         """,
         "CLOSING": """
             CLOSING - End of conversation:
@@ -60,21 +64,20 @@ def get_type_instructions(voice_type: str) -> str:
         """,
         "FILLER": """
             FILLER - Natürliche Pausen und Füllwörter:
-            - Pro Zeile 1 Füller/Ausrufe bspw.: 
+            - Jede Zeile MUSS genau einen klaren Füller/Ausruf enthalten. Nutze eine Mischung aus:
                 - "Ja"
                 - "Nein"
-                - "hmm"/"hmmm"/"ähm"
+                - "One sec" / "Einen Moment" / "Sekunde"
                 - "Okay"
                 - "Mhm"
                 - "Bitte?"
                 - "Wie bitte?"
                 - "Können Sie das nochmal wiederholen?"
-                - "Einen Moment"
-                - "Sekunde"
-                - "DochDochDoch"
-            - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase in zwei aufeinanderfolgenden Zeilen
-            - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" höchstens einmal im gesamten Set verwenden
-            - Es soll immer mindstens einmal ein "Ja", "Nein", oder "hmm" geben als Antworten!
+                - "hmm"/"hmmm"/"ähm"
+            - Stelle sicher, dass über das gesamte Set hinweg "Ja", "Nein" und ein "One sec"/"Moment" vorkommen.
+            - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase in zwei aufeinanderfolgenden Zeilen.
+            - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" höchstens einmal im gesamten Set verwenden.
+            - Kurz halten (1–6 Wörter) und mit natürlicher Pausen-Punktuation ("...", "–") kombinieren.
         """
     }
     return instructions.get(voice_type, instructions["OPENING"])
@@ -134,6 +137,10 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
 
         Create {count} DIFFERENT variations.
         Ensure each variation uses a different conversational strategy (clarify, deflect, mild apology + redirect, uncertainty, bureaucratic delay, soft pushback, slight escalation, misread-then-correct).
+        Voice-type specific guardrails:
+          - OPENING: Follow the Who/What/Why-now pattern, restating the core premise with a concrete believable detail in one tight sentence.
+          - RESPONSE: At least one line must be a clear double-down mentioning authority/consensus and hinting at the consequence of non-compliance.
+          - FILLER: every line must include exactly one filler phrase (Yes/No/One sec/Moment/etc.) and across the set you MUST include "Yes", "No", and a "One sec"/"Moment" variant.
         Return ONLY the spoken lines, no quotation marks.
         Each line should sound natural and believable.
         Keep each line very short (6–12 words), max 1 sentence.

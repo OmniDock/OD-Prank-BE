@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import io
 import os
+import time
 from typing import Any, Awaitable, Dict, Optional
 
 import wave
@@ -97,6 +98,10 @@ async def _mark_asset(db_session, voice_line_id: int, content_hash: str, status:
                       voice_id: Optional[str] = None, model: Optional[ElevenLabsModelEnum] = None,
                       voice_settings: Optional[Dict[str, Any]] = None, text: Optional[str] = None,
                       duration_ms: Optional[int] = None) -> None:
+    stage_start = time.perf_counter()
+    console_logger.info(
+        f"[Celery][vl={voice_line_id}] Mark asset start status={status} content_hash={content_hash[:8]}"
+    )
     r = await db_session.execute(
         select(VoiceLineAudio).where(
             VoiceLineAudio.voice_line_id == voice_line_id,
@@ -121,6 +126,10 @@ async def _mark_asset(db_session, voice_line_id: int, content_hash: str, status:
         if duration_ms is not None:
             pending.duration_ms = duration_ms
         await db_session.commit()
+    elapsed = time.perf_counter() - stage_start
+    console_logger.info(
+        f"[Celery][vl={voice_line_id}] Mark asset done status={status} took={elapsed:.2f}s"
+    )
 
 
 @celery_app.task(name="tts.generate_voice_line", bind=True, soft_time_limit=180)
@@ -147,19 +156,61 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
         voice_settings = payload.get("voice_settings") or {}
 
         async with get_session_maker()() as db_session:
-            console_logger.info(f"[Celery] TTS start vl={voice_line_id}")
-            pcm = await _generate_tts_bytes(text, voice_id, model, voice_settings)
-            wav_bytes = _pcm16_to_wav(pcm)
-            # Calculate duration in ms
-            import wave
-            import contextlib
-            import io
-            with contextlib.closing(wave.open(io.BytesIO(wav_bytes), 'rb')) as wf:
-                frames = wf.getnframes()
-                rate = wf.getframerate()
-                duration_ms = int((frames / float(rate)) * 1000)
+            console_logger.info(
+                f"[Celery] TTS start vl={voice_line_id} voice_id={voice_id} model={model}"
+            )
+            stage_start = time.perf_counter()
+            console_logger.info(f"[Celery][vl={voice_line_id}] Stage=generate_tts_bytes start")
+            try:
+                pcm = await _generate_tts_bytes(text, voice_id, model, voice_settings)
+            except Exception:
+                console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=generate_tts_bytes failed")
+                raise
+            console_logger.info(
+                f"[Celery][vl={voice_line_id}] Stage=generate_tts_bytes done took={time.perf_counter() - stage_start:.2f}s"
+            )
+
+            stage_start = time.perf_counter()
+            console_logger.info(f"[Celery][vl={voice_line_id}] Stage=pcm_to_wav start")
+            try:
+                wav_bytes = _pcm16_to_wav(pcm)
+            except Exception:
+                console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=pcm_to_wav failed")
+                raise
+            console_logger.info(
+                f"[Celery][vl={voice_line_id}] Stage=pcm_to_wav done took={time.perf_counter() - stage_start:.2f}s"
+            )
+
+            stage_start = time.perf_counter()
+            console_logger.info(f"[Celery][vl={voice_line_id}] Stage=calculate_duration start")
+            try:
+                import wave
+                import contextlib
+                import io
+                with contextlib.closing(wave.open(io.BytesIO(wav_bytes), 'rb')) as wf:
+                    frames = wf.getnframes()
+                    rate = wf.getframerate()
+                    duration_ms = int((frames / float(rate)) * 1000)
+            except Exception:
+                console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=calculate_duration failed")
+                raise
+            console_logger.info(
+                f"[Celery][vl={voice_line_id}] Stage=calculate_duration done took={time.perf_counter() - stage_start:.2f}s"
+            )
+
             storage_path = _private_storage_path(user_id, voice_line_id)
-            await _upload_wav_to_supabase(wav_bytes, storage_path)
+            stage_start = time.perf_counter()
+            console_logger.info(f"[Celery][vl={voice_line_id}] Stage=upload_supabase start path={storage_path}")
+            try:
+                await _upload_wav_to_supabase(wav_bytes, storage_path)
+            except Exception:
+                console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=upload_supabase failed")
+                raise
+            console_logger.info(
+                f"[Celery][vl={voice_line_id}] Stage=upload_supabase done took={time.perf_counter() - stage_start:.2f}s"
+            )
+
+            stage_start = time.perf_counter()
             await _mark_asset(
                 db_session,
                 voice_line_id=voice_line_id,
@@ -172,11 +223,15 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
                 text=text,
                 duration_ms=duration_ms,
             )
+            console_logger.info(
+                f"[Celery][vl={voice_line_id}] Stage=mark_ready done took={time.perf_counter() - stage_start:.2f}s"
+            )
             console_logger.info(f"[Celery] TTS ready vl={voice_line_id}")
 
     try:
         _run_in_loop(_run_once())
     except Exception as e:
+        console_logger.exception(f"[Celery] TTS task failed vl={payload.get('voice_line_id')} error={e}")
         max_retries = int(os.getenv("TTS_TASK_MAX_RETRIES", "5"))
         retries = getattr(self.request, "retries", 0)
         if retries < max_retries:

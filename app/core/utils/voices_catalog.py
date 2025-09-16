@@ -21,7 +21,7 @@ DEFAULT_SETTINGS = {
 }
 
 DEFAULT_SETTINGS_V2 = {
-    "stability": 0.5,
+    "stability": 0.0,
     "use_speaker_boost": False,
     "similarity_boost": 0.7,
     "style": 1.1,

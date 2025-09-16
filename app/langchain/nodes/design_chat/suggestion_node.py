@@ -80,7 +80,7 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             - If places, important object (e.g. cars, houses) is there a small detail to make them feel real (e.g., car color or an address)?
             - Is the Caller a Male or Female? (Important for the voice lines, and maybe the introduction of the caller persona)
             - What are character traits of the caller persona? 
-            - How should the question "Where did you get my number?" be answered?
+            - How should the question "Where did you get my number?" be answered? (Only interesting of no personal contact is stated. Random persona calling the called one)
             - How should the question "How do you know my name?" be answered?
             - In which mood is the caller persona? (e.g. angry, happy, sad, etc.)
         </Aspects>
