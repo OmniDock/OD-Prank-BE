@@ -84,6 +84,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         9. Tags MUST precede the parts of the voice line they affect. Different Tags may appear at multiple spots in the voice line or be combined like [hesitant][nervous].
         10. Do not exceed combing 1-3 tags back to back. You can use more per voice line if fitting.
         11. Do not add a real newline at the end of the output.
+        12. Not each Voice Line needs to have a emphasis or a pause or multiple tags.
 
         Single Voice Line Examples:
         Example 1.
