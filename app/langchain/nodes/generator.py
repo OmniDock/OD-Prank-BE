@@ -45,6 +45,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Stay in character
             - Get slightly annoyed at too many questions
             - Redirect back to main topic
+            - Double down in a short sentence why you are calling. (For example while responding to a confused called person not understanding why you are calling.)
         """,
         "CLOSING": """
             CLOSING - End of conversation:
