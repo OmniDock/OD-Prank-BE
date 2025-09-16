@@ -12,13 +12,12 @@ from app.langchain.prompts.core_principles import (
 )
 from app.langchain.prompts.examples import kleber_generator_example, refugee_camp_generator_example, trash_generator_example
 from app.core.logging import console_logger
+import random 
 
 
 class GeneratorOutput(BaseModel):
     """Structured output for generation"""
     lines: List[str] = Field(description="Generated voice lines")
-
-
 def get_type_instructions(voice_type: str) -> str:
     """Get specific instructions for each voice line type"""
     instructions = {
@@ -27,9 +26,11 @@ def get_type_instructions(voice_type: str) -> str:
             - Introduce yourself (name/role/company)
             - State the reason for calling
             - Establish authority and credibility (e.g. Neighbor, Volunteer Group Leader, etc.)
-            - Create mild urgency 
-            - Use the target's name
+            - Create urgency 
+            - Use the target's name if needed
             - Stay believable and professional
+            - Explain why you are calling without being weird while opening the call. 
+            - Keep it short: 12–30 words per sentence, max 2 sentence
         """,
         "QUESTION": """
             QUESTION - Questions during conversation:
@@ -40,11 +41,15 @@ def get_type_instructions(voice_type: str) -> str:
         """,
         "RESPONSE": """
             RESPONSE - Reactions to objections:
-            - Think of reactions the React the target is likely to give and create fitting responses accordingly
+            - Think of likely objections the target might raise and create fitting responses accordingly
             - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
             - Stay in character
             - Get slightly annoyed at too many questions
             - Redirect back to main topic
+            - Vary strategies across lines (do not repeat the same approach):
+              • clarify politely • deflect to a process/rule • mild apology + redirect • uncertainty / "not sure" • bureaucratic delay/transfer • misinterpret (lightly) then correct • soft pushback • escalate slightly
+            - Do NOT always assure that details are correct (avoid repeating "the system shows", "we have confirmation"). Treat the premise as your belief, not an objective fact.
+            - OPTIONAL: Include a clear 'Mittelteil' line that reiterates the premise and justifies it briefly (double down) in at most one response; keep it to max 1 sentence when used.
         """,
         "CLOSING": """
             CLOSING - End of conversation:
@@ -52,12 +57,16 @@ def get_type_instructions(voice_type: str) -> str:
             - Mention the absurd thing casually again
             - Stay in character
             - Use the name for goodbye
+            - Keep it short: 12-30 words per sentence, max 2 sentence
         """,
         "FILLER": """
-            FILLER - Natural pauses and fillers:
-            - MUST include atleast one 'yes' and alteast one 'no' filler 
-            - Use natural pauses with "..." or fillers
-            - No repetition - each filler different
+            FILLER - Natürliche Pausen und Füllwörter:
+            - Nutze natürliche Pausen mit "..." oder kurze Zwischenlaute
+            - Pro Zeile 1 Füller/Ausrufe zufällig aus: "Ja", "Nein", "hmm"/"hmmm"/"ähm", "Okay", "Mhm", "Bitte?", "Wie bitte?", "Können Sie das nochmal wiederholen?", "Einen Moment", "Sekunde"
+            - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase in zwei aufeinanderfolgenden Zeilen
+            - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" höchstens einmal im gesamten Set verwenden
+            - Kurz halten (1–6 Wörter)
+            - Es soll immer mindstens einmal ein "Ja", "Nein", oder "hmm" geben als kure Antworten!
         """
     }
     return instructions.get(voice_type, instructions["OPENING"])
@@ -91,18 +100,20 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         - Your tone and workd choice needs to match the character you are including their cultuaral context and how that person would do the escalation plan
         {_get_already_generated_lines_prompt(state)}
 
-        GOOD EXAMPLES:
-        {kleber_generator_example}
-        {refugee_camp_generator_example}
-        {trash_generator_example}
+
     """
+
+    # GOOD EXAMPLES:
+    # {kleber_generator_example}
+    # {refugee_camp_generator_example}
+    # {trash_generator_example}
 
     # Include relevant examples
     examples_text = ""
-    if voice_type in GOOD_EXAMPLES:
-        examples_text = f"\nGood examples for inspiration (DON'T copy, just use the style):\n"
-        for example in GOOD_EXAMPLES[voice_type][:3]:
-            examples_text += f"- {example}\n"
+    examples = GOOD_EXAMPLES.get(voice_type, [])
+    if examples:
+        pick = random.sample(examples, k=1)
+        examples_text = "\nStyle cues (do not copy; use only the vibe):\n" + "".join(f"- {e}\n" for e in pick)
 
     user_prompt = """
         Generate {count} {voice_type} lines for a prank call.
@@ -114,15 +125,21 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         {examples_text}
 
         Create {count} DIFFERENT variations.
+        Ensure each variation uses a different conversational strategy (clarify, deflect, mild apology + redirect, uncertainty, bureaucratic delay, soft pushback, slight escalation, misread-then-correct).
         Return ONLY the spoken lines, no quotation marks.
         Each line should sound natural and believable.
+        Keep each line very short (6–12 words), max 1 sentence.
         Generate in {language} language.
     """
 
+    temp = 0.7 if voice_type in ["OPENING", "CLOSING"] else 0.9
     llm = ChatOpenAI(
-        model="gpt-4.1-mini", 
-        temperature=0.4 if voice_type in ["OPENING", "CLOSING", "FILLER"] else 0.6
+        model="gpt-4.1-mini",
+        temperature=temp,
+        model_kwargs={"top_p": 0.95, "frequency_penalty": 0.5, "presence_penalty": 0.3}
     ).with_structured_output(GeneratorOutput)
+
+
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),

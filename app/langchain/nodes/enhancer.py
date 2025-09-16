@@ -23,7 +23,6 @@ class EnhancementOutput(BaseModel):
 async def enhancer_node(state: ScenarioState) -> dict:
     """
     Enhance existing voice lines based on user feedback
-    
     This node is called when user provides feedback on generated content
     """
     console_logger.info("Running enhancer node with user feedback")
@@ -69,9 +68,7 @@ async def enhancer_node(state: ScenarioState) -> dict:
         {feedback}
 
         Enhance these lines based on the feedback. Keep what works, improve what doesn't.
-
         List the specific changes you made.
-
         Generate in {language} language.
     """
     
