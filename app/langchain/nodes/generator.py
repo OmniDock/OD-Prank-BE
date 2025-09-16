@@ -21,37 +21,43 @@ def get_type_instructions(voice_type: str) -> str:
     """Get specific instructions for each voice line type"""
     instructions = {
         "OPENING": """
-            OPENING - First contact:
-            - Introduce yourself (name/role/company)
-            - State the reason for calling AND instantly restate the core premise so the target understands the situation in one sentence.
-            - Combine the premise with a concrete believable detail (school name, project, document, date) pulled from the context.
+            OPENING - Point ofFirst contact:
+
+            - Imagen you are starting a conversation with a target who does not know that this call will happen. Openers should introduce the scenario.
+
             - Usually this follows the 3 Rules i) Who is calling ii) What it's about iii) Why it matters right now (clear urgency / next step)
+            - Introduce yourself (name/role/company)
+            - State why you are calling and why it matters right now. 
+            - Also include some justification for the call if present in the context. 
+
+            - You can add a detail to make it more believable. 
             - Establish authority and credibility (e.g. Neighbor, Volunteer Group Leader, etc.)
-            - Create urgency without sounding cartoonish.
             - Use the target's name if needed
             - Stay believable and professional
-            - Explain why you are calling without being weird while opening the call. 
-            - Keep it short: 12–30 words per sentence, max 3 sentences, no filler words.
+            - Make it straight forward to the point. Dont tell a whole story. Start a Conversation here. 
         """,
         "QUESTION": """
-            QUESTION - Questions during conversation:
+            QUESTION - Questions during the conversation to keep it interesting. Those are Mid Call Questions:
             - ONLY real QUESTIONS, no statements or explanations
-            - Escalate from normal to absurd 
+            - Escalate from normal to absurd but keep it believable. 
             - Sparse "Mr./Mrs. [Name]" in questions - it's unnatural
             - Avoid repetition - each question different
+            - Tie each question to a new angle (where to drop package, who can sign, how to handle your test ride, follow-up visit, etc.).
+            - Never re-introduce yourself; treat every question as mid-call context (skip "Hallo"/"Guten Tag" greetings).
+            - Keep it short and concise. 
+            - Reference the premise succinctly, without re-delivering the full opening spiel.
         """,
         "RESPONSE": f"""
-            RESPONSE - Reactions to objections:
+            RESPONSE - Reactions to objections or emphasis questions for the call itself:
             - Think of likely objections the target might raise and create fitting responses accordingly
             - Most RESPONSES should actively reiterate the premise and justify it briefly (double down) in a confident tone.
             - DO NOT REACT TO YOUR OWN QUESTIONS THAT ARE GIVEN AS CONTEXT
-            - Stay in character
-            - Get slightly annoyed at too many questions
-            - Vary strategies across lines (do not repeat the same approach):
-              • clarify politely • deflect to a process/rule • mild apology + redirect • uncertainty / "not sure" • bureaucratic delay/transfer • misinterpret (lightly) then correct • soft pushback • escalate slightly
-            - Do NOT always assure that details are correct (avoid repeating "the system shows", "we have confirmation"). Treat the premise as your belief, not an objective fact.
-            - MANDATORY: Include at least one explicit doubling-down line that cites consensus or authority ("all the teachers agreed" / "the board signed this") and hints at consequence if ignored.
-            - Just repeat why you are calling and confirm it yourself. (Something like, "But that's what all the teachers say, we can't move forward unless you redo it.")
+            - Ensure every response addresses a different hypothetical objection and references a fresh procedural or situational detail.
+            - Keep it naturally and believable. Dont narrate on a whole story.
+            - Stay in flow: no greetings, no self-introductions, no "Ich meld mich" framing — you are already in conversation.
+            - The Rest follows answers to hypothetical questions.
+            MANDATORY: Include AT LEAST one explicit doubling-down line that cites consensus or authority ("all the teachers agreed" / "the board signed this") and hints at consequence if ignored.
+
         """,
         "CLOSING": """
             CLOSING - End of conversation:
@@ -59,7 +65,8 @@ def get_type_instructions(voice_type: str) -> str:
             - Mention the absurd thing casually again
             - Stay in character
             - Use the name for goodbye
-            - Keep it short: 12-30 words per sentence, max 3 sentences
+            - Offer varied wrap-up actions (next delivery attempt, sending proof, leaving swing assembled, texting a photo, etc.) and avoid repeating language.
+            - Keep it naturally and believable. Dont narrate on a whole story.
         """,
         "FILLER": """
             FILLER - Natürliche Pausen und Füllwörter:
@@ -73,11 +80,11 @@ def get_type_instructions(voice_type: str) -> str:
                 - "Wie bitte?"
                 - "Können Sie das nochmal wiederholen?"
                 - "hmm"/"hmmm"/"ähm"
-            - Stelle sicher, dass über das gesamte Set hinweg "Ja", "Nein" und ein "One sec"/"Moment" vorkommen.
-            - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase in zwei aufeinanderfolgenden Zeilen.
+            - Stelle sicher, dass über das gesamte Set hinweg "Ja", "Nein" und ein "Einen Moment bitte" vorkommen.
+            - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase im Set.
+            - Variiere die Zeichensetzung oder knappe Zusatzsilben, damit jede Zeile eine eigene Nuance bekommt.
             - Keine vollständigen Sätze oder zusätzlichen Aussagen – nur das Füllwort plus ggf. eine knappe bestätigende Silbe.
-            - Kein Erwähnen von Personen, Orten oder Handlungen, die zum Premise gehören.
-            - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" höchstens einmal im gesamten Set verwenden.
+            - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" können im Set vorkommen.
             - Ultra-kurz halten (1–4 Wörter) und mit natürlicher Pausen-Punktuation ("...", "–") kombinieren.
         """
     }
@@ -96,26 +103,33 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
     system_prompt = f"""
         {CORE_PRINCIPLES}
 
-        You are {state.analysis.persona_name} from {state.analysis.company_service}.{voice_context}
+        You are {state.analysis.persona_name} from {state.analysis.company_service}. {voice_context}
         Your goals: {', '.join(state.analysis.conversation_goals)}
         Believable details: {', '.join(state.analysis.believability_anchors)}
         Escalation: {' → '.join(state.analysis.escalation_plan)}
 
-        {get_type_instructions(voice_type)}
 
         IMPORTANT GLOBAL RULES:
+        - Voice Lines are Part of a Conversation. They should sound natural and believable. 
         - No obvious jokes; keep it straight-faced and believable
-        - Maximum ONE absurd detail
         - ALWAYS stay in character; never break the fourth wall
-        - No stage directions or narration
-        - NO REPETITION — each line must be unique in wording and idea
+        - NO REPETITION — each line within a type must be unique in wording and idea. 
         - Avoid excessive name usage; at most once in OPENING, otherwise only if natural
         - Your tone and word choice must match the character, including their cultural context and how that person would execute the escalation plan
-        - Never ask the target to restate the premise
         - Do not hedge with "if you want"/"maybe" unless it's the chosen strategy
         - Forbidden: "AI", "as an AI", "language model", "script", "prompt", "prank"
         - No placeholders like [NAME]/[DATE]; always use natural wording without brackets
+        VARIETY DIRECTIVES:
+        - Each line must spotlight a different micro-context detail (timeline, location, logistics step, personal action, consequence, or follow-up).
+        - Rotate sentence openings and key verbs; avoid multiple lines with the same skeleton such as "Hallo ..., hier ist".
+        - When referencing a absurd hook, find fresh angles (what was checked, who approved, next steps) without contradicting earlier lines.
+
+        Already generated Voice Lines Scripts for this scenario:
         {_get_already_generated_lines_prompt(state)}
+
+        Instruction for this new type you should provide right now: 
+        {get_type_instructions(voice_type)}
+
 
 
     """
@@ -132,29 +146,14 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         pick = random.sample(examples, k=1)
         examples_text = "\nStyle cues (do not copy; use only the vibe):\n" + "".join(f"- {e}\n" for e in pick)
 
-    strategy_instruction = "        Ensure each variation uses a different conversational strategy (clarify, deflect, mild apology + redirect, uncertainty, bureaucratic delay, soft pushback, slight escalation, misread-then-correct)." if voice_type != "FILLER" else ""
-    filler_output_instruction = "        Return only filler interjections or short sounds with optional pause punctuation (\"...\"/\"–\")." if voice_type == "FILLER" else ""
-
     user_prompt = """
-        Generate {count} {voice_type} lines for a prank call.
+        Generate {count} {voice_type} lines for a prank call in {language} language. Return ONLY the spoken lines — no quotation marks, numbers, or bullets.
 
         Scenario: {title}
         Description: {description}
         Target Name: {target_name}
 
-        {examples_text}
-
-        Create {count} DIFFERENT variations.
-        {strategy_instruction}
-        Voice-type specific guardrails:
-          - OPENING: Follow the Who/What/Why-now pattern, restating the core premise with a concrete believable detail in one tight sentence.
-          - QUESTION: Only real questions; each must end with "?"; escalate from mundane to slightly absurd; avoid repeating rhetorical tags like "okay?".
-          - RESPONSE: At least one line must be a clear double-down mentioning authority/consensus and hinting at the consequence of non-compliance.
-          - FILLER: every set must include exactly all of the following filler phrases "Yes", "No", "Moment", "Sorry?" in some kind of variation.
-        Return ONLY the spoken lines — no quotation marks, numbers, or bullets.
-        Each line should sound natural and believable.
-        {filler_output_instruction}
-        Generate in {language} language.
+        Create {count} DIFFERENT Voice Line Texts.
     """
 
     if voice_type == "FILLER":
@@ -188,26 +187,9 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
             "target_name": state.target_name,
             "examples_text": examples_text,
             "language": state.language,
-            "strategy_instruction": strategy_instruction,
-            "filler_output_instruction": filler_output_instruction
         })
         
-        # Clean up lines
-        lines = []
-        for line in result.lines:
-            cleaned = line.strip().strip('"\'')
-            if cleaned:
-                lines.append(cleaned)
-        
-        # Enforce formatting and de-duplicate
-        if voice_type == "QUESTION":
-            normalized_lines = []
-            for _ln in lines:
-                if _ln.endswith("?"):
-                    normalized_lines.append(_ln)
-                else:
-                    normalized_lines.append(_ln.rstrip(".!… ").rstrip() + "?")
-            lines = normalized_lines
+        lines = result.lines        
         unique_lines = []
         seen_lower = set()
         for _ln in lines:
@@ -216,6 +198,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
                 continue
             seen_lower.add(_low)
             unique_lines.append(_ln)
+
         lines = unique_lines
 
         console_logger.debug(f"Generated {len(lines)} {voice_type} lines")

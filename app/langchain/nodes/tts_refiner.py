@@ -159,8 +159,8 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         - Do not force tags or fillers; only add them when they sound natural and are justified by context.
         - Avoid repetitive sentence-final tics (", ja?", "oder?", "okay?"). Use them rarely and never on consecutive lines unless the character explicitly seeks confirmation.
         - Prefer variety. If a confirmation fits, consider placing it mid-sentence rather than at the very end.
-{filler_specific_rules}
-'''
+        {filler_specific_rules}
+    '''
 
     # Check for voice hints
     voice_instruction = ""
