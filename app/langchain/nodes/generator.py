@@ -111,6 +111,8 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
 
         IMPORTANT GLOBAL RULES:
         - Voice Lines are Part of a Conversation. They should sound natural and believable. 
+        - Each Voice Line stands alone but is part of a converstation. 
+        - Each Voice Line Type should also stand alone but is still part of a conversation. For example the Opening should be a standalone line and each Line should contain all needed informations.
         - No obvious jokes; keep it straight-faced and believable
         - ALWAYS stay in character; never break the fourth wall
         - NO REPETITION — each line within a type must be unique in wording and idea. 

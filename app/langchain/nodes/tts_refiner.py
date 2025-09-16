@@ -35,7 +35,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         with voice tags, expressive punctuation and filler words.
 
         OUTPUT FORMAT:
-        - Each spoken unit must end with the literal characters \\n.  
+        - Each spoken unit must end with the literal characters \n.  
         - Do NOT use actual line breaks.  
         - Insert expressive tags, punctuation and filler words directly into the dialogue.  
         - Do not explain your changes — output only the rewritten conversation.  
@@ -43,7 +43,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
 
         RULES:
         1. Split long input into coherent spoken-length sentences .  
-        - Separate each spoken unit with the literal \\n.  
+        - Separate each spoken unit with the literal \n.  
         - Each unit should sound one or two  human breath groups.  
         - Length constraints: each spoken unit must be \u2264 12 words (prefer 6\u201310). 
         2. For prosody:
