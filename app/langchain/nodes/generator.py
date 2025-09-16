@@ -45,7 +45,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Avoid repetition - each question different
             - Tie each question to a new angle (where to drop package, who can sign, how to handle your test ride, follow-up visit, etc.).
             - Never re-introduce yourself; treat every question as mid-call context (skip "Hallo"/"Guten Tag" greetings).
-            - Keep it short and concise. 
+            - Length: 1 sentence, about 12–22 words. No ellipses "…"; ask a direct question.
             - Reference the premise succinctly, without re-delivering the full opening spiel.
         """,
         "RESPONSE": f"""
@@ -128,15 +128,11 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         - Do not hedge with "if you want"/"maybe" unless it's the chosen strategy
         - Forbidden: "AI", "as an AI", "language model", "script", "prompt", "prank"
         - No placeholders like [NAME]/[DATE]; always use natural wording without brackets
-        VARIETY DIRECTIVES:
-        - Each line must spotlight a different micro-context detail (timeline, location, logistics step, personal action, consequence, or follow-up).
-        - Rotate sentence openings and key verbs; avoid multiple lines with the same skeleton such as "Hallo ..., hier ist".
-        - When referencing a absurd hook, find fresh angles (what was checked, who approved, next steps) without contradicting earlier lines.
 
         Already generated Voice Lines Scripts for this scenario:
         {_get_already_generated_lines_prompt(state)}
 
-        Instruction for this new type you should provide right now: 
+        Instruction for each line of this new type you should provide right now: 
         {get_type_instructions(voice_type)}
 
 
@@ -162,7 +158,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         Description: {description}
         Target Name: {target_name}
 
-        Create {count} DIFFERENT Voice Line Texts.
+        Create {count} DIFFERENT Voice Line Texts for each line of this new type.
         {examples_text}
     """
 
