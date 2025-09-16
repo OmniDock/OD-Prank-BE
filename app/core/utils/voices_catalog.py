@@ -73,7 +73,7 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "avatar_url": "dana.webp",
         "intro": "Hallo, ich bin Dana. [curious] Und ja… ich hab diese Stimme, bei der man nie so ganz weiß, ob man gleich lacht oder gegrillt wird [laughs]. [whispers] Ich sag nur: Gut festhalten. Denn jetzt wird’s interessant.",
         "voice_settings": DEFAULT_SETTINGS,
-        "tts_speedup": 1.15,
+        "tts_speedup": 1.25,
     
     },
     {
