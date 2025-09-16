@@ -30,6 +30,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Use the target's name if needed
             - Stay believable and professional
             - Explain why you are calling without being weird while opening the call. 
+            - Keep it short: 6–15 words per sentence, max 2 sentence
         """,
         "QUESTION": """
             QUESTION - Questions during conversation:
@@ -54,6 +55,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Mention the absurd thing casually again
             - Stay in character
             - Use the name for goodbye
+            - Keep it short: 6–15 words per sentence, max 2 sentence
         """,
         "FILLER": """
             FILLER - Natürliche Pausen und Füllwörter:
@@ -121,6 +123,7 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         Create {count} DIFFERENT variations.
         Return ONLY the spoken lines, no quotation marks.
         Each line should sound natural and believable.
+        Keep each line very short (6–12 words), max 1 sentence.
         Generate in {language} language.
     """
 

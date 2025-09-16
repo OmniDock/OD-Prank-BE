@@ -209,6 +209,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         1. Split long input into coherent spoken-length sentences .  
         - Separate each spoken unit with the literal \n\n.  
         - Each unit should sound one or two  human breath groups.  
+        - Length constraints: each spoken unit must be \u2264 12 words (prefer 6\u201310). 
         2. For prosody:
         - "..." for hesitation or short pauses between words 
         - "—" for interruptions or shifts
