@@ -30,7 +30,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Use the target's name if needed
             - Stay believable and professional
             - Explain why you are calling without being weird while opening the call. 
-            - Keep it short: 12–30 words per sentence, max 2 sentence
+            - Keep it short: 12–30 words per sentence, max 3 sentences
         """,
         "QUESTION": """
             QUESTION - Questions during conversation:
@@ -58,7 +58,7 @@ def get_type_instructions(voice_type: str) -> str:
             - Mention the absurd thing casually again
             - Stay in character
             - Use the name for goodbye
-            - Keep it short: 12-30 words per sentence, max 2 sentence
+            - Keep it short: 12-30 words per sentence, max 3 sentences
         """,
         "FILLER": """
             FILLER - Natürliche Pausen und Füllwörter:
