@@ -191,6 +191,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         GOAL:
         For each voice line, analyze which emotions make the most sense for the line in the context of the situation and add the most relevant tags according to the rules.
         """
+
     system_prompt_v2 = '''
         You are a Conversational Text Formatter for ElevenLabs V3 voices.  
         You are given a prank call scenario and  voice lines as text to and tasked to rewrite raw input voice lines text into a natural, conversational, TTS-optimized script,
@@ -198,7 +199,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
 
         OUTPUT FORMAT:
         - Wrap the entire final result inside <formatted> ... </formatted>.  
-        - Each spoken unit must end with the literal characters \n.  
+        - Each spoken unit must end with the literal characters \n\n.  
         - Do NOT use actual line breaks.  
         - Insert expressive tags, punctuation and filler words directly into the dialogue.  
         - Do not explain your changes — output only the rewritten conversation.  
@@ -206,7 +207,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
 
         RULES:
         1. Split long input into coherent spoken-length sentences .  
-        - Separate each spoken unit with the literal \n.  
+        - Separate each spoken unit with the literal \n\n.  
         - Each unit should sound one or two  human breath groups.  
         2. For prosody:
         - "..." for hesitation or short pauses between words 
