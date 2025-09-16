@@ -21,21 +21,24 @@ async def refine_description_node(state: DesignChatState) -> Dict:
         }
     
     system_prompt = """
+
         <Setup>
-            You are a helpful assistant that summarizes the chat into a short, cohesive description of a prank-call scenario. 
-            The description will be used to generate voice lines.
+            You are a helpful assistant that summarizes the chat messages into a short, cohesive description of a prank-call scenario. 
+            The description will be used to generate voice lines. Newer messages should update the description.
         </Setup>
 
         <Rules>
             - Use BOTH the assistant questions and the user answers as context. Treat user replies as answers to the most recent assistant question.
             - Start from the current description and MERGE in new facts from the chat. Preserve correct existing details; update only when the user changes them.
-            - Include, when available (do not invent):
+            - Do never invent details. If ambiguous, state that it is not clear. Our next LLM Request will ask for the details.
+            - Include, when available:
               • Caller persona/role (e.g., DHL driver) and attitude/tone if implied
               • Callee personalization choice (generic vs name) and the name if provided
               • Small realism details (e.g., item specifics, address hint, tiny plausible cues)
               • Any safety-relevant constraints or boundaries
+              • Any other details that are not clear or ambiguous.
             - Avoid low-impact timing questions. Infer simple delivery timing only if clearly implied; otherwise omit.
-            - Write a single cohesive paragraph, declarative, with no questions.
+            - Write a single cohesive paragraph, declarative, with no questions. Just state the facts.
             - Refer to the callee in third person; the caller is described as a role the user plays (e.g., "als DHL-Fahrer").
             - Do NOT contradict the user's statements. Do NOT add speculative content.
             - In the Summary also place the language the user want to hear. If the user does not specify anything use the language of his messages. 
