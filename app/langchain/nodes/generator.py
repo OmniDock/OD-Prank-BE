@@ -75,8 +75,10 @@ def get_type_instructions(voice_type: str) -> str:
                 - "hmm"/"hmmm"/"ähm"
             - Stelle sicher, dass über das gesamte Set hinweg "Ja", "Nein" und ein "One sec"/"Moment" vorkommen.
             - Über alle FILLER-Zeilen hinweg hohe Varianz: Wiederhole nicht dieselbe Phrase in zwei aufeinanderfolgenden Zeilen.
+            - Keine vollständigen Sätze oder zusätzlichen Aussagen – nur das Füllwort plus ggf. eine knappe bestätigende Silbe.
+            - Kein Erwähnen von Personen, Orten oder Handlungen, die zum Premise gehören.
             - Interrogative Füller wie "Wie bitte?" oder "Können Sie das nochmal wiederholen?" höchstens einmal im gesamten Set verwenden.
-            - Kurz halten (1–6 Wörter) und mit natürlicher Pausen-Punktuation ("...", "–") kombinieren.
+            - Ultra-kurz halten (1–4 Wörter) und mit natürlicher Pausen-Punktuation ("...", "–") kombinieren.
         """
     }
     return instructions.get(voice_type, instructions["OPENING"])
@@ -125,6 +127,10 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         pick = random.sample(examples, k=1)
         examples_text = "\nStyle cues (do not copy; use only the vibe):\n" + "".join(f"- {e}\n" for e in pick)
 
+    strategy_instruction = "        Ensure each variation uses a different conversational strategy (clarify, deflect, mild apology + redirect, uncertainty, bureaucratic delay, soft pushback, slight escalation, misread-then-correct)." if voice_type != "FILLER" else ""
+    length_instruction = "        Keep each line very short (6–12 words), max 1 sentence." if voice_type != "FILLER" else "        Keep each line ultra short (1–4 words); never form a complete sentence."
+    filler_output_instruction = "        Return only filler interjections or short sounds with optional pause punctuation (\"...\"/\"–\")." if voice_type == "FILLER" else ""
+
     user_prompt = """
         Generate {count} {voice_type} lines for a prank call.
 
@@ -135,14 +141,15 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
         {examples_text}
 
         Create {count} DIFFERENT variations.
-        Ensure each variation uses a different conversational strategy (clarify, deflect, mild apology + redirect, uncertainty, bureaucratic delay, soft pushback, slight escalation, misread-then-correct).
+{strategy_instruction}
         Voice-type specific guardrails:
           - OPENING: Follow the Who/What/Why-now pattern, restating the core premise with a concrete believable detail in one tight sentence.
           - RESPONSE: At least one line must be a clear double-down mentioning authority/consensus and hinting at the consequence of non-compliance.
-          - FILLER: every line must include exactly one filler phrase (Yes/No/One sec/Moment/etc.) and across the set you MUST include "Yes", "No", and a "One sec"/"Moment" variant.
+          - FILLER: every line must include exactly one filler phrase (Yes/No/One sec/Moment/etc.) and across the set you MUST include "Yes", "No", and a "One sec"/"Moment" variant. Keine weiteren Wörter außer dem Füller selbst.
         Return ONLY the spoken lines, no quotation marks.
         Each line should sound natural and believable.
-        Keep each line very short (6–12 words), max 1 sentence.
+{length_instruction}
+{filler_output_instruction}
         Generate in {language} language.
     """
 

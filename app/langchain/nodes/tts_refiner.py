@@ -20,7 +20,17 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
     if not lines:
         return []
 
-    system_prompt_v2 = '''
+    filler_specific_rules = ""
+    if voice_type == "FILLER":
+        filler_specific_rules = """
+        ADDITIONAL FILLER RULES:
+        - Preserve each filler as a standalone interjection (maximum 1–3 words).
+        - Never expand fillers into full sentences or add new semantic content.
+        - Optional: add a single expressive tag or pause punctuation, but no new words beyond the filler itself.
+        - If the input already matches the rules, return it unchanged except for required formatting.
+        """
+
+    system_prompt_v2 = f'''
         You are a Conversational Text Formatter for ElevenLabs V3 voices.  
         You are given a prank call scenario and  voice lines as text to and tasked to rewrite raw input voice lines text into a natural, conversational, TTS-optimized script,
         with voice tags, expressive punctuation and filler words.
@@ -149,6 +159,7 @@ async def refine_lines(lines: List[str], voice_type: str, state: Optional[Scenar
         - Do not force tags or fillers; only add them when they sound natural and are justified by context.
         - Avoid repetitive sentence-final tics (", ja?", "oder?", "okay?"). Use them rarely and never on consecutive lines unless the character explicitly seeks confirmation.
         - Prefer variety. If a confirmation fits, consider placing it mid-sentence rather than at the very end.
+{filler_specific_rules}
 '''
 
     # Check for voice hints
@@ -223,4 +234,3 @@ async def tts_refiner_node(state: ScenarioState) -> dict:
             tts_lines[voice_type] = []
     
     return {"tts_lines": tts_lines}
-
