@@ -189,7 +189,6 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
             "examples_text": examples_text,
             "language": state.language,
             "strategy_instruction": strategy_instruction,
-            "length_instruction": length_instruction,
             "filler_output_instruction": filler_output_instruction
         })
         
