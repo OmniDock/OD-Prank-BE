@@ -10,6 +10,7 @@ from sqlalchemy import select, text
 from app.core.utils.product_catalog import PRODUCT_PRICE_CATALOG, PRODUCT_CATALOG, get_product_name_by_product_id
 from app.core.utils.enums import ProductNameEnum
 from app.schemas.payment import CheckoutSessionParams, LineItem
+from app.services.payment_service import PaymentService
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -107,7 +108,6 @@ def get_products():
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request):
@@ -118,52 +118,28 @@ async def stripe_webhook(request: Request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
+        async for db_session in get_db_session():
+            payment_service = PaymentService(db_session)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
     
-    # Handle the event
-    if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        mode = session['mode'] 
-        await handle_successful_payment(session=session, mode=mode)
+    event_type = event['type']
+    data = event['data']
+    data_object = data['object']
+    
+    #First time purchase
+    if event_type == 'checkout.session.completed':
+        await payment_service.handle_purchase(session=data_object, mode=data_object['mode'])
+    #Subscription payment
+    elif event_type == 'invoice.paid':
+        await payment_service.handle_subscription_payment(data_object=data_object)
+    #Subscription deleted
+    elif event_type == 'customer.subscription.deleted':
+        await payment_service.handle_subscription_deleted(data_object=data_object)
+
+
     
     return {"status": "success"}
 
-async def handle_successful_payment(session, mode):
-    customer_email = session['customer_details']['email']
-    subscription_id = session.get('subscription', None)
-    
-    # Get the price ID from the session
-    if mode == 'subscription':
-        # For subscription payments, get from line items
-        line_items = session.get('line_items', {}).get('data', [])
-        if line_items:
-            price_id = line_items[0]['price']['id']
-            product_id = line_items[0]['price']['product']  # Stripe product ID
-        else:
-            # Alternative: get from subscription object
-            subscription = stripe.Subscription.retrieve(subscription_id)
-            price_id = subscription['items']['data'][0]['price']['id']
-            product_id = subscription['items']['data'][0]['price']['product']
-    else:
-        # For one-time payments
-        line_items = session.get('line_items', {}).get('data', [])
-        if line_items:
-            price_id = line_items[0]['price']['id']
-            product_id = line_items[0]['price']['product']
-        else:
-            # If line_items are not in the session, retrieve them separately
-            line_items = stripe.checkout.Session.list_line_items(session['id'])
-            price_id = line_items['data'][0]['price']['id']
-            product_id = line_items['data'][0]['price']['product']
-        
-    
-    async for db_session in get_db_session():
-        profile_service = ProfileService(db_session)
-        await profile_service.update_user_profile_after_payment(
-            customer_email=customer_email, 
-            product_id=product_id, 
-            subscription_id=subscription_id
-            )
