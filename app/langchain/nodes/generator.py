@@ -57,7 +57,7 @@ def get_type_instructions(voice_type: str) -> str:
         """,
         "FILLER": """
             FILLER - Natural pauses and fillers:
-            - MUST include atleast one 'yes' and alteast one 'no' filler 
+            - MUST include atleast one 'yes' and alteast one 'no' filler and one 'hmm' or 'uh' filler
             - Use natural pauses with "..." or fillers
             - No repetition - each filler different
         """
