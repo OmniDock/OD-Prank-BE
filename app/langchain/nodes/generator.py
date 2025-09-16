@@ -27,9 +27,10 @@ def get_type_instructions(voice_type: str) -> str:
             - Introduce yourself (name/role/company)
             - State the reason for calling
             - Establish authority and credibility (e.g. Neighbor, Volunteer Group Leader, etc.)
-            - Create mild urgency 
-            - Use the target's name
+            - Create urgency 
+            - Use the target's name if needed
             - Stay believable and professional
+            - Explain why you are calling without being weird while opening the call. 
         """,
         "QUESTION": """
             QUESTION - Questions during conversation:
