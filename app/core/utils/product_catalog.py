@@ -29,7 +29,8 @@ PRODUCT_CATALOG = {
         'prank_amount': 1,
         'call_amount': 1,
         'features': [
-            "Ein Prank Call",
+            "1 Individueller Prank",
+            "1 Anruf",
         ],
         'ctaLabel': "Jetzt Kaufen",
         'ctaHref': "",
@@ -45,9 +46,8 @@ PRODUCT_CATALOG = {
         'prank_amount': 5,
         'call_amount': 5,
         'features': [
-            "3 active scenarios",
-            "15 calls per week",
-            "basic voices"
+            "5 Anrufe pro Woche",
+            "5 Individuelle Pranks pro Woche",
         ],
         'ctaLabel': "Get Started",
         'ctaHref': "",
@@ -63,9 +63,8 @@ PRODUCT_CATALOG = {
         'prank_amount': 35,
         'call_amount': 40,
         'features': [
-            "5 active scenarios",
-            "100 calls per week",
-            "access to all voices"
+            "40 Anrufe pro Monat",
+            "35 Individuelle Pranks pro Monat",
         ],
         'ctaLabel': "Get Started",
         'ctaHref': "",
