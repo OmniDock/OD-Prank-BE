@@ -27,6 +27,7 @@ from app.core.config import settings
 import io
 import struct
 import audioop
+import time
 
 # Preload background noise into memory at startup
 background_noise_pcm = None
@@ -484,6 +485,7 @@ class TelnyxHandler:
 
 
     async def play_voice_line(self, user_id: str, conference_name: str, voice_line_id: int):
+        started_at = time.perf_counter()
         session = await self._session_service.get_conference_session(conference_name)
         if not session:
             raise RuntimeError(f"No session found for conference {conference_name}")
@@ -508,9 +510,12 @@ class TelnyxHandler:
                 raise RuntimeError("Failed to create signed URL for audio")
 
         # Prefer conference-level playback so all participants hear it
+        dispatch_started = time.perf_counter()
+        used_fallback = False
         try:
             await self._client.conference_play(conference_name, signed_url)
         except Exception:
+            used_fallback = True
             # Fallback: play on each leg
             ccids = await self._session_service.get_ccids_by_conference(conference_name)
             if not ccids:
@@ -518,6 +523,16 @@ class TelnyxHandler:
             await asyncio.gather(*[
                 self._client.playback_start(ccid, signed_url)
             for ccid in ccids])
+        finally:
+            dispatch_ended = time.perf_counter()
+            prep_ms = (dispatch_started - started_at) * 1000
+            dispatch_ms = (dispatch_ended - dispatch_started) * 1000
+            total_ms = (dispatch_ended - started_at) * 1000
+            fallback_suffix = " using fallback" if used_fallback else ""
+            self.logger.debug(
+                f"Voice line {voice_line_id} dispatched{fallback_suffix} in {dispatch_ms:.1f}ms "
+                f"(prep {prep_ms:.1f}ms, total {total_ms:.1f}ms) for conference {conference_name}"
+            )
         return
 
     async def stop_voice_line(self, user_id: str, conference_name: str):
@@ -571,6 +586,9 @@ class TelnyxHandler:
         
         console_logger.info(f"Hung up {len(ccids)} calls in conference {conference_name}")
         return True
+
+    async def close(self) -> None:
+        await self._client.close()
 
 
 telnyx_handler = TelnyxHandler()
