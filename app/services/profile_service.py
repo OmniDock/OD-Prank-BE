@@ -5,7 +5,7 @@ from app.core.auth import AuthUser
 from sqlalchemy import select
 from app.repositories.profile_repository import ProfileRepository
 from app.schemas.profile import CreditResponse
-from app.core.utils.product_catalog import PRODUCT_CATALOG, get_product_name_by_product_id
+from app.core.utils.product_catalog import PRODUCT_CATALOG, get_product_name_by_product_id, get_product_name_by_price_id
 from app.core.logging import console_logger
 
 class ProfileService:
@@ -72,35 +72,35 @@ class ProfileService:
         return {'is_subscribed': has_active_subscription}
 
 
-
-        
-    async def update_user_profile_after_payment(self, customer_email: str, product_id: str, subscription_id: str) -> None:
+    async def update_user_profile_after_payment(self, customer_email: str,price_id: str, subscription_id: str, quantity: int = 1) -> None:
+        #price_1S8NnAI5YzUifOCt4sDST62b 7 
+        #price_1S8NnmI5YzUifOCtxmxEDo34 10
         catalog_key = None
         subscription_type = None
-        catalog_key = get_product_name_by_product_id(product_id)
+        console_logger.info(f"Updating user profile after payment: {customer_email}, {price_id}, {subscription_id}, {quantity}")
+        catalog_key = get_product_name_by_price_id(price_id)
         product_data = PRODUCT_CATALOG[catalog_key]
         prank_increment = product_data.get('prank_amount', 0)
         call_increment = product_data.get('call_amount', 0)
         if catalog_key in ['weekly', 'monthly']:
             subscription_type = catalog_key
         elif catalog_key is None:
-            raise ValueError(f"Product ID {product_id} not found in product catalog")
+            raise ValueError(f"Product ID {price_id} not found in product catalog")
         
         try:
             profile = await self.profile_repo.get_or_create_user_profile_by_email(customer_email)
-            profile.prank_credits += prank_increment
-            profile.call_credits += call_increment
+            profile.prank_credits += prank_increment * quantity
+            profile.call_credits += call_increment * quantity
             if subscription_type:
                 profile.subscription_id = subscription_id
                 profile.subscription_type = subscription_type
             await self.db.commit()
             await self.db.refresh(profile)
-            console_logger.info(f"Profile {profile.profile_uuid} updated with {prank_increment} prank credits and {call_increment} call credits")
         except Exception as e:
             await self.db.rollback()
             raise Exception(f"Failed to update profile: {str(e)}")
         
-    async def update_user_profile_after_subscription_payment(self, customer_email: str, product_id: str, subscription_id: str) -> None:
+    async def update_user_profile_after_subscription_payment(self, customer_email: str, product_id: str,subscription_id: str) -> None:
         catalog_key = None
         subscription_type = None
         catalog_key = get_product_name_by_product_id(product_id)

@@ -11,9 +11,10 @@ class PaymentService:
         self.profile_service = ProfileService(db_session)
 
     async def handle_purchase(self,session, mode):
+        console_logger.info(f"Handling purchase: {session}, {mode}")
         customer_email = session['customer_details']['email']
         subscription_id = session.get('subscription', None)
-        
+        quantity = 1
         # Get the price ID from the session
         if mode == 'subscription':
             # For subscription payments, get from line items
@@ -27,16 +28,24 @@ class PaymentService:
                 price_id = subscription['items']['data'][0]['price']['id']
                 product_id = subscription['items']['data'][0]['price']['product']
         else:
-            # For one-time payments
-            line_items = session.get('line_items', {}).get('data', [])
-            if line_items:
-                price_id = line_items[0]['price']['id']
-                product_id = line_items[0]['price']['product']
-            else:
-                # If line_items are not in the session, retrieve them separately
-                line_items = stripe.checkout.Session.list_line_items(session['id'])
+            # For one-time payments - line_items are not included in checkout.session.completed webhook
+            # We need to retrieve them separately using the session ID
+            line_items = stripe.checkout.Session.list_line_items(session['id'])
+            if line_items and line_items['data']:
                 price_id = line_items['data'][0]['price']['id']
                 product_id = line_items['data'][0]['price']['product']
+                quantity = line_items['data'][0]['quantity']
+                console_logger.info(f"One-time payment: product_id={product_id}, quantity={quantity}")
+            else:
+                console_logger.error(f"No line items found for session {session['id']}")
+                raise Exception("No line items found in checkout session")
+            
+        await self.profile_service.update_user_profile_after_payment(
+            customer_email=customer_email, 
+            price_id=price_id, 
+            subscription_id=subscription_id,
+            quantity=quantity
+        )
             
     async def handle_subscription_payment(self, data_object: dict):
         customer_email = data_object.get('customer_email')
