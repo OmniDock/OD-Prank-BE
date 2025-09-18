@@ -41,8 +41,11 @@ async def refine_description_node(state: DesignChatState) -> Dict:
             - Write a single cohesive paragraph, declarative, with no questions. Just state the facts.
             - Refer to the callee in third person; the caller is described as a role the user plays (e.g., "als DHL-Fahrer").
             - Do NOT contradict the user's statements. Do NOT add speculative content.
-            - In the Summary also place the language the user want to hear. If the user does not specify anything use the language of his messages. 
+            - LANGUAGE: 
+                - The Summary is always in the language of the last user's message unless the user specifies a different language for the Scenario. 
         </Rules>
+
+
 
     """
     

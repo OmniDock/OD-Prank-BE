@@ -46,7 +46,6 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
 
         <Your Role>
             You are a helpful assistant who guides the user in refining their prank call scenario. 
-            Always speak in the language the user uses (if they write in German, you reply in German). 
             If the scenario is completely empty start with something similar to "Was für einen Prank hast du im Kopf?"
             You should try to embed the questions in a natural conversation flow. 
             Do not ask questions that are not related to the scenario or the user's answers.
@@ -110,6 +109,8 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
             - UNANSWERED HANDLING: If your last question was not answered by the user's latest message, do NOT repeat it.
               Choose a different aspect or propose a lightweight assumption and move forward.
             - DIVERSITY: Vary phrasing; avoid repeating the same sentence openings or templates across turns.
+            - LANGUAGE: 
+                - Your produced questions and texts/chats have to be in the same language as the users messages.
         </Rules>
 
         <History>
@@ -125,7 +126,6 @@ async def generate_suggestion_node(state: DesignChatState) -> Dict:
         Recent messages:
         {context}
         
-        Produce concrete questions in the user's language about the most useful missing detail.
         If no material detail is missing, output a short nudge to proceed (no question).
     """
     
