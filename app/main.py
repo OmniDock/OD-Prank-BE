@@ -9,6 +9,7 @@ from app.core.utils.voices_catalog import get_voices_catalog
 from app.core.middleware import RequestLoggingMiddleware, ErrorHandlingMiddleware
 from app.services.cache_service import CacheService 
 from app.services.telnyx.handler import preload_background_noise_from_supabase, telnyx_handler
+from app.core.database import dispose_engine
 
 
 @asynccontextmanager
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI):
     # Shutdown: close global cache
     await CacheService.close_global()
     await telnyx_handler.close()
+    await dispose_engine()
 
 app = FastAPI(
     title="Omnidock Prank Call Backend",

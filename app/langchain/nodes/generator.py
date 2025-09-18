@@ -76,43 +76,20 @@ def get_type_instructions(voice_type: str) -> str:
 
 async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
     """Generate lines for a specific voice type"""
-    
-    
-    # Check for voice hints from analyzer
+
+    if not state.analysis:
+        console_logger.error(f"Analyzer data missing before generating {voice_type} lines")
+        return state.plain_lines.get(voice_type, [])[: state.target_counts.get(voice_type, 2)]
+
     voice_context = ""
-    if hasattr(state.analysis, 'voice_hints') and state.analysis.voice_hints:
+    if state.analysis.voice_hints:
         voice_context = f"\nCHARACTER VOICE: {state.analysis.voice_hints}"
-    
-    system_prompt = f"""
-        {CORE_PRINCIPLES}
 
-        You are {state.analysis.persona_name} from {state.analysis.company_service}.{voice_context}
-        Your goals: {', '.join(state.analysis.conversation_goals)}
-        Believable details: {', '.join(state.analysis.believability_anchors)}
-        Escalation: {' → '.join(state.analysis.escalation_plan)}
-
-        {get_type_instructions(voice_type)}
-
-        IMPORTANT RULES:
-        - No obvious jokes
-        - Maximum ONE absurd detail 
-        - ALWAYS stay in character
-        - NO REPETITION - each line must be unique
-        - Avoid excessive name usage 
-        - Your tone and workd choice needs to match the character you are including their cultuaral context and how that person would do the escalation plan
-       
-        {_get_already_generated_lines_prompt(state)}
-
-        FULL SCENARIO EXAMPLES AS REFERENCE ONLY:
-        {kleber_generator_example}
-        {refugee_camp_generator_example}
-        {trash_generator_example}
-    """
-
-    # Include relevant examples
     examples_text = ""
     if voice_type in GOOD_EXAMPLES:
-        examples_text = f"\nGood examples for inspiration (DON'T copy, just use the style, length, context depth for this type of Voice Line, randomness, facts, etc.):\n"
+        examples_text = (
+            "\nGood examples for inspiration (DON'T copy, just use the style, length, context depth for this type of Voice Line, randomness, facts, etc.):\n"
+        )
         for example in GOOD_EXAMPLES[voice_type]:
             examples_text += f"- {example}\n"
 
@@ -125,48 +102,102 @@ async def generate_for_type(state: ScenarioState, voice_type: str) -> List[str]:
 
         {examples_text}
 
-        Create {count} DIFFERENT variations.
+        Create exactly {count} DIFFERENT variations.
         Return ONLY the spoken lines, no quotation marks.
         Each line should sound natural and believable.
         Generate in {language} language.
     """
 
     llm = ChatOpenAI(
-        model="gpt-4.1-mini", 
-        temperature=0.4 if voice_type in ["OPENING", "CLOSING", "FILLER"] else 0.6
+        model="gpt-4.1-mini",
+        temperature=0.4 if voice_type in ["OPENING", "CLOSING", "FILLER"] else 0.6,
     ).with_structured_output(GeneratorOutput)
-    
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("user", user_prompt)
-    ])
-    
-    chain = prompt | llm
-    
+
+    target_count = state.target_counts.get(voice_type, 2)
+    collected: List[str] = list(state.plain_lines.get(voice_type, []))
+    max_attempts = 3
+    attempts = 0
+
     try:
-        result = await chain.ainvoke({
-            "count": state.target_counts.get(voice_type, 2),
-            "voice_type": voice_type,
-            "title": state.title,
-            "description": state.scenario_description or "",
-            "target_name": state.target_name,
-            "examples_text": examples_text,
-            "language": state.language
-        })
-        
-        # Clean up lines
-        lines = []
-        for line in result.lines:
-            cleaned = line.strip().strip('"\'')
-            if cleaned:
-                lines.append(cleaned)
-        
-        console_logger.debug(f"Generated {len(lines)} {voice_type} lines")
-        return lines[:state.target_counts.get(voice_type, 2)]
-        
+        while len(collected) < target_count and attempts < max_attempts:
+            system_prompt = f"""
+                {CORE_PRINCIPLES}
+
+                You are {state.analysis.persona_name} from {state.analysis.company_service}.{voice_context}
+                Your goals: {', '.join(state.analysis.conversation_goals)}
+                Believable details: {', '.join(state.analysis.believability_anchors)}
+                Escalation: {' → '.join(state.analysis.escalation_plan)}
+
+                {get_type_instructions(voice_type)}
+
+                IMPORTANT RULES:
+                - No obvious jokes
+                - Maximum ONE absurd detail 
+                - ALWAYS stay in character
+                - NO REPETITION - each line must be unique
+                - Avoid excessive name usage 
+                - Your tone and workd choice needs to match the character you are including their cultuaral context and how that person would do the escalation plan
+               
+                {_get_already_generated_lines_prompt(state)}
+
+                FULL SCENARIO EXAMPLES AS REFERENCE ONLY:
+                {kleber_generator_example}
+                {refugee_camp_generator_example}
+                {trash_generator_example}
+            """
+
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_prompt),
+                ("user", user_prompt),
+            ])
+
+            chain = prompt | llm
+
+            remaining = max(target_count - len(collected), 0)
+            if remaining == 0:
+                break
+
+            result = await chain.ainvoke(
+                {
+                    "count": remaining,
+                    "voice_type": voice_type,
+                    "title": state.title,
+                    "description": state.scenario_description or "",
+                    "target_name": state.target_name,
+                    "examples_text": examples_text,
+                    "language": state.language,
+                }
+            )
+
+            new_lines = []
+            for line in result.lines:
+                cleaned = line.strip().strip('"\'')
+                if cleaned and cleaned not in collected:
+                    new_lines.append(cleaned)
+
+            collected.extend(new_lines)
+            state.plain_lines[voice_type] = collected
+            attempts += 1
+
+            console_logger.debug(
+                f"Attempt {attempts} generated {len(collected)}/{target_count} {voice_type} lines"
+            )
+
+            if not new_lines:
+                console_logger.warning(
+                    f"No new {voice_type} lines generated on attempt {attempts}"
+                )
+
+        if len(collected) < target_count:
+            console_logger.warning(
+                f"Only generated {len(collected)} of {target_count} {voice_type} lines after {attempts} attempts"
+            )
+
+        return collected[:target_count]
+
     except Exception as e:
         console_logger.error(f"Generation failed for {voice_type}: {str(e)}")
-        return []
+        return collected[:target_count]
     
 
 

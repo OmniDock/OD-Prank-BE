@@ -18,7 +18,7 @@ def run():
     """Upload a scenario JSON file to the database"""
     
     # Create synchronous database engine and session
-    database_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+    database_url = settings.DATABASE_URL.replace("postgresql+psycopg://", "postgresql://")
     engine = create_engine(database_url)
     SessionLocal = sessionmaker(bind=engine)
     

@@ -2,26 +2,28 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.pool import NullPool
 from app.core.config import settings
 from contextlib import asynccontextmanager
-import uuid
 import os
 
 DATABASE_URL = (
     settings.DATABASE_URL
-    .replace("postgresql://", "postgresql+asyncpg://")
-    .replace("postgres://", "postgresql+asyncpg://")
+    .replace("postgresql://", "postgresql+psycopg://")
+    .replace("postgres://", "postgresql+psycopg://")
 )
 
 _ENGINE = None
 _ENGINE_PID = None
 _SESSION_MAKER = None
 
-# Für Transaction Pooler (Port 6543) wären spezielle connect_args nötig (statement_cache_size=0),
-# für Session Pooler/Direct Connection aber nicht!
+# Für Transaction-Pooler (Port 6543) nutzen wir NullPool, damit psycopg jede
+# Verbindung nach der Anfrage freigibt und PgBouncer den Rest erledigt.
 def get_engine():
     global _ENGINE, _ENGINE_PID
     pid = os.getpid()
     if _ENGINE is None or _ENGINE_PID != pid:
-        use_nullpool = settings.DEBUG and os.getenv("SQLALCHEMY_DISABLE_POOL", "0") == "1"
+        disable_pool_env = settings.SQLALCHEMY_DISABLE_POOL
+        targets_pooler = ".pooler." in settings.DATABASE_URL or settings.DATABASE_URL.rstrip("/").endswith(":6543")
+        use_nullpool = disable_pool_env or targets_pooler
+
         pool_kwargs = {
             "pool_pre_ping": True,
             "pool_size": 8,
@@ -34,6 +36,7 @@ def get_engine():
             _ENGINE = create_async_engine(
                 DATABASE_URL,
                 poolclass=NullPool,
+                pool_pre_ping=True,
             )
         else:
             _ENGINE = create_async_engine(
@@ -71,3 +74,11 @@ async def lifespan_session():
 async def get_db_session():
     async with lifespan_session() as session:
         yield session
+
+
+async def dispose_engine():
+    """Dispose async engine if it was created (used e.g. on FastAPI shutdown)."""
+    global _ENGINE
+    if _ENGINE is not None:
+        await _ENGINE.dispose()
+        _ENGINE = None

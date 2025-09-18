@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = Field(default="postgresql://postgres:password@localhost:5432/your_db")
     MIGRATION_DATABASE_URL: str = Field(default="postgresql://postgres:password@localhost:5432/your_db")
+    SQLALCHEMY_DISABLE_POOL: bool = Field(default=False)
     
     # LangChain & AI
     OPENAI_API_KEY: str = Field(default="")

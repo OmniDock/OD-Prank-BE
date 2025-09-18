@@ -8,7 +8,6 @@ dependencies = [
     "aiohttp>=3.12.15",
     "alembic>=1.16.4",
     "celery>=5.4.0",
-    "asyncpg>=0.30.0",
     "deprecated>=1.2.18",
     "elevenlabs>=2.10.0",
     "fastapi>=0.116.1",
@@ -33,5 +32,5 @@ dependencies = [
     "uvicorn-worker>=0.3.0",
     "stripe>=12.5.1",
     "pytz>=2025.2",
-    "psycopg2-binary>=2.9.10",
+    "psycopg[binary]>=3.1",
 ]

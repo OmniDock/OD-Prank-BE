@@ -12,7 +12,7 @@ from app.core.config import settings
 config = context.config
 
 # Set the database URL
-config.set_main_option("sqlalchemy.url", settings.MIGRATION_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"))
+config.set_main_option("sqlalchemy.url", settings.MIGRATION_DATABASE_URL.replace("postgresql://", "postgresql+psycopg://"))
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:
