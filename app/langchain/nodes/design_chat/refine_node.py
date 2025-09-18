@@ -43,6 +43,8 @@ async def refine_description_node(state: DesignChatState) -> Dict:
             - Do NOT contradict the user's statements. Do NOT add speculative content.
             - LANGUAGE: 
                 - The Summary is always in the language of the last user's message unless the user specifies a different language for the Scenario. 
+            - Question:Answer Summary.
+                - Try to incorporate the questions and answers into the summary. 
         </Rules>
 
 
