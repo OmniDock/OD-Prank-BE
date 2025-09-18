@@ -50,7 +50,13 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "gender": GenderEnum.MALE,
         "intro": "[chill] Was geht? Timo hier! [quicker] Lass dich von der gechillten Stimme nicht täuschen... [slightly excited] wir nehmen heute ein paar Leute richtig hops, hast' Bock?",
         "avatar_url": "timo.webp",
-        "voice_settings": DEFAULT_SETTINGS,
+        "voice_settings": {
+            "stability": 0.5,
+            "use_speaker_boost": False,
+            "similarity_boost": 1.1 ,
+            "style": 2,
+            "speed": 1.1
+},
         "tts_speedup": 1.15,
     },
     {
@@ -72,7 +78,13 @@ VOICES_CATALOG: List[Dict[str, Any]] = [
         "gender": GenderEnum.FEMALE,
         "avatar_url": "dana.webp",
         "intro": "Hallo, ich bin Dana. [curious] Und ja… ich hab diese Stimme, bei der man nie so ganz weiß, ob man gleich lacht oder gegrillt wird [laughs]. [whispers] Ich sag nur: Gut festhalten. Denn jetzt wird’s interessant.",
-        "voice_settings": DEFAULT_SETTINGS,
+        "voice_settings":{
+            "stability": 0.5,
+            "use_speaker_boost": False,
+            "similarity_boost": 1.5,
+            "style": 2,
+            "speed": 1.1
+},
         "tts_speedup": 1.25,
     
     },
