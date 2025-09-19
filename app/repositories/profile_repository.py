@@ -61,25 +61,29 @@ class ProfileRepository:
         
     async def _get_auth_user_by_email(self, email: str) -> AuthUser:
         try:
-            auth_user_query = text("SELECT id FROM auth.users WHERE email = :email")
+            auth_user_query = text("SELECT id, email FROM auth.users WHERE email = :email")
             auth_result = await self.db.execute(auth_user_query, {"email": email})
-            auth_user = auth_result.fetchone()
-            user_id = auth_user.id
-            user_metadata = auth_user.metadata
-            return AuthUser(user_id=user_id, email=email, metadata=user_metadata)
+            row = auth_result.fetchone()
+            if not row:
+                raise Exception(f"Auth user not found for email: {email}")
+            # Row supports attribute or index access depending on driver
+            user_id = getattr(row, "id", None) or row[0]
+            user_email = getattr(row, "email", None) or row[1]
+            return AuthUser(user_id=user_id, email=user_email, metadata={})
         except Exception as e:
             await self.db.rollback()
             raise Exception(f"Failed to get auth user by email: {str(e)}")
 
     async def _get_auth_user_by_id(self, user_id: str) -> AuthUser:
         try:
-            auth_user_query = text("SELECT id FROM auth.users WHERE id = :user_id")
+            auth_user_query = text("SELECT id, email FROM auth.users WHERE id = :user_id")
             auth_result = await self.db.execute(auth_user_query, {"user_id": user_id})
-            auth_user = auth_result.fetchone()
-            user_id = auth_user.id
-            email = auth_user.email
-            user_metadata = auth_user.metadata
-            return AuthUser(user_id=user_id, email=email, metadata=user_metadata)
+            row = auth_result.fetchone()
+            if not row:
+                raise Exception(f"Auth user not found for id: {user_id}")
+            uid = getattr(row, "id", None) or row[0]
+            email = getattr(row, "email", None) or row[1]
+            return AuthUser(user_id=uid, email=email, metadata={})
         except Exception as e:
             await self.db.rollback()
             raise Exception(f"Failed to get auth user by id: {str(e)}")

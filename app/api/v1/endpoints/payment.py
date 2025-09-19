@@ -157,3 +157,93 @@ async def stripe_webhook(request: Request):
     
     return {"status": "success"}
 
+
+@router.post("/checkout/finalize")
+async def finalize_checkout(session_id: str):
+    """Finalize a checkout session immediately after return.
+
+    This is useful in local dev or when webhooks are not reliably delivered.
+    It retrieves the Checkout Session and applies the credit/subscription using the same logic
+    as the webhook handler.
+    """
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        async with lifespan_session() as db_session:
+            payment_service = PaymentService(db_session)
+            await payment_service.handle_purchase(session=session, mode=session["mode"])    
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/subscription/cancel")
+async def cancel_subscription(immediate: bool = False, user: AuthUser = Depends(get_current_user)):
+    """Cancel the user's active subscription.
+
+    - If immediate=False (default): schedule cancellation at period end (recommended)
+    - If immediate=True: cancel immediately and remove subscription from profile
+    """
+    try:
+        async with lifespan_session() as db_session:
+            profile_service = ProfileService(db_session)
+            profile = await profile_service.get_profile(user)
+            sub_id = profile.subscription_id
+            if not sub_id:
+                raise HTTPException(status_code=400, detail="No active subscription to cancel")
+
+            if immediate:
+                stripe.Subscription.delete(sub_id)
+                # reflect immediate cancel in profile
+                profile.subscription_id = None
+                profile.subscription_type = None
+                await db_session.commit()
+                await db_session.refresh(profile)
+                return {"status": "cancelled_immediately"}
+            else:
+                stripe.Subscription.modify(sub_id, cancel_at_period_end=True)
+                return {"status": "cancel_scheduled"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/subscription/resume")
+async def resume_subscription(user: AuthUser = Depends(get_current_user)):
+    """Resume a subscription that was scheduled to cancel at period end."""
+    try:
+        async with lifespan_session() as db_session:
+            profile_service = ProfileService(db_session)
+            profile = await profile_service.get_profile(user)
+            sub_id = profile.subscription_id
+            if not sub_id:
+                raise HTTPException(status_code=400, detail="No active subscription to resume")
+
+            stripe.Subscription.modify(sub_id, cancel_at_period_end=False)
+            return {"status": "cancel_reverted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/subscription/meta")
+async def get_subscription_meta(user: AuthUser = Depends(get_current_user)):
+    """Return subscription metadata from Stripe: cancel_at and cancel_at_period_end."""
+    try:
+        async with lifespan_session() as db_session:
+            # We don't need DB writes; only read profile to get subscription_id
+            profile_service = ProfileService(db_session)
+            profile = await profile_service.get_profile(user)
+            sub_id = profile.subscription_id
+            if not sub_id:
+                return {"cancel_at": None, "cancel_at_period_end": False}
+            sub = stripe.Subscription.retrieve(sub_id)
+            return {
+                "cancel_at": sub.get("cancel_at"),
+                "cancel_at_period_end": bool(sub.get("cancel_at_period_end")),
+            }
+    except Exception:
+        # Don't fail profile load due to Stripe issues; return safe defaults
+        return {"cancel_at": None, "cancel_at_period_end": False}
+
