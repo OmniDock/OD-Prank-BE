@@ -9,11 +9,15 @@ from app.core.utils.voices_catalog import get_voices_catalog
 from app.core.middleware import RequestLoggingMiddleware, ErrorHandlingMiddleware
 from app.services.cache_service import CacheService 
 from app.services.telnyx.handler import preload_background_noise_from_supabase, telnyx_handler
-from app.core.database import dispose_engine
+from app.core.database import create_engine, set_engine, dispose_engine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+
+    # Startup: Initialize database engine per-process and register for dependency usage
+    engine = create_engine()
+    set_engine(engine)
 
     # # Startup: Initialize Global Cache (class-level)
     cache = await CacheService.get_global()

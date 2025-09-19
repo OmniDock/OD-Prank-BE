@@ -1,3 +1,9 @@
+import os
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional, Dict, Any
+
+from sqlalchemy import select
+
 from app.langchain import ScenarioProcessor, SingleLineEnhancer, ScenarioState
 from app.schemas.scenario import ScenarioCreateRequest, ScenarioCreateResponse, ScenarioResponse, VoiceLineResponse, VoiceLineAudioResponse
 from app.core.auth import AuthUser
@@ -8,11 +14,10 @@ from app.services.profile_service import ProfileService
 from app.core.database import AsyncSession
 from app.core.logging import console_logger
 from app.services.tts_service import TTSService
+from app.services.audio_progress_service import AudioProgressService
 from app.models.scenario import Scenario
 from app.models.voice_line import VoiceLine
 from app.core.utils.enums import VoiceLineTypeEnum
-from typing import List, Optional, Dict, Any
-from sqlalchemy import select
 from app.services.cache_service import CacheService
 
 class ScenarioService: 
@@ -24,6 +29,7 @@ class ScenarioService:
         self.repository = ScenarioRepository(db_session)
         self.voice_line_repository = VoiceLineRepository(db_session)
         self.db_session = db_session
+        self._stale_pending_seconds = int(os.getenv("TTS_PENDING_STALE_SECONDS", "120"))
 
 
 
@@ -405,7 +411,12 @@ class ScenarioService:
         
         return await self._to_scenario_response(scenario, include_audio=True)
     
-    async def get_audio_generation_status(self, user: AuthUser, scenario_id: int) -> dict:
+    async def get_audio_generation_status(
+        self,
+        user: AuthUser,
+        scenario_id: int,
+        voice_id: Optional[str] = None,
+    ) -> dict:
         """Get audio generation status for all voice lines"""
         from app.models.voice_line_audio import VoiceLineAudio
         from app.core.utils.enums import VoiceLineAudioStatusEnum
@@ -418,41 +429,102 @@ class ScenarioService:
         total_voice_lines = len(scenario.voice_lines)
         generated_count = 0
         pending_count = 0
-        
+        failed_count = 0
+        stale_pending_count = 0
+
         # Get all voice line IDs
         voice_line_ids = [vl.id for vl in scenario.voice_lines]
-        
-        if voice_line_ids and scenario.preferred_voice_id:
+
+        lookup_voice_id = voice_id or scenario.preferred_voice_id
+        cached_progress = None
+        if lookup_voice_id:
+            cached_progress = await AudioProgressService.get_progress(scenario_id, lookup_voice_id)
+        if not cached_progress:
+            cached_progress = await AudioProgressService.get_latest_progress(scenario_id)
+            if cached_progress:
+                lookup_voice_id = cached_progress.get("voice_id") or lookup_voice_id
+        if cached_progress:
+            counts = cached_progress.get("counts", {}) or {}
+            generated_count = int(counts.get("ready", 0))
+            failed_count = int(counts.get("failed", 0))
+            pending_count = int(counts.get("pending", 0))
+            stale_pending_count = 0  # Redis snapshot does not track staleness
+            total_voice_lines = int(cached_progress.get("total", total_voice_lines))
+            statuses_raw = cached_progress.get("statuses", {}) or {}
+            line_statuses = {
+                int(vl_id): status for vl_id, status in statuses_raw.items()
+            }
+            is_complete = (
+                generated_count == total_voice_lines
+                and failed_count == 0
+                and total_voice_lines > 0
+            )
+            can_activate = scenario.is_safe and is_complete
+            return {
+                "total_voice_lines": total_voice_lines,
+                "generated_count": generated_count,
+                "pending_count": pending_count,
+                "failed_count": failed_count,
+                "stale_pending_count": stale_pending_count,
+                "is_complete": is_complete,
+                "can_activate": can_activate,
+                "updated_at": cached_progress.get("updated_at"),
+                "completed_at": cached_progress.get("completed_at"),
+                "voice_id": lookup_voice_id,
+                "line_statuses": line_statuses,
+            }
+
+        line_statuses: Dict[int, str] = {}
+
+        if voice_line_ids and lookup_voice_id:
             # Query for audios that match the preferred voice
             audio_query = (
                 select(VoiceLineAudio)
                 .where(
                     and_(
                         VoiceLineAudio.voice_line_id.in_(voice_line_ids),
-                        VoiceLineAudio.voice_id == scenario.preferred_voice_id
+                        VoiceLineAudio.voice_id == lookup_voice_id
                     )
                 )
             )
             
             audio_result = await self.db_session.execute(audio_query)
             audios = audio_result.scalars().all()
-            
+            now = datetime.now(timezone.utc)
+            stale_cutoff = now - timedelta(seconds=self._stale_pending_seconds)
+
             # Count by status
             for audio in audios:
                 if audio.status == VoiceLineAudioStatusEnum.READY:
                     generated_count += 1
+                    line_statuses[audio.voice_line_id] = VoiceLineAudioStatusEnum.READY.name
                 elif audio.status == VoiceLineAudioStatusEnum.PENDING:
                     pending_count += 1
-        
+                    if audio.updated_at and audio.updated_at < stale_cutoff:
+                        stale_pending_count += 1
+                    line_statuses.setdefault(audio.voice_line_id, VoiceLineAudioStatusEnum.PENDING.name)
+                elif audio.status == VoiceLineAudioStatusEnum.FAILED:
+                    failed_count += 1
+                    line_statuses[audio.voice_line_id] = VoiceLineAudioStatusEnum.FAILED.name
+
+            # Add entries for voice lines without audio yet
+            for vl_id in voice_line_ids:
+                if vl_id not in line_statuses:
+                    line_statuses[vl_id] = VoiceLineAudioStatusEnum.PENDING.name
+
         is_complete = generated_count == total_voice_lines
         can_activate = scenario.is_safe and is_complete
-        
+
         return {
             "total_voice_lines": total_voice_lines,
             "generated_count": generated_count,
             "pending_count": pending_count,
+            "failed_count": failed_count,
+            "stale_pending_count": stale_pending_count,
             "is_complete": is_complete,
-            "can_activate": can_activate
+            "can_activate": can_activate,
+            "voice_id": lookup_voice_id,
+            "line_statuses": line_statuses if voice_line_ids else {},
         }
     
     async def get_public_scenarios(self) -> List[Scenario]:

@@ -1,66 +1,52 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from contextlib import asynccontextmanager
+from typing import AsyncIterator, Optional
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncEngine, AsyncSession
 from sqlalchemy.pool import NullPool
 from app.core.config import settings
-from contextlib import asynccontextmanager
-import os
 
-DATABASE_URL = (
-    settings.DATABASE_URL
-    .replace("postgresql://", "postgresql+psycopg://")
-    .replace("postgres://", "postgresql+psycopg://")
-)
+class Database:
+    """Encapsulates all database-related logic."""
 
-_ENGINE = None
-_ENGINE_PID = None
-_SESSION_MAKER = None
+    def __init__(self):
+        self.engine = self._create_async_engine()
+        self.SessionLocal = async_sessionmaker(
+            self.engine,
+            autocommit=False,
+            autoflush=False,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
 
-# Für Transaction-Pooler (Port 6543) nutzen wir NullPool, damit psycopg jede
-# Verbindung nach der Anfrage freigibt und PgBouncer den Rest erledigt.
-def get_engine():
-    global _ENGINE, _ENGINE_PID
-    pid = os.getpid()
-    if _ENGINE is None or _ENGINE_PID != pid:
-        disable_pool_env = settings.SQLALCHEMY_DISABLE_POOL
-        targets_pooler = ".pooler." in settings.DATABASE_URL or settings.DATABASE_URL.rstrip("/").endswith(":6543")
-        use_nullpool = disable_pool_env or targets_pooler
+    @staticmethod
+    def _format_database_url(url: str) -> str:
+        """Replace standard postgresql driver with the async driver."""
+        return url.replace("postgresql://", "postgresql+asyncpg://").replace("postgres://", "postgresql+asyncpg://")
 
-        pool_kwargs = {
+    @staticmethod
+    def _needs_null_pool(db_url: str) -> bool:
+        """Determine whether we must disable SQLAlchemy pooling for the given URL."""
+        if settings.SQLALCHEMY_DISABLE_POOL:
+            return True
+        return ":6543/" in db_url  # Supabase transaction/shared poolers
+
+    def _create_async_engine(self) -> AsyncEngine:
+        """Create an AsyncEngine with settings tailored for Supabase + PgBouncer."""
+        db_url = self._format_database_url(settings.DATABASE_URL)
+        connect_args = {"statement_cache_size": 0, "prepared_statement_cache_size": 0}
+
+        engine_kwargs = {
             "pool_pre_ping": True,
-            "pool_size": 8,
-            "max_overflow": 8,
-            "pool_recycle": 1800,
-            "pool_timeout": 30,
+            "connect_args": connect_args,
         }
+        if self._needs_null_pool(db_url):
+            engine_kwargs["poolclass"] = NullPool
 
-        if use_nullpool:
-            _ENGINE = create_async_engine(
-                DATABASE_URL,
-                poolclass=NullPool,
-                pool_pre_ping=True,
-            )
-        else:
-            _ENGINE = create_async_engine(
-                DATABASE_URL,
-                **pool_kwargs,
-            )
-        _ENGINE_PID = pid
-    return _ENGINE
+        return create_async_engine(db_url, **engine_kwargs)
 
-def get_session_maker():
-    global _SESSION_MAKER, _ENGINE_PID
-    pid = os.getpid()
-    if _SESSION_MAKER is None or _ENGINE_PID != pid:
-        engine = get_engine()
-        _SESSION_MAKER = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    return _SESSION_MAKER
-
-@asynccontextmanager
-async def lifespan_session():
-    """
-    Provides a session for a request.
-    Ensures commit/rollback happens properly, which is crucial for PgBouncer transaction pooling.
-    """
-    async with get_session_maker()() as session:  # type: AsyncSession
+    @asynccontextmanager
+    async def get_session(self) -> AsyncIterator[AsyncSession]:
+        """Provides a transactional scope around a series of operations."""
+        session = self.SessionLocal()
         try:
             yield session
             await session.commit()
@@ -68,17 +54,67 @@ async def lifespan_session():
             await session.rollback()
             raise
         finally:
-            # Ensure session is closed (connection returned to pool)
             await session.close()
 
-async def get_db_session():
-    async with lifespan_session() as session:
+    async def dispose(self):
+        """Dispose the engine and close all connections."""
+        if self.engine:
+            await self.engine.dispose()
+
+db_manager = Database()
+
+# FastAPI Dependency for injecting a session
+async def get_db_session() -> AsyncIterator[AsyncSession]:
+    """Dependency that provides a session and handles cleanup."""
+    async with db_manager.get_session() as session:
         yield session
 
 
-async def dispose_engine():
-    """Dispose async engine if it was created (used e.g. on FastAPI shutdown)."""
-    global _ENGINE
-    if _ENGINE is not None:
-        await _ENGINE.dispose()
-        _ENGINE = None
+# --- Additional helpers for app lifespan and worker processes ---
+
+def lifespan_session():
+    """Alias returning the process-local async session context manager."""
+    return db_manager.get_session()
+
+def create_engine(db_url: str | None = None) -> AsyncEngine:
+    """Create a new AsyncEngine using the provided URL (defaults to settings.DATABASE_URL)."""
+    target_url = Database._format_database_url(db_url or settings.DATABASE_URL)
+    connect_args = {"statement_cache_size": 0, "prepared_statement_cache_size": 0}
+
+    engine_kwargs = {
+        "pool_pre_ping": True,
+        "connect_args": connect_args,
+    }
+    if Database._needs_null_pool(target_url):
+        engine_kwargs["poolclass"] = NullPool
+
+    return create_async_engine(target_url, **engine_kwargs)
+
+
+def set_engine(engine: AsyncEngine) -> None:
+    """Install a process-local engine and session maker for web requests."""
+    db_manager.engine = engine
+    db_manager.SessionLocal = async_sessionmaker(
+        engine,
+        autocommit=False,
+        autoflush=False,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+
+async def dispose_engine() -> None:
+    """Dispose the currently installed engine."""
+    await db_manager.dispose()
+
+
+def get_session_maker(engine: Optional[AsyncEngine] = None) -> async_sessionmaker[AsyncSession]:
+    """Return an async sessionmaker bound to the provided engine, or the global one if omitted."""
+    target = engine or db_manager.engine
+    return async_sessionmaker(
+        target,
+        autocommit=False,
+        autoflush=False,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )

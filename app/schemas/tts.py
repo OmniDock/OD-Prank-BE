@@ -18,6 +18,10 @@ class ScenarioTTSRequest(BaseModel):
     voice_id: Optional[str] = None
     model: Optional[ElevenLabsModelEnum] = ElevenLabsModelEnum.ELEVEN_TTV_V3
 
+class RetryMissingTTSRequest(BaseModel):
+    scenario_id: int
+    voice_id: Optional[str] = None
+
 class RegenerateTTSRequest(BaseModel):
     voice_line_id: int
     voice_id: Optional[str] = None

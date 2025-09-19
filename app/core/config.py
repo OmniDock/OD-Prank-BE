@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = Field(default="postgresql://postgres:password@localhost:5432/your_db")
     MIGRATION_DATABASE_URL: str = Field(default="postgresql://postgres:password@localhost:5432/your_db")
+    DATABASE_POOLER_URL: str | None = Field(default=None)
+    DATABASE_TRANSACTION_URL: str | None = Field(default=None)
+    CELERY_DATABASE_URL: str | None = Field(default=None)
     SQLALCHEMY_DISABLE_POOL: bool = Field(default=False)
     
     # LangChain & AI
@@ -86,6 +89,11 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         """Parse CORS origins from comma-separated string."""
         return [origin.strip() for origin in self.BACKEND_CORS_ORIGINS.split(",")]
+
+    @property
+    def celery_db_url(self) -> str:
+        """Return Celery database URL with sensible fallbacks."""
+        return self.CELERY_DATABASE_URL or self.DATABASE_TRANSACTION_URL or self.MIGRATION_DATABASE_URL or self.DATABASE_URL
     
     model_config = ConfigDict(
         env_file=".env.local",

@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends, Body
 from app.core.logging import console_logger
 from app.core.config import settings
 from app.core.auth import get_current_user, AuthUser
-from app.core.database import get_db_session
+from app.core.database import lifespan_session
 from app.services.profile_service import ProfileService
 from app.models.user_profile import UserProfile
 from sqlalchemy import select, text
@@ -133,26 +133,25 @@ async def stripe_webhook(request: Request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
-        async for db_session in get_db_session():
+        async with lifespan_session() as db_session:
             payment_service = PaymentService(db_session)
+            event_type = event['type']
+            data = event['data']
+            data_object = data['object']
+
+            #First time purchase
+            if event_type == 'checkout.session.completed':
+                await payment_service.handle_purchase(session=data_object, mode=data_object['mode'])
+            #Subscription payment
+            elif event_type == 'invoice.paid':
+                await payment_service.handle_subscription_payment(data_object=data_object)
+            #Subscription deleted
+            elif event_type == 'customer.subscription.deleted':
+                await payment_service.handle_subscription_deleted(data_object=data_object)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
-    
-    event_type = event['type']
-    data = event['data']
-    data_object = data['object']
-    
-    #First time purchase
-    if event_type == 'checkout.session.completed':
-        await payment_service.handle_purchase(session=data_object, mode=data_object['mode'])
-    #Subscription payment
-    elif event_type == 'invoice.paid':
-        await payment_service.handle_subscription_payment(data_object=data_object)
-    #Subscription deleted
-    elif event_type == 'customer.subscription.deleted':
-        await payment_service.handle_subscription_deleted(data_object=data_object)
 
 
     

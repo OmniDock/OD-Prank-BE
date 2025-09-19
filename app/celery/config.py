@@ -25,5 +25,3 @@ def _create_celery() -> Celery:
 
 
 celery_app = _create_celery()
-
-

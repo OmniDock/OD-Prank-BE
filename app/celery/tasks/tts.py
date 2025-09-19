@@ -15,7 +15,7 @@ from supabase import Client, create_client
 from app.celery.config import celery_app
 from app.core.config import settings
 from app.core.logging import console_logger
-from app.core.database import get_session_maker
+from app.core.database import get_db_session
 from app.core.utils.enums import ElevenLabsModelEnum, VoiceLineAudioStatusEnum
 from app.core.utils.audio import pcm16_to_wav_with_tempo
 from app.core.utils.tts_common import (
@@ -25,6 +25,7 @@ from app.core.utils.tts_common import (
     private_voice_line_storage_path,
 )
 from app.models.voice_line_audio import VoiceLineAudio
+from app.services.audio_progress_service import AudioProgressService
 from sqlalchemy import select
 
 
@@ -114,6 +115,10 @@ async def _mark_asset(db_session, voice_line_id: int, content_hash: str, status:
         pending.status = status
         pending.storage_path = storage_path if storage_path else pending.storage_path
         pending.error = error
+        if status == VoiceLineAudioStatusEnum.FAILED:
+            pending.retry_attempts = (pending.retry_attempts or 0) + 1
+        elif status == VoiceLineAudioStatusEnum.READY:
+            pending.retry_attempts = 0
         if voice_id:
             pending.voice_id = voice_id
         if model:
@@ -153,64 +158,65 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
         user_id: str = payload["user_id"]
         voice_line_id: int = int(payload["voice_line_id"])
         content_hash: str = payload["content_hash"]
+        scenario_id = payload.get("scenario_id")
         voice_settings = payload.get("voice_settings") or {}
+        
+        console_logger.info(
+            f"[Celery] TTS start vl={voice_line_id} voice_id={voice_id} model={model}"
+        )
+        stage_start = time.perf_counter()
+        console_logger.info(f"[Celery][vl={voice_line_id}] Stage=generate_tts_bytes start")
+        try:
+            pcm = await _generate_tts_bytes(text, voice_id, model, voice_settings)
+        except Exception:
+            console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=generate_tts_bytes failed")
+            raise
+        console_logger.info(
+            f"[Celery][vl={voice_line_id}] Stage=generate_tts_bytes done took={time.perf_counter() - stage_start:.2f}s"
+        )
 
-        async with get_session_maker()() as db_session:
-            console_logger.info(
-                f"[Celery] TTS start vl={voice_line_id} voice_id={voice_id} model={model}"
-            )
-            stage_start = time.perf_counter()
-            console_logger.info(f"[Celery][vl={voice_line_id}] Stage=generate_tts_bytes start")
-            try:
-                pcm = await _generate_tts_bytes(text, voice_id, model, voice_settings)
-            except Exception:
-                console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=generate_tts_bytes failed")
-                raise
-            console_logger.info(
-                f"[Celery][vl={voice_line_id}] Stage=generate_tts_bytes done took={time.perf_counter() - stage_start:.2f}s"
-            )
+        stage_start = time.perf_counter()
+        console_logger.info(f"[Celery][vl={voice_line_id}] Stage=pcm_to_wav start")
+        try:
+            wav_bytes = _pcm16_to_wav(pcm)
+        except Exception:
+            console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=pcm_to_wav failed")
+            raise
+        console_logger.info(
+            f"[Celery][vl={voice_line_id}] Stage=pcm_to_wav done took={time.perf_counter() - stage_start:.2f}s"
+        )
 
-            stage_start = time.perf_counter()
-            console_logger.info(f"[Celery][vl={voice_line_id}] Stage=pcm_to_wav start")
-            try:
-                wav_bytes = _pcm16_to_wav(pcm)
-            except Exception:
-                console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=pcm_to_wav failed")
-                raise
-            console_logger.info(
-                f"[Celery][vl={voice_line_id}] Stage=pcm_to_wav done took={time.perf_counter() - stage_start:.2f}s"
-            )
+        stage_start = time.perf_counter()
+        console_logger.info(f"[Celery][vl={voice_line_id}] Stage=calculate_duration start")
+        try:
+            import wave
+            import contextlib
+            import io
+            with contextlib.closing(wave.open(io.BytesIO(wav_bytes), 'rb')) as wf:
+                frames = wf.getnframes()
+                rate = wf.getframerate()
+                duration_ms = int((frames / float(rate)) * 1000)
+        except Exception:
+            console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=calculate_duration failed")
+            raise
+        console_logger.info(
+            f"[Celery][vl={voice_line_id}] Stage=calculate_duration done took={time.perf_counter() - stage_start:.2f}s"
+        )
 
-            stage_start = time.perf_counter()
-            console_logger.info(f"[Celery][vl={voice_line_id}] Stage=calculate_duration start")
-            try:
-                import wave
-                import contextlib
-                import io
-                with contextlib.closing(wave.open(io.BytesIO(wav_bytes), 'rb')) as wf:
-                    frames = wf.getnframes()
-                    rate = wf.getframerate()
-                    duration_ms = int((frames / float(rate)) * 1000)
-            except Exception:
-                console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=calculate_duration failed")
-                raise
-            console_logger.info(
-                f"[Celery][vl={voice_line_id}] Stage=calculate_duration done took={time.perf_counter() - stage_start:.2f}s"
-            )
+        storage_path = _private_storage_path(user_id, voice_line_id)
+        stage_start = time.perf_counter()
+        console_logger.info(f"[Celery][vl={voice_line_id}] Stage=upload_supabase start path={storage_path}")
+        try:
+            await _upload_wav_to_supabase(wav_bytes, storage_path)
+        except Exception:
+            console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=upload_supabase failed")
+            raise
+        console_logger.info(
+            f"[Celery][vl={voice_line_id}] Stage=upload_supabase done took={time.perf_counter() - stage_start:.2f}s"
+        )
 
-            storage_path = _private_storage_path(user_id, voice_line_id)
-            stage_start = time.perf_counter()
-            console_logger.info(f"[Celery][vl={voice_line_id}] Stage=upload_supabase start path={storage_path}")
-            try:
-                await _upload_wav_to_supabase(wav_bytes, storage_path)
-            except Exception:
-                console_logger.exception(f"[Celery][vl={voice_line_id}] Stage=upload_supabase failed")
-                raise
-            console_logger.info(
-                f"[Celery][vl={voice_line_id}] Stage=upload_supabase done took={time.perf_counter() - stage_start:.2f}s"
-            )
-
-            stage_start = time.perf_counter()
+        stage_start = time.perf_counter()
+        async for db_session in get_db_session():
             await _mark_asset(
                 db_session,
                 voice_line_id=voice_line_id,
@@ -223,10 +229,18 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
                 text=text,
                 duration_ms=duration_ms,
             )
-            console_logger.info(
-                f"[Celery][vl={voice_line_id}] Stage=mark_ready done took={time.perf_counter() - stage_start:.2f}s"
+            break
+        if scenario_id:
+            await AudioProgressService.update_status(
+                scenario_id,
+                voice_id,
+                voice_line_id,
+                VoiceLineAudioStatusEnum.READY,
             )
-            console_logger.info(f"[Celery] TTS ready vl={voice_line_id}")
+        console_logger.info(
+            f"[Celery][vl={voice_line_id}] Stage=mark_ready done took={time.perf_counter() - stage_start:.2f}s"
+        )
+        console_logger.info(f"[Celery] TTS ready vl={voice_line_id}")
 
     try:
         _run_in_loop(_run_once())
@@ -239,13 +253,24 @@ def generate_voice_line_task(self, payload: Dict[str, Any]) -> None:
             raise self.retry(exc=e, countdown=countdown, max_retries=max_retries)
 
         async def _mark_failed() -> None:
-            async with get_session_maker()() as db_session:
+            async for db_session in get_db_session():
                 await _mark_asset(
                     db_session,
                     voice_line_id=int(payload.get("voice_line_id", 0)),
                     content_hash=str(payload.get("content_hash", "")),
                     status=VoiceLineAudioStatusEnum.FAILED,
                     error=str(e),
+                )
+                break
+            scenario_id = payload.get("scenario_id")
+            voice_id = payload.get("voice_id")
+            voice_line_id = int(payload.get("voice_line_id", 0))
+            if scenario_id and voice_id and voice_line_id:
+                await AudioProgressService.update_status(
+                    scenario_id,
+                    voice_id,
+                    voice_line_id,
+                    VoiceLineAudioStatusEnum.FAILED,
                 )
 
         _run_in_loop(_mark_failed())

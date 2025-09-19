@@ -25,6 +25,9 @@ class VoiceLineAudio(Base, TimestampMixin):
     settings_hash: Mapped[str] = mapped_column(String(64), nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=True, index=True)
 
+    # Retry tracking
+    retry_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     # Generation status
     status: Mapped[VoiceLineAudioStatusEnum] = mapped_column(Enum(VoiceLineAudioStatusEnum), nullable=False, default=VoiceLineAudioStatusEnum.PENDING)
     error: Mapped[str] = mapped_column(Text, nullable=True)
@@ -34,6 +37,5 @@ class VoiceLineAudio(Base, TimestampMixin):
 
     def __repr__(self):
         return f"<VoiceLineAudio(id={self.id}, voice_line_id={self.voice_line_id}, status='{self.status}')>"
-
 
 

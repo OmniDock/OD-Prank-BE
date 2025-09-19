@@ -8,7 +8,17 @@ from app.repositories.voice_line_repository import VoiceLineRepository
 from app.core.utils.enums import VoiceLineAudioStatusEnum, ElevenLabsModelEnum
 from app.core.config import settings
 from app.core.utils.voices_catalog import get_voices_catalog, PREVIEW_VERSION
-from app.schemas.tts import SingleTTSRequest, RegenerateTTSRequest, TTSResult, VoiceListResponse, ScenarioTTSRequest, TTSResponse, PublicTTSTestRequest, PublicTTSTestResponse
+from app.schemas.tts import (
+    SingleTTSRequest,
+    RegenerateTTSRequest,
+    TTSResult,
+    VoiceListResponse,
+    ScenarioTTSRequest,
+    RetryMissingTTSRequest,
+    TTSResponse,
+    PublicTTSTestRequest,
+    PublicTTSTestResponse,
+)
 from sqlalchemy import select
 from app.models.voice_line_audio import VoiceLineAudio
 from app.core.logging import console_logger
@@ -211,6 +221,46 @@ async def generate_scenario_voice_lines(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scenario TTS generation failed: {str(e)}")
+
+
+@router.post("/retry-missing", response_model=TTSResponse)
+async def retry_missing_voice_lines(
+    request: RetryMissingTTSRequest,
+    user: AuthUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    """Retry generation for scenario voice lines that failed or got stuck."""
+    try:
+        svc = VoiceLineService(db_session)
+        results, payloads = await svc.retry_missing_audios(user, request.scenario_id, request.voice_id)
+
+        for payload in payloads:
+            model_value = payload["model"].value if isinstance(payload.get("model"), ElevenLabsModelEnum) else payload.get("model")
+            job_payload = {**payload, "model": model_value}
+            generate_voice_line_task.delay(job_payload)
+
+        successful_count = sum(1 for r in results if r.get("success"))
+        failed_count = len(results) - successful_count
+        return TTSResponse(
+            success=successful_count > 0 and failed_count == 0,
+            total_processed=len(results),
+            successful_count=successful_count,
+            failed_count=failed_count,
+            results=[
+                TTSResult(
+                    voice_line_id=r["voice_line_id"],
+                    success=r.get("success", False),
+                    signed_url=r.get("signed_url"),
+                    storage_path=r.get("storage_path"),
+                    error_message=r.get("error_message"),
+                )
+                for r in results
+            ],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Retry attempts failed: {str(e)}")
 
 @router.post("/regenerate", response_model=TTSResult)
 async def regenerate_voice_line_audio(

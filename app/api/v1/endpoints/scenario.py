@@ -217,8 +217,14 @@ class AudioGenerationStatusResponse(BaseModel):
     total_voice_lines: int
     generated_count: int
     pending_count: int
+    failed_count: int
+    stale_pending_count: int
     is_complete: bool
-    can_activate: bool  
+    can_activate: bool
+    updated_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    voice_id: Optional[str] = None
+    line_statuses: Dict[int, str] = Field(default_factory=dict)
 
     
 @router.patch("/{scenario_id}/active", response_model=ScenarioResponse)
@@ -242,13 +248,14 @@ async def set_scenario_active(
 @router.get("/{scenario_id}/audio-status", response_model=AudioGenerationStatusResponse)
 async def get_audio_generation_status(
     scenario_id: int,
+    voice_id: Optional[str] = Query(None),
     user: AuthUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
 ):
     """Get audio generation status for all voice lines in a scenario"""
     try:
         service = ScenarioService(db_session)
-        status = await service.get_audio_generation_status(user, scenario_id)
+        status = await service.get_audio_generation_status(user, scenario_id, voice_id=voice_id)
         return status
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -274,4 +281,3 @@ async def delete_scenario(
     except Exception as e:
         console_logger.error(f"Error deleting scenario {scenario_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete scenario: {str(e)}")
-
