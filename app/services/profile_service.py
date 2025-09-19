@@ -2,11 +2,18 @@ import stripe
 from app.core.database import AsyncSession
 from app.models.user_profile import UserProfile
 from app.core.auth import AuthUser
-from sqlalchemy import select
 from app.repositories.profile_repository import ProfileRepository
 from app.schemas.profile import CreditResponse
 from app.core.utils.product_catalog import PRODUCT_CATALOG, get_product_name_by_product_id, get_product_name_by_price_id
 from app.core.logging import console_logger
+from uuid import UUID
+
+
+class InsufficientCreditsError(Exception):
+    """Raised when a credit deduction would result in a negative balance."""
+
+    def __init__(self, message: str = "Insufficient credits available") -> None:
+        super().__init__(message)
 
 class ProfileService:
     def __init__(self, db: AsyncSession):
@@ -20,36 +27,64 @@ class ProfileService:
             return profile
         except Exception as e:
             raise Exception(f"Failed to get profile: {str(e)}")
-    
+
+    async def ensure_call_credit_available(self, user: AuthUser) -> None:
+        profile = await self.profile_repo.get_or_create_user_profile(user)
+        if profile.call_credits <= 0:
+            raise InsufficientCreditsError("Nicht genügend Call-Credits verfügbar.")
+
     async def update_credits(self, user: AuthUser, prank_credit_amount: int, call_credit_amount: int) -> UserProfile:
         try:
             profile = await self.profile_repo.get_or_create_user_profile(user)
-            profile.prank_credits += prank_credit_amount
-            profile.call_credits += call_credit_amount
-            await self.db.commit()
-            await self.db.refresh(profile)
-            return profile
+            return await self._apply_credit_delta(profile.user_id, prank_credit_amount, call_credit_amount)
+        except InsufficientCreditsError:
+            raise
         except Exception as e:
             await self.db.rollback()
             raise Exception(f"Failed to update credits: {str(e)}")
-    
+
     async def update_user_credits_by_id(self, user_id: str, prank_credit_amount: int, call_credit_amount: int) -> UserProfile:
         try:
             profile = await self.profile_repo.get_or_create_user_profile_by_id(user_id)
-            profile.prank_credits += prank_credit_amount
-            profile.call_credits += call_credit_amount
-            await self.db.commit()
-            await self.db.refresh(profile)
-            return profile
+            return await self._apply_credit_delta(profile.user_id, prank_credit_amount, call_credit_amount)
+        except InsufficientCreditsError:
+            raise
         except Exception as e:
             await self.db.rollback()
             raise Exception(f"Failed to update credits: {str(e)}")
+
+    async def _apply_credit_delta(self, user_id: UUID | str, prank_credit_amount: int, call_credit_amount: int) -> UserProfile:
+        profile = await self.profile_repo.lock_user_profile_by_id(user_id)
+        if not profile:
+            raise Exception(f"User profile {user_id} not found")
+
+        new_prank_total = profile.prank_credits + prank_credit_amount
+        new_call_total = profile.call_credits + call_credit_amount
+
+        if new_prank_total < 0 or new_call_total < 0:
+            await self.db.rollback()
+            raise InsufficientCreditsError()
+
+        profile.prank_credits = new_prank_total
+        profile.call_credits = new_call_total
+
+        await self.db.commit()
+        await self.db.refresh(profile)
+        return profile
         
     async def get_credits(self, user: AuthUser) -> CreditResponse:
         try:
             profile = await self.profile_repo.get_or_create_user_profile(user)
-            prank_credits = profile.prank_credits 
+            prank_credits = profile.prank_credits
             call_credits = profile.call_credits
+
+            if prank_credits < 0 or call_credits < 0:
+                user_identifier = getattr(user, "id_str", getattr(user, "id", "unknown"))
+                console_logger.warning(
+                    f"Detected negative credits for user {user_identifier}: prank={prank_credits}, call={call_credits}. Clamping to zero."
+                )
+                prank_credits = max(prank_credits, 0)
+                call_credits = max(call_credits, 0)
             return CreditResponse(prank_credit_amount=prank_credits, call_credit_amount=call_credits)
         except Exception as e:
             raise Exception(f"Failed to get credits: {str(e)}")

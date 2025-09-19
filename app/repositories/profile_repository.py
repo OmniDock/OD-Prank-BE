@@ -3,6 +3,7 @@ from app.models.user_profile import UserProfile
 from app.core.auth import AuthUser
 from sqlalchemy import select
 from sqlalchemy import text
+from uuid import UUID
 
 class ProfileRepository:
     def __init__(self, db: AsyncSession):
@@ -23,6 +24,23 @@ class ProfileRepository:
         except Exception as e:
             await self.db.rollback()
             raise Exception(f"Failed to get or create user profile: {str(e)}")
+
+    async def lock_user_profile_by_id(self, user_id: str | UUID) -> UserProfile:
+        try:
+            lookup_id = user_id
+            if isinstance(user_id, str):
+                try:
+                    lookup_id = UUID(user_id)
+                except ValueError:
+                    lookup_id = user_id
+            result = await self.db.execute(
+                select(UserProfile).where(UserProfile.user_id == lookup_id).with_for_update()
+            )
+            profile = result.scalar_one_or_none()
+            return profile
+        except Exception as e:
+            await self.db.rollback()
+            raise Exception(f"Failed to lock user profile: {str(e)}")
     
     async def get_or_create_user_profile_by_email(self, email: str) -> UserProfile:
         try:

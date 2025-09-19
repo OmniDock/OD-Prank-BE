@@ -10,7 +10,7 @@ from app.core.auth import AuthUser
 from app.repositories.profile_repository import ProfileRepository
 from app.repositories.scenario_repository import ScenarioRepository
 from app.repositories.voice_line_repository import VoiceLineRepository
-from app.services.profile_service import ProfileService
+from app.services.profile_service import ProfileService, InsufficientCreditsError
 from app.core.database import AsyncSession
 from app.core.logging import console_logger
 from app.services.tts_service import TTSService
@@ -50,8 +50,28 @@ class ScenarioService:
         result:Dict[str, Any] = await processor.process(state)
 
         state = ScenarioState(**result)
-        created = await self.create_scenario_from_state(user, state)
-        await self.profile_service.update_credits(user, -1, 0)
+
+        try:
+            await self.profile_service.update_credits(user, -1, 0)
+        except InsufficientCreditsError:
+            user_identifier = getattr(user, "id_str", getattr(user, "id", "unknown"))
+            console_logger.info(
+                f"User {user_identifier} attempted to create a scenario without sufficient prank credits"
+            )
+            return {
+                "status": "error",
+                "error": "Nicht genügend Prank-Credits für diese Aktion."
+            }
+
+        try:
+            created = await self.create_scenario_from_state(user, state)
+        except Exception as creation_error:
+            console_logger.error(f"Scenario creation failed after credit deduction, refunding credit: {creation_error}")
+            try:
+                await self.profile_service.update_credits(user, 1, 0)
+            except Exception as refund_error:
+                console_logger.error(f"Failed to refund prank credit after scenario creation error: {refund_error}")
+            raise
         
         return {
             "status": "complete",

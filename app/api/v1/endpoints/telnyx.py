@@ -6,6 +6,7 @@ from app.core.auth import get_current_user, AuthUser
 from app.core.database import AsyncSession, get_db_session
 from app.core.logging import console_logger
 from app.services.telnyx.handler import telnyx_handler
+from app.services.profile_service import ProfileService, InsufficientCreditsError
 from app.services.cache_service import CacheService
 
 
@@ -29,6 +30,8 @@ async def start_call(
     db: AsyncSession = Depends(get_db_session),
 ):
     try:
+        profile_service = ProfileService(db=db)
+        await profile_service.ensure_call_credit_available(user)
 
         # Also mint WebRTC token immediately so frontend can join
         token = await telnyx_handler.get_webrtc_token(user.id)
@@ -48,6 +51,8 @@ async def start_call(
             webrtc_token=token,
         )
     
+    except InsufficientCreditsError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
