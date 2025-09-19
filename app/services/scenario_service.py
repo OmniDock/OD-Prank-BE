@@ -17,8 +17,10 @@ from app.services.tts_service import TTSService
 from app.services.audio_progress_service import AudioProgressService
 from app.models.scenario import Scenario
 from app.models.voice_line import VoiceLine
-from app.core.utils.enums import VoiceLineTypeEnum
+from app.core.utils.enums import VoiceLineTypeEnum, ElevenLabsModelEnum
 from app.services.cache_service import CacheService
+from app.services.voice_line_service import VoiceLineService
+from app.celery.tasks.tts import generate_voice_line_task
 
 class ScenarioService: 
     """Service for managing scenarios with LangChain processing"""
@@ -320,7 +322,9 @@ class ScenarioService:
         
         if not scenario:
             raise ValueError(f"Scenario {scenario_id} not found")
-        return await self._to_scenario_response(scenario, include_audio=True)
+        response = await self._to_scenario_response(scenario, include_audio=True)
+        await self._trigger_audio_recovery_if_needed(user, scenario, response)
+        return response
     
 
     async def get_user_scenarios(self, user: AuthUser, limit: int = 50, offset: int = 0, only_active: bool = True) -> List[ScenarioResponse]:
@@ -526,6 +530,82 @@ class ScenarioService:
             "voice_id": lookup_voice_id,
             "line_statuses": line_statuses if voice_line_ids else {},
         }
+
+    async def _trigger_audio_recovery_if_needed(
+        self,
+        user: AuthUser,
+        scenario: Scenario,
+        scenario_response: ScenarioResponse,
+    ) -> None:
+        """Kick off TTS recovery when a preferred voice is set but audio is missing."""
+        preferred_voice = scenario_response.preferred_voice_id
+        if not preferred_voice or not scenario_response.voice_lines:
+            return
+
+        missing_voice_line_ids = [
+            vl.id for vl in scenario_response.voice_lines if vl.preferred_audio is None
+        ]
+        if not missing_voice_line_ids:
+            return
+
+        try:
+            status = await self.get_audio_generation_status(user, scenario.id, preferred_voice)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            console_logger.warning(
+                f"Audio status check failed for scenario {scenario.id}: {exc}"
+            )
+            return
+
+        total = int(status.get("total_voice_lines", 0) or 0)
+        generated = int(status.get("generated_count", 0) or 0)
+        pending = int(status.get("pending_count", 0) or 0)
+        failed = int(status.get("failed_count", 0) or 0)
+        stale_pending = int(status.get("stale_pending_count", 0) or 0)
+
+        if total <= 0:
+            return
+
+        needs_recovery = False
+        if generated < total:
+            if failed > 0 or stale_pending > 0:
+                needs_recovery = True
+            elif pending == 0:
+                needs_recovery = True
+
+        if not needs_recovery:
+            return
+
+        try:
+            voice_line_service = VoiceLineService(self.db_session)
+            results, payloads = await voice_line_service.retry_missing_audios(
+                user,
+                scenario.id,
+                preferred_voice,
+            )
+            if not payloads:
+                return
+
+            for payload in payloads:
+                model_value = payload.get("model")
+                if isinstance(model_value, ElevenLabsModelEnum):
+                    model_value = model_value.value
+                job_payload = {
+                    **payload,
+                    "model": model_value,
+                }
+                generate_voice_line_task.delay(job_payload)
+
+            ready = sum(1 for r in results if r.get("success"))
+            console_logger.info(
+                "Triggered TTS recovery for scenario %s (%s ready, %s payloads)",
+                scenario.id,
+                ready,
+                len(payloads),
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            console_logger.warning(
+                f"Failed to trigger TTS recovery for scenario {scenario.id}: {exc}"
+            )
     
     async def get_public_scenarios(self) -> List[Scenario]:
         """Get public scenarios"""
