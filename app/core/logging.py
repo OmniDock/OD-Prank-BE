@@ -34,15 +34,15 @@ structlog.configure(
 console_logger: structlog.BoundLogger = structlog.get_logger("console")
 
 # Silencing other loggers
-# logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-# logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
-# logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-# logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
-# logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
-# logging.getLogger("sqlalchemy.orm").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.orm").setLevel(logging.WARNING)
 
-# logging.getLogger("httpx").setLevel(logging.WARNING)
-# logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-# logging.getLogger("postgrest").setLevel(logging.WARNING)    
-# logging.getLogger("supabase").setLevel(logging.WARNING)
+logging.getLogger("postgrest").setLevel(logging.WARNING)    
+logging.getLogger("supabase").setLevel(logging.WARNING)
